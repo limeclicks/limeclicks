@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Sign in{% endblock %}
+
+{% block content %}
+<div class="max-w-md mx-auto mt-8">
+    <div class="card bg-base-100 shadow-xl">
+        <div class="card-body">
+            <h1 class="card-title text-2xl mb-2">Welcome back</h1>
+            <p class="opacity-70 mb-4">Please sign in to your account</p>
+
+            {% if form.non_field_errors %}
+            <div class="alert alert-error mb-4">
+                <span>{{ form.non_field_errors.0 }}</span>
+            </div>
+            {% endif %}
+
+            <form method="post" novalidate>
+                {% csrf_token %}
+
+                <div class="form-control mb-4">
+                    <label class="label pb-1">
+                        <span class="label-text">Email Address</span>
+                    </label>
+                    <input 
+                        type="email" 
+                        name="{{ form.username.html_name }}"
+                        value="{{ form.username.value|default_if_none:'' }}" 
+                        class="input input-bordered w-full{% if form.username.errors %} input-error{% endif %}"
+                        placeholder="Enter your email address"
+                        required 
+                        autofocus 
+                        autocomplete="email"
+                    />
+                    {% if form.username.errors %}
+                    <div class="text-error text-xs mt-1">
+                        Please enter a valid email address
+                    </div>
+                    {% endif %}
+                </div>
+
+                <div class="form-control mb-4">
+                    <label class="label pb-1">
+                        <span class="label-text">Password</span>
+                    </label>
+                    <input 
+                        type="password" 
+                        name="{{ form.password.html_name }}" 
+                        class="input input-bordered w-full{% if form.password.errors %} input-error{% endif %}"
+                        placeholder="Enter your password"
+                        required 
+                    />
+                    {% if form.password.errors %}
+                    <div class="text-error text-xs mt-1">
+                        Please enter your password
+                    </div>
+                    {% endif %}
+                </div>
+
+                {# "next" support so Django redirects back after login #}
+                {% if next %}
+                <input type="hidden" name="next" value="{{ next }}">
+                {% endif %}
+
+                <button class="btn btn-primary w-full" type="submit">Sign in</button>
+            </form>
+
+            <div class="mt-4 text-center">
+                <a class="link link-primary text-sm" href="{% url 'accounts:password_reset' %}">
+                    Forgot your password?
+                </a>
+            </div>
+
+            <div class="divider">or</div>
+            
+            <p class="text-sm opacity-70">
+                New to LimeClicks?
+                <a class="link link-primary" href="{% url 'accounts:register' %}">
+                    Create an account
+                </a>
+            </p>
+        </div>
+    </div>
+</div>
+{% endblock %}

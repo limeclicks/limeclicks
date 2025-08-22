@@ -1,0 +1,37 @@
+{% load static %}
+<!doctype html>
+<html lang="en" data-theme="light">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>{% block title %}LimeClicks{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'dist/tailwind.css' %}">
+    <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+</head>
+
+<body {% if not is_admin %} hx-boost="true" hx-push-url="true" hx-target="#content" hx-select="#content"
+    hx-swap="innerHTML transition:true" {% endif %} class="bg-base-200 min-h-screen">
+    {% include "includes/messages.html" %}
+    <header class="navbar bg-base-100 shadow-sm border-b border-base-300">
+        <div class="flex-1 px-4">
+            <a href="/" class="text-xl font-bold text-primary">LimeClicks</a>
+        </div>
+        <nav class="flex items-center gap-3 px-4">
+            <a class="btn btn-ghost btn-sm" href="{% url 'accounts:login' %}">Sign in</a>
+            <a class="btn btn-primary btn-sm" href="{% url 'accounts:register' %}">Get started</a>
+        </nav>
+    </header>
+
+    <main id="content" class="container mx-auto p-6">
+        {% block content %}{% endblock %}
+    </main>
+
+    <script>
+        // CSRF for HTMX
+        function getCookie(name) { const m = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)'); return m ? m.pop() : '' }
+        document.body.addEventListener('htmx:configRequest', (e) => { e.detail.headers['X-CSRFToken'] = getCookie('csrftoken') });
+    </script>
+</body>
+
+</html>
