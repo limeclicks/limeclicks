@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     "django_htmx", 
     "crispy_forms", 
     "crispy_tailwind",
+    "django_recaptcha",
     "accounts"
 ]
 
@@ -161,4 +162,12 @@ MESSAGE_TAGS = {
     messages.ERROR: "alert error",
 }
 
-EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+EMAIL_BACKEND = "accounts.email_backend.BrevoEmailBackend"
+
+# Brevo email configuration
+DEFAULT_FROM_EMAIL = "noreply@limeclicks.com"
+
+# reCAPTCHA settings
+RECAPTCHA_PUBLIC_KEY = os.getenv("GOOGLE_RECAPTCHA_SITE_KEY", "your_site_key_here")
+RECAPTCHA_PRIVATE_KEY = os.getenv("GOOGLE_RECAPTCHA_SECRET_KEY", "your_secret_key_here")
+RECAPTCHA_REQUIRED_SCORE = 0.85

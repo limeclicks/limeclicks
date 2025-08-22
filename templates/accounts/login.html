@@ -25,7 +25,7 @@
                     </label>
                     <input 
                         type="email" 
-                        name="{{ form.username.html_name }}"
+                        name="username"
                         value="{{ form.username.value|default_if_none:'' }}" 
                         class="input input-bordered w-full{% if form.username.errors %} input-error{% endif %}"
                         placeholder="Enter your email address"
@@ -46,7 +46,7 @@
                     </label>
                     <input 
                         type="password" 
-                        name="{{ form.password.html_name }}" 
+                        name="password" 
                         class="input input-bordered w-full{% if form.password.errors %} input-error{% endif %}"
                         placeholder="Enter your password"
                         required 
@@ -54,6 +54,18 @@
                     {% if form.password.errors %}
                     <div class="text-error text-xs mt-1">
                         Please enter your password
+                    </div>
+                    {% endif %}
+                </div>
+
+                <div class="form-control mb-4">
+                    <label class="label pb-1">
+                        <span class="label-text">Verification</span>
+                    </label>
+                    {{ form.captcha }}
+                    {% if form.captcha.errors %}
+                    <div class="text-error text-xs mt-1">
+                        Please complete the reCAPTCHA verification
                     </div>
                     {% endif %}
                 </div>

@@ -101,6 +101,18 @@
                     {% endif %}
                 </div>
 
+                <div class="form-control mb-4">
+                    <label class="label pb-1">
+                        <span class="label-text">Verification</span>
+                    </label>
+                    {{ form.captcha }}
+                    {% if form.captcha.errors %}
+                    <div class="text-error text-xs mt-1">
+                        Please complete the reCAPTCHA verification
+                    </div>
+                    {% endif %}
+                </div>
+
                 <button class="btn btn-primary w-full" type="submit">Create account</button>
             </form>
 

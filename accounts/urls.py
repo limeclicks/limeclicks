@@ -8,14 +8,7 @@ urlpatterns = [
     path("register/", views.register_view, name="register"),
 
     # Login / Logout
-    path(
-        "login/",
-        auth_views.LoginView.as_view(
-            template_name="accounts/login.html",
-            redirect_authenticated_user=True,
-        ),
-        name="login",
-    ),
+    path("login/", views.login_view, name="login"),
     path(
         "logout/",
         auth_views.LogoutView.as_view(),
@@ -23,13 +16,7 @@ urlpatterns = [
     ),
 
     # Forgot password (optional but handy for your next steps)
-    path(
-        "password-reset/",
-        auth_views.PasswordResetView.as_view(
-            template_name="accounts/password_reset.html"
-        ),
-        name="password_reset",
-    ),
+    path("password-reset/", views.password_reset_view, name="password_reset"),
     path(
         "password-reset/done/",
         auth_views.PasswordResetDoneView.as_view(
