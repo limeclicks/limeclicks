@@ -1,173 +1,164 @@
-{% extends "base.html" %}
+{% extends "dashboard_base.html" %}
 {% block title %}Dashboard - LimeClicks{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
 
 {% block content %}
-<div class="min-h-screen bg-base-200">
-    <!-- Header -->
-    <div class="navbar bg-base-100 shadow-sm">
-        <div class="flex-1">
-            <a href="{% url 'accounts:dashboard' %}" class="btn btn-ghost text-xl">
-                LimeClicks Dashboard
-            </a>
-        </div>
-        <div class="flex-none gap-2">
-            <div class="dropdown dropdown-end">
-                <div tabindex="0" role="button" class="btn btn-ghost btn-circle avatar placeholder">
-                    <div class="bg-neutral text-neutral-content rounded-full w-10">
-                        <span class="text-xs">{{ user.first_name|first|default:user.username|first|upper }}</span>
-                    </div>
+<!-- Welcome Section -->
+<div class="hero bg-gradient-to-r from-primary/10 to-secondary/10 rounded-xl mb-8">
+    <div class="hero-content text-center py-12">
+        <div class="max-w-md">
+            <div class="flex justify-center mb-4">
+                <div class="w-20 h-20 bg-primary/20 rounded-full flex items-center justify-center">
+                    <i class="fas fa-bolt text-3xl text-primary"></i>
                 </div>
-                <ul tabindex="0" class="menu menu-sm dropdown-content mt-3 z-[1] p-2 shadow bg-base-100 rounded-box w-52">
-                    <li>
-                        <div class="px-4 py-2 text-sm text-base-content/60">
-                            Signed in as<br>
-                            <strong class="text-base-content">{{ user.first_name|default:user.username }}</strong>
-                        </div>
-                    </li>
-                    <li><hr></li>
-                    <li><a href="#" class="text-sm">Profile Settings</a></li>
-                    <li><a href="#" class="text-sm">Account Settings</a></li>
-                    <li><hr></li>
-                    <li><a href="{% url 'accounts:logout' %}" class="text-sm text-error">Sign Out</a></li>
-                </ul>
+            </div>
+            <h1 class="text-4xl font-bold mb-4">{{ welcome_message }}</h1>
+            <p class="text-base-content/70 mb-6">
+                Welcome to your LimeClicks dashboard. Here you can manage your account, view analytics, and access all platform features.
+            </p>
+            <div class="flex justify-center gap-3">
+                <button class="btn btn-primary">Get Started</button>
+                <button class="btn btn-outline">Learn More</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Actions -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+    <div class="card bg-base-100 shadow-md hover:shadow-lg transition-shadow cursor-pointer">
+        <div class="card-body">
+            <div class="flex items-center gap-4">
+                <div class="w-12 h-12 bg-info/20 rounded-lg flex items-center justify-center">
+                    <i class="fas fa-chart-bar text-info text-xl"></i>
+                </div>
+                <div>
+                    <h3 class="font-semibold">Analytics</h3>
+                    <p class="text-sm text-base-content/60">View your performance metrics</p>
+                </div>
             </div>
         </div>
     </div>
 
-    <!-- Main Content -->
-    <div class="container mx-auto px-4 py-8">
-        <!-- Welcome Section -->
-        <div class="hero bg-gradient-to-r from-primary/10 to-secondary/10 rounded-xl mb-8">
-            <div class="hero-content text-center py-12">
-                <div class="max-w-md">
-                    <div class="flex justify-center mb-4">
-                        <div class="w-20 h-20 bg-primary/20 rounded-full flex items-center justify-center">
-                            <svg class="w-10 h-10 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-                                      d="M13 10V3L4 14h7v7l9-11h-7z"></path>
-                            </svg>
-                        </div>
-                    </div>
-                    <h1 class="text-4xl font-bold mb-4">{{ welcome_message }}</h1>
-                    <p class="text-base-content/70 mb-6">
-                        Welcome to your LimeClicks dashboard. Here you can manage your account, view analytics, and access all platform features.
-                    </p>
-                    <div class="flex justify-center gap-3">
-                        <button class="btn btn-primary">Get Started</button>
-                        <button class="btn btn-outline">Learn More</button>
-                    </div>
+    <div class="card bg-base-100 shadow-md hover:shadow-lg transition-shadow cursor-pointer">
+        <div class="card-body">
+            <div class="flex items-center gap-4">
+                <div class="w-12 h-12 bg-success/20 rounded-lg flex items-center justify-center">
+                    <i class="fas fa-users text-success text-xl"></i>
+                </div>
+                <div>
+                    <h3 class="font-semibold">Team</h3>
+                    <p class="text-sm text-base-content/60">Manage your team members</p>
                 </div>
             </div>
         </div>
+    </div>
 
-        <!-- Quick Actions -->
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-            <div class="card bg-base-100 shadow-md hover:shadow-lg transition-shadow">
-                <div class="card-body">
-                    <div class="flex items-center gap-4">
-                        <div class="w-12 h-12 bg-info/20 rounded-lg flex items-center justify-center">
-                            <svg class="w-6 h-6 text-info" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-                                      d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-                            </svg>
-                        </div>
-                        <div>
-                            <h3 class="font-semibold">Analytics</h3>
-                            <p class="text-sm text-base-content/60">View your performance metrics</p>
-                        </div>
-                    </div>
+    <div class="card bg-base-100 shadow-md hover:shadow-lg transition-shadow cursor-pointer">
+        <div class="card-body">
+            <div class="flex items-center gap-4">
+                <div class="w-12 h-12 bg-warning/20 rounded-lg flex items-center justify-center">
+                    <i class="fas fa-cog text-warning text-xl"></i>
                 </div>
-            </div>
-
-            <div class="card bg-base-100 shadow-md hover:shadow-lg transition-shadow">
-                <div class="card-body">
-                    <div class="flex items-center gap-4">
-                        <div class="w-12 h-12 bg-success/20 rounded-lg flex items-center justify-center">
-                            <svg class="w-6 h-6 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-                                      d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z"></path>
-                            </svg>
-                        </div>
-                        <div>
-                            <h3 class="font-semibold">Team</h3>
-                            <p class="text-sm text-base-content/60">Manage your team members</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="card bg-base-100 shadow-md hover:shadow-lg transition-shadow">
-                <div class="card-body">
-                    <div class="flex items-center gap-4">
-                        <div class="w-12 h-12 bg-warning/20 rounded-lg flex items-center justify-center">
-                            <svg class="w-6 h-6 text-warning" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-                                      d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                            </svg>
-                        </div>
-                        <div>
-                            <h3 class="font-semibold">Settings</h3>
-                            <p class="text-sm text-base-content/60">Configure your preferences</p>
-                        </div>
-                    </div>
+                <div>
+                    <h3 class="font-semibold">Settings</h3>
+                    <p class="text-sm text-base-content/60">Configure your preferences</p>
                 </div>
             </div>
         </div>
+    </div>
+</div>
 
-        <!-- Account Info -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <!-- Account Details -->
-            <div class="card bg-base-100 shadow-md">
-                <div class="card-body">
-                    <h3 class="card-title mb-4">Account Information</h3>
-                    <div class="space-y-3">
-                        <div class="flex justify-between items-center py-2">
-                            <span class="text-base-content/70">Name:</span>
-                            <span class="font-medium">{{ user.first_name|default:user.username }}</span>
-                        </div>
-                        <div class="flex justify-between items-center py-2">
-                            <span class="text-base-content/70">Email:</span>
-                            <div class="flex items-center gap-2">
-                                <span class="font-medium">{{ user.email }}</span>
-                                {% if user.email_verified %}
-                                <div class="badge badge-success badge-sm">Verified</div>
-                                {% else %}
-                                <div class="badge badge-warning badge-sm">Unverified</div>
-                                {% endif %}
-                            </div>
-                        </div>
-                        <div class="flex justify-between items-center py-2">
-                            <span class="text-base-content/70">Member since:</span>
-                            <span class="font-medium">{{ user.date_joined|date:"M d, Y" }}</span>
-                        </div>
-                        <div class="flex justify-between items-center py-2">
-                            <span class="text-base-content/70">Last login:</span>
-                            <span class="font-medium">{{ user.last_login|date:"M d, Y H:i"|default:"Never" }}</span>
-                        </div>
+<!-- Stats Cards -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+    <div class="stat bg-base-100 shadow-md rounded-lg">
+        <div class="stat-figure text-primary">
+            <i class="fas fa-link text-2xl"></i>
+        </div>
+        <div class="stat-title">Total Links</div>
+        <div class="stat-value text-primary">0</div>
+        <div class="stat-desc">Links created</div>
+    </div>
+    
+    <div class="stat bg-base-100 shadow-md rounded-lg">
+        <div class="stat-figure text-secondary">
+            <i class="fas fa-mouse-pointer text-2xl"></i>
+        </div>
+        <div class="stat-title">Total Clicks</div>
+        <div class="stat-value text-secondary">0</div>
+        <div class="stat-desc">Clicks received</div>
+    </div>
+    
+    <div class="stat bg-base-100 shadow-md rounded-lg">
+        <div class="stat-figure text-accent">
+            <i class="fas fa-eye text-2xl"></i>
+        </div>
+        <div class="stat-title">Views Today</div>
+        <div class="stat-value text-accent">0</div>
+        <div class="stat-desc">24h activity</div>
+    </div>
+    
+    <div class="stat bg-base-100 shadow-md rounded-lg">
+        <div class="stat-figure text-info">
+            <i class="fas fa-chart-line text-2xl"></i>
+        </div>
+        <div class="stat-title">Conversion</div>
+        <div class="stat-value text-info">0%</div>
+        <div class="stat-desc">Click rate</div>
+    </div>
+</div>
+
+<!-- Account Info -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <!-- Account Details -->
+    <div class="card bg-base-100 shadow-md">
+        <div class="card-body">
+            <h3 class="card-title mb-4"><i class="fas fa-user mr-2"></i>Account Information</h3>
+            <div class="space-y-3">
+                <div class="flex justify-between items-center py-2">
+                    <span class="text-base-content/70">Name:</span>
+                    <span class="font-medium">{{ user.first_name|default:user.username }}</span>
+                </div>
+                <div class="flex justify-between items-center py-2">
+                    <span class="text-base-content/70">Email:</span>
+                    <div class="flex items-center gap-2">
+                        <span class="font-medium">{{ user.email }}</span>
+                        {% if user.email_verified %}
+                        <div class="badge badge-success badge-sm"><i class="fas fa-check mr-1"></i>Verified</div>
+                        {% else %}
+                        <div class="badge badge-warning badge-sm"><i class="fas fa-exclamation-triangle mr-1"></i>Unverified</div>
+                        {% endif %}
                     </div>
                 </div>
+                <div class="flex justify-between items-center py-2">
+                    <span class="text-base-content/70">Member since:</span>
+                    <span class="font-medium">{{ user.date_joined|date:"M d, Y" }}</span>
+                </div>
+                <div class="flex justify-between items-center py-2">
+                    <span class="text-base-content/70">Last login:</span>
+                    <span class="font-medium">{{ user.last_login|date:"M d, Y H:i"|default:"Never" }}</span>
+                </div>
             </div>
+        </div>
+    </div>
 
-            <!-- Recent Activity -->
-            <div class="card bg-base-100 shadow-md">
-                <div class="card-body">
-                    <h3 class="card-title mb-4">Recent Activity</h3>
-                    <div class="space-y-4">
-                        <div class="flex items-start gap-3">
-                            <div class="w-2 h-2 bg-primary rounded-full mt-2"></div>
-                            <div>
-                                <p class="text-sm">Welcome email sent</p>
-                                <p class="text-xs text-base-content/60">Account verification completed</p>
-                            </div>
-                        </div>
-                        <div class="flex items-start gap-3">
-                            <div class="w-2 h-2 bg-success rounded-full mt-2"></div>
-                            <div>
-                                <p class="text-sm">Account created</p>
-                                <p class="text-xs text-base-content/60">{{ user.date_joined|date:"M d, Y" }}</p>
-                            </div>
-                        </div>
+    <!-- Recent Activity -->
+    <div class="card bg-base-100 shadow-md">
+        <div class="card-body">
+            <h3 class="card-title mb-4"><i class="fas fa-history mr-2"></i>Recent Activity</h3>
+            <div class="space-y-4">
+                <div class="flex items-start gap-3">
+                    <div class="w-2 h-2 bg-primary rounded-full mt-2"></div>
+                    <div>
+                        <p class="text-sm">Welcome email sent</p>
+                        <p class="text-xs text-base-content/60">Account verification completed</p>
+                    </div>
+                </div>
+                <div class="flex items-start gap-3">
+                    <div class="w-2 h-2 bg-success rounded-full mt-2"></div>
+                    <div>
+                        <p class="text-sm">Account created</p>
+                        <p class="text-xs text-base-content/60">{{ user.date_joined|date:"M d, Y" }}</p>
                     </div>
                 </div>
             </div>

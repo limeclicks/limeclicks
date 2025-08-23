@@ -1,0 +1,645 @@
+{% load static %}
+<!doctype html>
+<html lang="en" data-theme="light" id="html-root">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>{% block title %}Dashboard - LimeClicks{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'dist/tailwind.css' %}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css" integrity="sha512-Kc323vGBEqzTmouAECnVceyQqyqdsSiqLQISBL29aUW4U/M7pSPA/gEUZQqv1cwx4OnYxTxve5UMg5GT6L4JJg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+    <style>
+        /* Hide drawer toggle checkbox but keep it functional */
+        .drawer-toggle {
+            position: absolute;
+            opacity: 0;
+            pointer-events: none;
+        }
+        
+        /* Custom active state for menu items */
+        .menu li > a.active {
+            background-color: hsl(var(--p));
+            color: hsl(var(--pc));
+        }
+        
+        .menu li > a.active i {
+            color: hsl(var(--pc));
+        }
+        
+        /* Sidebar collapsed state */
+        .sidebar-collapsed .drawer-side aside {
+            width: 4rem;
+        }
+        
+        .sidebar-collapsed .sidebar-header {
+            padding: 0.75rem;
+            justify-content: center;
+        }
+        
+        .sidebar-collapsed .sidebar-header .brand-text,
+        .sidebar-collapsed .menu-title,
+        .sidebar-collapsed .menu span,
+        .sidebar-collapsed .badge {
+            display: none;
+        }
+        
+        .sidebar-collapsed .menu a {
+            justify-content: center;
+            padding-left: 0.75rem;
+            padding-right: 0.75rem;
+        }
+        
+        /* Smooth transitions */
+        .drawer-side aside,
+        .drawer-side aside *,
+        .drawer-content {
+            transition: all 0.3s ease-in-out;
+        }
+        
+        /* Mobile sidebar behavior */
+        @media (max-width: 1023px) {
+            /* Ensure drawer is closed by default on mobile */
+            .drawer:not(.lg:drawer-open) .drawer-side {
+                transform: translateX(-100%);
+                transition: transform 0.3s ease-in-out;
+            }
+            
+            /* Show sidebar when toggle is checked */
+            .drawer-toggle:checked ~ .drawer-side {
+                transform: translateX(0);
+                pointer-events: auto;
+                visibility: visible;
+                position: fixed;
+                top: 0;
+                left: 0;
+                bottom: 0;
+                z-index: 999;
+            }
+            
+            /* Hide sidebar when toggle is not checked */
+            .drawer-toggle:not(:checked) ~ .drawer-side {
+                transform: translateX(-100%);
+                pointer-events: none;
+                visibility: hidden;
+            }
+            
+            /* Overlay styling for mobile */
+            .drawer-toggle:checked ~ .drawer-side .drawer-overlay {
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: rgba(0, 0, 0, 0.5);
+                z-index: 1;
+            }
+            
+            /* Ensure sidebar content is above overlay */
+            .drawer-side aside {
+                position: relative;
+                z-index: 2;
+            }
+            
+            /* Reset collapsed state on mobile - always show full sidebar */
+            .sidebar-collapsed .drawer-side aside {
+                width: 15rem;
+            }
+            
+            .sidebar-collapsed .sidebar-header .brand-text,
+            .sidebar-collapsed .menu-title,
+            .sidebar-collapsed .menu span,
+            .sidebar-collapsed .badge {
+                display: block;
+            }
+            
+            .sidebar-collapsed .menu a {
+                justify-content: flex-start;
+                padding-left: 0.75rem;
+                padding-right: 0.75rem;
+            }
+            
+            /* Force sidebar header to be visible on mobile */
+            .sidebar-collapsed .sidebar-header {
+                padding: 1rem;
+                justify-content: flex-start;
+            }
+        }
+        
+        /* Desktop sidebar toggle */
+        @media (min-width: 1024px) {
+            .drawer-open .drawer-side {
+                pointer-events: auto;
+                visibility: visible;
+                position: sticky;
+                top: 0;
+                height: 100vh;
+            }
+        }
+        
+        /* Match heights */
+        .navbar {
+            min-height: 4rem;
+            height: 4rem;
+        }
+        
+        .sidebar-header {
+            min-height: 4rem;
+            height: 4rem;
+        }
+    </style>
+</head>
+
+<body class="bg-base-200 min-h-screen">
+    {% include "includes/messages.html" %}
+    
+    <div class="drawer lg:drawer-open" id="main-drawer">
+        <input id="sidebar-toggle" type="checkbox" class="drawer-toggle" />
+        
+        <!-- Page content -->
+        <div class="drawer-content flex flex-col min-h-screen">
+            <!-- Top Navigation Bar -->
+            <div class="navbar bg-base-100 shadow-sm border-b border-base-300 sticky top-0 z-30">
+                <div class="flex-none">
+                    <!-- Mobile hamburger -->
+                    <label for="sidebar-toggle" class="btn btn-square btn-ghost drawer-button lg:hidden">
+                        <i class="fas fa-bars text-lg"></i>
+                    </label>
+                    <!-- Desktop collapse button -->
+                    <button id="sidebar-collapse-btn" class="btn btn-square btn-ghost hidden lg:flex">
+                        <i class="fas fa-bars text-lg"></i>
+                    </button>
+                </div>
+                <div class="flex-1 px-2">
+                    <span class="text-xl font-semibold">{% block page_title %}Dashboard{% endblock %}</span>
+                </div>
+                <div class="flex-none gap-2 px-2">
+                    <!-- Theme Toggle -->
+                    <div class="dropdown dropdown-end">
+                        <div tabindex="0" role="button" class="btn btn-ghost btn-circle" id="theme-toggle">
+                            <i class="fas fa-sun text-lg" id="theme-icon"></i>
+                        </div>
+                        <ul tabindex="0" class="dropdown-content z-[1] menu p-2 shadow-lg bg-base-100 rounded-box w-44 border">
+                            <li class="menu-title">
+                                <span class="text-xs uppercase font-semibold">Theme</span>
+                            </li>
+                            <li>
+                                <a class="theme-option flex items-center gap-3" data-theme="light">
+                                    <i class="fas fa-sun text-yellow-500"></i>
+                                    <span>Light Mode</span>
+                                    <i class="fas fa-check ml-auto text-primary hidden" id="light-check"></i>
+                                </a>
+                            </li>
+                            <li>
+                                <a class="theme-option flex items-center gap-3" data-theme="dark">
+                                    <i class="fas fa-moon text-blue-400"></i>
+                                    <span>Dark Mode</span>
+                                    <i class="fas fa-check ml-auto text-primary hidden" id="dark-check"></i>
+                                </a>
+                            </li>
+                            <li>
+                                <a class="theme-option flex items-center gap-3" data-theme="auto">
+                                    <i class="fas fa-adjust text-base-content"></i>
+                                    <span>System</span>
+                                    <i class="fas fa-check ml-auto text-primary hidden" id="auto-check"></i>
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
+                    
+                    <!-- Search Button -->
+                    <div class="dropdown dropdown-end">
+                        <div tabindex="0" role="button" class="btn btn-ghost btn-circle">
+                            <i class="fas fa-search text-lg"></i>
+                        </div>
+                        <div tabindex="0" class="dropdown-content z-[1] card card-compact w-80 p-4 shadow-lg bg-base-100 border">
+                            <div class="card-body p-0">
+                                <h3 class="font-bold mb-3">Quick Search</h3>
+                                <div class="form-control">
+                                    <input type="text" placeholder="Search links, analytics..." class="input input-bordered input-sm w-full" />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Notifications -->
+                    <div class="dropdown dropdown-end">
+                        <div tabindex="0" role="button" class="btn btn-ghost btn-circle">
+                            <div class="indicator">
+                                <i class="fas fa-bell text-lg"></i>
+                                <span class="badge badge-xs badge-primary indicator-item">3</span>
+                            </div>
+                        </div>
+                        <div tabindex="0" class="dropdown-content z-[1] card card-compact w-80 p-4 shadow-lg bg-base-100 border">
+                            <div class="card-body p-0">
+                                <div class="flex items-center justify-between mb-3">
+                                    <h3 class="font-bold">Notifications</h3>
+                                    <span class="badge badge-primary badge-sm">3 new</span>
+                                </div>
+                                <div class="space-y-3">
+                                    <div class="flex items-start gap-3 p-2 hover:bg-base-200 rounded-lg cursor-pointer">
+                                        <div class="w-2 h-2 bg-primary rounded-full mt-2"></div>
+                                        <div class="flex-1">
+                                            <p class="text-sm font-medium">New link created</p>
+                                            <p class="text-xs text-base-content/60">Your link "summer-sale" is now live</p>
+                                            <p class="text-xs text-base-content/40">2 min ago</p>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-start gap-3 p-2 hover:bg-base-200 rounded-lg cursor-pointer">
+                                        <div class="w-2 h-2 bg-success rounded-full mt-2"></div>
+                                        <div class="flex-1">
+                                            <p class="text-sm font-medium">Campaign milestone</p>
+                                            <p class="text-xs text-base-content/60">100 clicks achieved!</p>
+                                            <p class="text-xs text-base-content/40">1 hour ago</p>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-start gap-3 p-2 hover:bg-base-200 rounded-lg cursor-pointer">
+                                        <div class="w-2 h-2 bg-warning rounded-full mt-2"></div>
+                                        <div class="flex-1">
+                                            <p class="text-sm font-medium">Account update</p>
+                                            <p class="text-xs text-base-content/60">Profile verification completed</p>
+                                            <p class="text-xs text-base-content/40">3 hours ago</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="divider my-2"></div>
+                                <a href="#" class="text-center text-sm text-primary hover:underline">View all notifications</a>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- User Profile Dropdown -->
+                    <div class="dropdown dropdown-end">
+                        <div tabindex="0" role="button" class="btn btn-ghost btn-circle avatar placeholder">
+                            <div class="bg-primary text-primary-content rounded-full w-10">
+                                <span class="text-xs font-semibold">{{ user.first_name|first|default:user.username|first|upper }}</span>
+                            </div>
+                        </div>
+                        <ul tabindex="0" class="menu menu-sm dropdown-content mt-3 z-[1] p-2 shadow-lg bg-base-100 rounded-box w-64 border">
+                            <li>
+                                <div class="px-4 py-3 border-b border-base-300">
+                                    <div class="flex items-center gap-3">
+                                        <div class="avatar placeholder">
+                                            <div class="bg-primary text-primary-content rounded-full w-12">
+                                                <span class="text-lg font-bold">{{ user.first_name|first|default:user.username|first|upper }}</span>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <p class="font-semibold">{{ user.first_name|default:user.username }}</p>
+                                            <p class="text-sm text-base-content/60">{{ user.email }}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </li>
+                            <li><a href="#" class="text-sm py-3"><i class="fas fa-user mr-3"></i>Profile Settings</a></li>
+                            <li><a href="#" class="text-sm py-3"><i class="fas fa-cog mr-3"></i>Account Settings</a></li>
+                            <li><a href="#" class="text-sm py-3"><i class="fas fa-credit-card mr-3"></i>Billing & Usage</a></li>
+                            <li><a href="#" class="text-sm py-3"><i class="fas fa-question-circle mr-3"></i>Help & Support</a></li>
+                            <li><hr class="my-2"></li>
+                            <li><a href="{% url 'accounts:logout' %}" class="text-sm py-3 text-error"><i class="fas fa-sign-out-alt mr-3"></i>Sign Out</a></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Main Content Area -->
+            <main class="flex-1 p-6 bg-base-200">
+                {% block content %}{% endblock %}
+            </main>
+            
+            <!-- Footer -->
+            <footer class="footer footer-center bg-base-100 border-t border-base-300 p-6 mt-auto">
+                <div class="grid grid-flow-col gap-8 text-sm">
+                    <div class="grid grid-flow-col gap-4">
+                        <a href="#" class="link link-hover">About</a>
+                        <a href="#" class="link link-hover">Contact</a>
+                        <a href="#" class="link link-hover">Help Center</a>
+                    </div>
+                    <div class="grid grid-flow-col gap-4">
+                        <a href="#" class="link link-hover">Privacy Policy</a>
+                        <a href="#" class="link link-hover">Terms of Service</a>
+                        <a href="#" class="link link-hover">API Docs</a>
+                    </div>
+                    <div class="grid grid-flow-col gap-4">
+                        <a href="#" class="link link-hover">Status</a>
+                        <a href="#" class="link link-hover">Blog</a>
+                        <a href="#" class="link link-hover">Changelog</a>
+                    </div>
+                </div>
+                <div class="mt-4">
+                    <p class="text-base-content/60">© 2025 LimeClicks. All rights reserved.</p>
+                </div>
+            </footer>
+        </div>
+        
+        <!-- Sidebar -->
+        <div class="drawer-side z-40">
+            <label for="sidebar-toggle" aria-label="close sidebar" class="drawer-overlay"></label>
+            <aside class="bg-base-100 min-h-full w-60 shadow-xl">
+                <!-- Sidebar Header -->
+                <div class="sidebar-header p-4 border-b border-base-300 flex items-center">
+                    <a href="{% url 'accounts:dashboard' %}" class="flex items-center gap-3 flex-1">
+                        <div class="w-10 h-10 bg-primary rounded-xl flex items-center justify-center flex-shrink-0">
+                            <i class="fas fa-bolt text-white text-lg"></i>
+                        </div>
+                        <div class="brand-text">
+                            <span class="text-lg font-bold text-primary">LimeClicks</span>
+                            <p class="text-xs text-base-content/60">Link Management</p>
+                        </div>
+                    </a>
+                </div>
+                
+                <!-- Navigation Menu -->
+                <ul class="menu p-4 space-y-1">
+                    <!-- Main Navigation -->
+                    <li class="menu-title">
+                        <span class="text-xs uppercase font-semibold text-base-content/60">Main</span>
+                    </li>
+                    <li>
+                        <a href="{% url 'accounts:dashboard' %}" class="flex items-center gap-3 {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">
+                            <i class="fas fa-home w-4"></i>
+                            <span>Dashboard</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#" class="flex items-center gap-3">
+                            <i class="fas fa-chart-line w-4"></i>
+                            <span>Analytics</span>
+                            <div class="badge badge-primary badge-sm ml-auto">New</div>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#" class="flex items-center gap-3">
+                            <i class="fas fa-link w-4"></i>
+                            <span>Links</span>
+                            <div class="badge badge-outline badge-sm ml-auto">12</div>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#" class="flex items-center gap-3">
+                            <i class="fas fa-qrcode w-4"></i>
+                            <span>QR Codes</span>
+                        </a>
+                    </li>
+                    
+                    <!-- Collaboration -->
+                    <li class="menu-title pt-4">
+                        <span class="text-xs uppercase font-semibold text-base-content/60">Collaboration</span>
+                    </li>
+                    <li>
+                        <a href="#" class="flex items-center gap-3">
+                            <i class="fas fa-users w-4"></i>
+                            <span>Team</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#" class="flex items-center gap-3">
+                            <i class="fas fa-share-alt w-4"></i>
+                            <span>Shared Links</span>
+                        </a>
+                    </li>
+                    
+                    <!-- Account -->
+                    <li class="menu-title pt-4">
+                        <span class="text-xs uppercase font-semibold text-base-content/60">Account</span>
+                    </li>
+                    <li>
+                        <a href="#" class="flex items-center gap-3">
+                            <i class="fas fa-credit-card w-4"></i>
+                            <span>Billing</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#" class="flex items-center gap-3">
+                            <i class="fas fa-user-cog w-4"></i>
+                            <span>Profile Settings</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#" class="flex items-center gap-3">
+                            <i class="fas fa-shield-alt w-4"></i>
+                            <span>Security</span>
+                        </a>
+                    </li>
+                    
+                    <!-- Support -->
+                    <li class="menu-title pt-4">
+                        <span class="text-xs uppercase font-semibold text-base-content/60">Support</span>
+                    </li>
+                    <li>
+                        <a href="#" class="flex items-center gap-3">
+                            <i class="fas fa-question-circle w-4"></i>
+                            <span>Help Center</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#" class="flex items-center gap-3">
+                            <i class="fas fa-bug w-4"></i>
+                            <span>Report Issue</span>
+                        </a>
+                    </li>
+                </ul>
+            </aside>
+        </div>
+    </div>
+
+    <script>
+        // CSRF for HTMX
+        function getCookie(name) { const m = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)'); return m ? m.pop() : '' }
+        document.body.addEventListener('htmx:configRequest', (e) => { e.detail.headers['X-CSRFToken'] = getCookie('csrftoken') });
+        
+        // Theme functionality
+        function initializeTheme() {
+            const htmlRoot = document.getElementById('html-root');
+            const themeIcon = document.getElementById('theme-icon');
+            
+            // Get system preference
+            function getSystemTheme() {
+                return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+            }
+            
+            // Get stored theme or default to 'auto'
+            function getStoredTheme() {
+                return localStorage.getItem('theme') || 'auto';
+            }
+            
+            // Update checkmarks to show only active theme
+            function updateCheckmarks(activeTheme) {
+                // Hide all checkmarks first
+                const allChecks = ['light-check', 'dark-check', 'auto-check'];
+                allChecks.forEach(checkId => {
+                    const checkElement = document.getElementById(checkId);
+                    if (checkElement) {
+                        checkElement.classList.add('hidden');
+                    }
+                });
+                
+                // Show only the active theme's checkmark
+                const activeCheckId = activeTheme + '-check';
+                const activeCheckElement = document.getElementById(activeCheckId);
+                if (activeCheckElement) {
+                    activeCheckElement.classList.remove('hidden');
+                }
+            }
+            
+            // Apply theme to HTML element
+            function applyTheme(theme) {
+                let actualTheme = theme;
+                
+                if (theme === 'auto') {
+                    actualTheme = getSystemTheme();
+                }
+                
+                htmlRoot.setAttribute('data-theme', actualTheme);
+                
+                // Update icon based on actual theme being displayed
+                if (themeIcon) {
+                    if (actualTheme === 'dark') {
+                        themeIcon.className = 'fas fa-moon text-lg';
+                    } else {
+                        themeIcon.className = 'fas fa-sun text-lg';
+                    }
+                }
+                
+                // Update checkmarks to show selected preference (not actual theme)
+                updateCheckmarks(theme);
+            }
+            
+            // Set theme and save to localStorage
+            function setTheme(theme) {
+                localStorage.setItem('theme', theme);
+                applyTheme(theme);
+            }
+            
+            // Initialize theme on page load
+            const currentTheme = getStoredTheme();
+            applyTheme(currentTheme);
+            
+            // Listen for system theme changes when in auto mode
+            window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+                if (getStoredTheme() === 'auto') {
+                    applyTheme('auto');
+                }
+            });
+            
+            // Add click handlers for theme options (wait for DOM)
+            document.addEventListener('DOMContentLoaded', function() {
+                document.querySelectorAll('.theme-option').forEach(option => {
+                    option.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        const selectedTheme = this.getAttribute('data-theme');
+                        setTheme(selectedTheme);
+                        
+                        // Close dropdown
+                        document.activeElement.blur();
+                    });
+                });
+            });
+        }
+        
+        // Initialize theme before DOM content loaded to prevent flash
+        initializeTheme();
+        
+        // Sidebar functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            const mainDrawer = document.getElementById('main-drawer');
+            const sidebarToggle = document.getElementById('sidebar-toggle');
+            const sidebarCollapseBtn = document.getElementById('sidebar-collapse-btn');
+            const menuLinks = document.querySelectorAll('.drawer-side .menu a');
+            const mobileHamburger = document.querySelector('.drawer-button.lg\\:hidden');
+            
+            // Desktop collapse functionality only
+            if (sidebarCollapseBtn) {
+                sidebarCollapseBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    // Only work on desktop
+                    if (window.innerWidth >= 1024) {
+                        mainDrawer.classList.toggle('sidebar-collapsed');
+                        localStorage.setItem('sidebar-collapsed', mainDrawer.classList.contains('sidebar-collapsed'));
+                    }
+                });
+            }
+            
+            // Restore sidebar state from localStorage (desktop only)
+            if (window.innerWidth >= 1024 && localStorage.getItem('sidebar-collapsed') === 'true') {
+                mainDrawer.classList.add('sidebar-collapsed');
+            }
+            
+            // Clear collapsed state on mobile
+            function handleResize() {
+                if (window.innerWidth < 1024) {
+                    mainDrawer.classList.remove('sidebar-collapsed');
+                    sidebarToggle.checked = false; // Ensure sidebar is closed on mobile by default
+                } else if (localStorage.getItem('sidebar-collapsed') === 'true') {
+                    mainDrawer.classList.add('sidebar-collapsed');
+                }
+            }
+            
+            // Handle window resize
+            window.addEventListener('resize', handleResize);
+            
+            // Initial call to set proper state
+            handleResize();
+            
+            // Mobile hamburger menu functionality
+            if (mobileHamburger) {
+                mobileHamburger.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    // Toggle the checkbox state
+                    sidebarToggle.checked = !sidebarToggle.checked;
+                    
+                    console.log('Mobile hamburger clicked, sidebar toggle:', sidebarToggle.checked);
+                });
+            }
+            
+            // Auto-close sidebar on mobile when clicking menu items
+            menuLinks.forEach(link => {
+                link.addEventListener('click', function(e) {
+                    if (window.innerWidth < 1024) {
+                        // Small delay to allow navigation to start
+                        setTimeout(() => {
+                            sidebarToggle.checked = false;
+                        }, 100);
+                    }
+                });
+            });
+            
+            // Handle overlay clicks on mobile
+            const overlay = document.querySelector('.drawer-overlay');
+            if (overlay) {
+                overlay.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    if (window.innerWidth < 1024) {
+                        sidebarToggle.checked = false;
+                        console.log('Overlay clicked, closing sidebar');
+                    }
+                });
+            }
+            
+            // Prevent body scroll when sidebar is open on mobile
+            function toggleBodyScroll() {
+                if (window.innerWidth < 1024) {
+                    if (sidebarToggle.checked) {
+                        document.body.style.overflow = 'hidden';
+                    } else {
+                        document.body.style.overflow = '';
+                    }
+                }
+            }
+            
+            // Watch for checkbox changes
+            sidebarToggle.addEventListener('change', function() {
+                console.log('Sidebar toggle changed:', this.checked);
+                toggleBodyScroll();
+            });
+        });
+    </script>
+</body>
+
+</html>

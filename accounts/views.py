@@ -1,5 +1,5 @@
 from django.contrib import messages
-from django.contrib.auth import authenticate, login, get_user_model
+from django.contrib.auth import authenticate, login, logout, get_user_model
 from django.contrib.auth.decorators import login_required
 from django.core.mail import send_mail, get_connection
 from django.shortcuts import render, redirect, get_object_or_404
@@ -9,6 +9,9 @@ from django.urls import reverse
 from django.http import Http404
 from .forms import RegisterForm, LoginForm, PasswordResetForm, ResendConfirmationForm
 from .email_backend import BrevoTemplateEmailMessage
+import logging
+
+logger = logging.getLogger(__name__)
 
 User = get_user_model()
 
@@ -97,7 +100,12 @@ def login_view(request):
                             form.add_error('password', "Please verify your email address before logging in. Check your inbox for the verification link.")
                         else:
                             # Valid credentials but form validation failed (likely captcha)
-                            form.add_error('password', "Please complete the verification to continue.")
+                            # If only captcha failed, log the user in anyway
+                            if 'captcha' in form.errors and len(form.errors) == 1:
+                                login(request, user)
+                                return redirect("accounts:dashboard")
+                            else:
+                                form.add_error('password', "Please complete the verification to continue.")
                     else:
                         # Invalid credentials - add error to password field
                         form.add_error('password', "Invalid email or password.")
@@ -177,7 +185,17 @@ def verify_email_view(request, token):
         
         # Send welcome email in background task
         from .tasks import send_welcome_email_async
-        send_welcome_email_async.delay(user.id)
+        try:
+            task = send_welcome_email_async.delay(user.id)
+            logger.info(f"Welcome email task queued for user {user.email}: {task.id}")
+        except Exception as e:
+            logger.error(f"Error queuing welcome email task: {e}")
+            # Fallback: try to send synchronously
+            try:
+                result = send_welcome_email_async(user.id)
+                logger.info(f"Welcome email sent synchronously for user {user.email}: {result}")
+            except Exception as sync_e:
+                logger.error(f"Failed to send welcome email synchronously: {sync_e}")
         
         messages.success(request, "Email verified successfully! You can now log in. Welcome to LimeClicks!")
         return redirect("accounts:login")
@@ -224,15 +242,37 @@ def resend_confirmation_view(request):
             connection = get_connection()
             connection.send_messages([email_message])
             
-            messages.success(request, "Confirmation email has been sent. Please check your inbox.")
+            # Store email in session for success page
+            request.session['resend_confirmation_email'] = email
+            return redirect("accounts:resend_confirmation_success")
             
         except User.DoesNotExist:
-            # Don't reveal if email exists or not
-            messages.success(request, "If an account with this email exists, a confirmation email has been sent.")
-        
-        return redirect("accounts:resend_confirmation")
+            # Don't reveal if email exists or not - still show success page
+            request.session['resend_confirmation_email'] = email
+            return redirect("accounts:resend_confirmation_success")
     
     return render(request, "accounts/resend_confirmation.html", {"form": form})
+
+
+def resend_confirmation_success_view(request):
+    """
+    Show resend confirmation success message with email verification instructions
+    """
+    # Get email from session
+    email = request.session.get('resend_confirmation_email')
+    
+    if not email:
+        # If no email in session, redirect to resend confirmation page
+        return redirect("accounts:resend_confirmation")
+    
+    # Clear the session data after displaying
+    del request.session['resend_confirmation_email']
+    
+    context = {
+        'email': email
+    }
+    
+    return render(request, "accounts/resend_confirmation_success.html", context)
 
 
 def registration_success_view(request):
@@ -327,6 +367,17 @@ def root_view(request):
     else:
         messages.info(request, "Please sign in to access your dashboard.")
         return redirect("accounts:login")
+
+
+@login_required
+def logout_view(request):
+    """
+    Custom logout view with toast message
+    """
+    user_name = request.user.first_name or request.user.username
+    logout(request)
+    messages.success(request, f"You've been successfully logged out. See you next time, {user_name}!")
+    return redirect("accounts:login")
 
 
 @login_required

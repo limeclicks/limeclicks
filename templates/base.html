@@ -1,6 +1,6 @@
 {% load static %}
 <!doctype html>
-<html lang="en" data-theme="light">
+<html lang="en" data-theme="light" id="html-root">
 
 <head>
     <meta charset="utf-8" />
@@ -32,6 +32,46 @@
         // CSRF for HTMX
         function getCookie(name) { const m = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)'); return m ? m.pop() : '' }
         document.body.addEventListener('htmx:configRequest', (e) => { e.detail.headers['X-CSRFToken'] = getCookie('csrftoken') });
+        
+        // Theme functionality for base template
+        function initializeBaseTheme() {
+            const htmlRoot = document.getElementById('html-root');
+            
+            // Get system preference
+            function getSystemTheme() {
+                return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+            }
+            
+            // Get stored theme or default to 'auto'
+            function getStoredTheme() {
+                return localStorage.getItem('theme') || 'auto';
+            }
+            
+            // Apply theme to HTML element
+            function applyTheme(theme) {
+                let actualTheme = theme;
+                
+                if (theme === 'auto') {
+                    actualTheme = getSystemTheme();
+                }
+                
+                htmlRoot.setAttribute('data-theme', actualTheme);
+            }
+            
+            // Initialize theme on page load
+            const currentTheme = getStoredTheme();
+            applyTheme(currentTheme);
+            
+            // Listen for system theme changes when in auto mode
+            window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+                if (getStoredTheme() === 'auto') {
+                    applyTheme('auto');
+                }
+            });
+        }
+        
+        // Initialize theme before DOM content loaded to prevent flash
+        initializeBaseTheme();
     </script>
 </body>
 

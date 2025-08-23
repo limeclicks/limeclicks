@@ -198,6 +198,11 @@ CELERY_BEAT_SCHEDULE = {
 }
 
 # Authentication settings
+AUTHENTICATION_BACKENDS = [
+    'accounts.backends.EmailBackend',  # Allow authentication with email
+    'django.contrib.auth.backends.ModelBackend',  # Keep default username auth
+]
+
 LOGIN_URL = '/accounts/login/'
 LOGIN_REDIRECT_URL = '/accounts/dashboard/'
 LOGOUT_REDIRECT_URL = '/accounts/login/'
