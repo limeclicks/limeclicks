@@ -6,6 +6,7 @@ app_name = 'accounts'
 
 urlpatterns = [
     path("register/", views.register_view, name="register"),
+    path("register/success/", views.registration_success_view, name="registration_success"),
 
     # Login / Logout
     path("login/", views.login_view, name="login"),
@@ -14,28 +15,16 @@ urlpatterns = [
         auth_views.LogoutView.as_view(),
         name="logout",
     ),
+    
+    # Dashboard
+    path("dashboard/", views.dashboard_view, name="dashboard"),
 
-    # Forgot password (optional but handy for your next steps)
+    # Email verification
+    path("verify-email/<uuid:token>/", views.verify_email_view, name="verify_email"),
+    path("resend-confirmation/", views.resend_confirmation_view, name="resend_confirmation"),
+
+    # Password reset
     path("password-reset/", views.password_reset_view, name="password_reset"),
-    path(
-        "password-reset/done/",
-        auth_views.PasswordResetDoneView.as_view(
-            template_name="accounts/password_reset_done.html"
-        ),
-        name="password_reset_done",
-    ),
-    path(
-        "reset/<uidb64>/<token>/",
-        auth_views.PasswordResetConfirmView.as_view(
-            template_name="accounts/password_reset_confirm.html"
-        ),
-        name="password_reset_confirm",
-    ),
-    path(
-        "reset/done/",
-        auth_views.PasswordResetCompleteView.as_view(
-            template_name="accounts/password_reset_complete.html"
-        ),
-        name="password_reset_complete",
-    ),
+    path("password-reset/success/", views.password_reset_success_view, name="password_reset_success"),
+    path("password-reset/confirm/<uuid:token>/", views.password_reset_confirm_view, name="password_reset_confirm"),
 ]

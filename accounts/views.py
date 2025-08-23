@@ -1,11 +1,16 @@
 from django.contrib import messages
-from django.contrib.auth.models import User
-from django.contrib.auth import authenticate, login
-from django.core.mail import send_mail
-from django.shortcuts import render, redirect
+from django.contrib.auth import authenticate, login, get_user_model
+from django.contrib.auth.decorators import login_required
+from django.core.mail import send_mail, get_connection
+from django.shortcuts import render, redirect, get_object_or_404
 from django.utils.text import slugify
 from django.conf import settings
-from .forms import RegisterForm, LoginForm, PasswordResetForm
+from django.urls import reverse
+from django.http import Http404
+from .forms import RegisterForm, LoginForm, PasswordResetForm, ResendConfirmationForm
+from .email_backend import BrevoTemplateEmailMessage
+
+User = get_user_model()
 
 def register_view(request):
     form = RegisterForm(request.POST or None)
@@ -24,10 +29,38 @@ def register_view(request):
 
         user = User.objects.create_user(username=username, email=email, password=password)
         user.first_name = name
+        user.email_verified = False  # User needs to verify email
         user.save()
 
-        messages.success(request, "Account created successfully. You can sign in once login is enabled.")
-        return redirect("accounts:register")  # stay on same page with success alert
+        # Send verification email using Brevo template ID 2
+        verification_url = request.build_absolute_uri(
+            reverse('accounts:verify_email', args=[user.verification_token])
+        )
+        
+        template_params = {
+            'name': name,
+            'url': verification_url
+        }
+        
+        # Create template email message
+        email_message = BrevoTemplateEmailMessage(
+            template_id=2,
+            template_params=template_params,
+            to=[email],
+            from_email=settings.DEFAULT_FROM_EMAIL
+        )
+        
+        # Send the email
+        connection = get_connection()
+        connection.send_messages([email_message])
+
+        # Store user info for success page
+        request.session['registration_success'] = {
+            'email': email,
+            'name': name
+        }
+        
+        return redirect("accounts:registration_success")
 
     return render(request, "accounts/register.html", {"form": form, "is_admin": request.path.startswith("/admin/")})
 
@@ -39,8 +72,11 @@ def login_view(request):
         password = form.cleaned_data["password"]
         user = authenticate(request, username=username, password=password)
         if user is not None:
+            if not user.email_verified:
+                messages.error(request, "Please verify your email address before logging in. Check your inbox for the verification link.")
+                return render(request, "accounts/login.html", {"form": form})
             login(request, user)
-            return redirect("accounts:register")  # or wherever you want to redirect
+            return redirect("accounts:dashboard")
         else:
             messages.error(request, "Invalid email or password.")
     
@@ -56,32 +92,225 @@ def password_reset_view(request):
         try:
             user = User.objects.get(email__iexact=email)
             
-            # Send password reset email using Brevo
-            subject = "Password Reset - LimeClicks"
-            message = f"""
-            Hi {user.first_name or user.username},
+            # Generate password reset token
+            reset_token = user.generate_password_reset_token()
             
-            You have requested a password reset for your LimeClicks account.
-            
-            If you did not request this, please ignore this email.
-            
-            Best regards,
-            LimeClicks Team
-            """
-            
-            send_mail(
-                subject=subject,
-                message=message,
-                from_email=settings.DEFAULT_FROM_EMAIL,
-                recipient_list=[email],
-                fail_silently=False,
+            # Create password reset URL with token
+            reset_url = request.build_absolute_uri(
+                reverse('accounts:password_reset_confirm', args=[reset_token])
             )
             
-            messages.success(request, "Password reset instructions have been sent to your email.")
+            # Send password reset email using Brevo template ID 1
+            template_params = {
+                'name': user.first_name or user.username,
+                'url': reset_url
+            }
+            
+            # Create template email message
+            email_message = BrevoTemplateEmailMessage(
+                template_id=1,
+                template_params=template_params,
+                to=[email],
+                from_email=settings.DEFAULT_FROM_EMAIL
+            )
+            
+            # Send the email
+            connection = get_connection()
+            connection.send_messages([email_message])
+            
+            # Store email in session for success page
+            request.session['password_reset_email'] = email
+            
+            return redirect("accounts:password_reset_success")
+            
         except User.DoesNotExist:
-            # Don't reveal if email exists or not
-            messages.success(request, "Password reset instructions have been sent to your email.")
-        
-        return redirect("accounts:password_reset")
+            # Don't reveal if email exists or not - still show success page
+            request.session['password_reset_email'] = email
+            return redirect("accounts:password_reset_success")
     
     return render(request, "accounts/password_reset.html", {"form": form})
+
+
+def verify_email_view(request, token):
+    """
+    Handle email verification using the token
+    """
+    try:
+        user = get_object_or_404(User, verification_token=token)
+        
+        if user.email_verified:
+            messages.info(request, "Your email is already verified. You can log in.")
+            return redirect("accounts:login")
+        
+        if user.is_verification_token_expired():
+            messages.error(request, "Verification link has expired. Please register again.")
+            return redirect("accounts:register")
+        
+        # Verify the email
+        user.email_verified = True
+        user.save()
+        
+        # Send welcome email in background task
+        from .tasks import send_welcome_email_async
+        send_welcome_email_async.delay(user.id)
+        
+        messages.success(request, "Email verified successfully! You can now log in. Welcome to LimeClicks!")
+        return redirect("accounts:login")
+        
+    except Http404:
+        messages.error(request, "Invalid verification link.")
+        return redirect("accounts:register")
+
+
+def resend_confirmation_view(request):
+    """
+    Handle resending confirmation email
+    """
+    form = ResendConfirmationForm(request.POST or None)
+    if request.method == "POST" and form.is_valid():
+        email = form.cleaned_data["email"]
+        
+        try:
+            user = User.objects.get(email__iexact=email)
+            
+            # Regenerate verification token if it's expired
+            if user.is_verification_token_expired():
+                user.regenerate_verification_token()
+            
+            # Send verification email using Brevo template ID 2
+            verification_url = request.build_absolute_uri(
+                reverse('accounts:verify_email', args=[user.verification_token])
+            )
+            
+            template_params = {
+                'name': user.first_name or user.username,
+                'url': verification_url
+            }
+            
+            # Create template email message
+            email_message = BrevoTemplateEmailMessage(
+                template_id=2,
+                template_params=template_params,
+                to=[email],
+                from_email=settings.DEFAULT_FROM_EMAIL
+            )
+            
+            # Send the email
+            connection = get_connection()
+            connection.send_messages([email_message])
+            
+            messages.success(request, "Confirmation email has been sent. Please check your inbox.")
+            
+        except User.DoesNotExist:
+            # Don't reveal if email exists or not
+            messages.success(request, "If an account with this email exists, a confirmation email has been sent.")
+        
+        return redirect("accounts:resend_confirmation")
+    
+    return render(request, "accounts/resend_confirmation.html", {"form": form})
+
+
+def registration_success_view(request):
+    """
+    Show registration success message with email verification instructions
+    """
+    # Get registration info from session
+    registration_info = request.session.get('registration_success')
+    
+    if not registration_info:
+        # If no registration info, redirect to register page
+        return redirect("accounts:register")
+    
+    # Clear the session data after displaying
+    del request.session['registration_success']
+    
+    context = {
+        'email': registration_info['email'],
+        'name': registration_info['name']
+    }
+    
+    return render(request, "accounts/registration_success.html", context)
+
+
+def password_reset_success_view(request):
+    """
+    Show password reset success message
+    """
+    # Get email from session
+    email = request.session.get('password_reset_email')
+    
+    if not email:
+        # If no email in session, redirect to password reset page
+        return redirect("accounts:password_reset")
+    
+    # Clear the session data after displaying
+    del request.session['password_reset_email']
+    
+    context = {
+        'email': email
+    }
+    
+    return render(request, "accounts/password_reset_success.html", context)
+
+
+def password_reset_confirm_view(request, token):
+    """
+    Handle password reset confirmation with token
+    """
+    try:
+        user = User.objects.get(password_reset_token=token)
+        
+        if user.is_password_reset_token_expired():
+            messages.error(request, "Password reset link has expired. Please request a new one.")
+            return redirect("accounts:password_reset")
+        
+        if request.method == "POST":
+            new_password = request.POST.get('new_password')
+            confirm_password = request.POST.get('confirm_password')
+            
+            if not new_password or len(new_password) < 8:
+                messages.error(request, "Password must be at least 8 characters long.")
+            elif new_password != confirm_password:
+                messages.error(request, "Passwords do not match.")
+            else:
+                # Set new password
+                user.set_password(new_password)
+                user.clear_password_reset_token()  # Clear the token
+                user.save()
+                
+                messages.success(request, "Your password has been reset successfully. You can now sign in with your new password.")
+                return redirect("accounts:login")
+        
+        context = {
+            'token': token,
+            'user': user
+        }
+        
+        return render(request, "accounts/password_reset_confirm.html", context)
+        
+    except User.DoesNotExist:
+        messages.error(request, "Invalid or expired password reset link.")
+        return redirect("accounts:password_reset")
+
+
+def root_view(request):
+    """
+    Root URL handler - redirects based on authentication status
+    """
+    if request.user.is_authenticated:
+        return redirect("accounts:dashboard")
+    else:
+        messages.info(request, "Please sign in to access your dashboard.")
+        return redirect("accounts:login")
+
+
+@login_required
+def dashboard_view(request):
+    """
+    Dashboard view for authenticated users
+    """
+    context = {
+        'user': request.user,
+        'welcome_message': f"Welcome back, {request.user.first_name or request.user.username}!"
+    }
+    return render(request, "accounts/dashboard.html", context)

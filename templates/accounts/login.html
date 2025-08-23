@@ -19,9 +19,9 @@
             <form method="post" novalidate>
                 {% csrf_token %}
 
-                <div class="form-control mb-4">
-                    <label class="label pb-1">
-                        <span class="label-text">Email Address</span>
+                <div class="form-control w-full">
+                    <label class="label">
+                        <span class="label-text font-medium">Email Address</span>
                     </label>
                     <input 
                         type="email" 
@@ -34,15 +34,17 @@
                         autocomplete="email"
                     />
                     {% if form.username.errors %}
-                    <div class="text-error text-xs mt-1">
-                        Please enter a valid email address
-                    </div>
+                    {% for error in form.username.errors %}
+                    <label class="label py-0">
+                        <span class="label-text-alt text-error">{{ error }}</span>
+                    </label>
+                    {% endfor %}
                     {% endif %}
                 </div>
 
-                <div class="form-control mb-4">
-                    <label class="label pb-1">
-                        <span class="label-text">Password</span>
+                <div class="form-control w-full mt-4">
+                    <label class="label">
+                        <span class="label-text font-medium">Password</span>
                     </label>
                     <input 
                         type="password" 
@@ -52,21 +54,25 @@
                         required 
                     />
                     {% if form.password.errors %}
-                    <div class="text-error text-xs mt-1">
-                        Please enter your password
-                    </div>
+                    {% for error in form.password.errors %}
+                    <label class="label py-0">
+                        <span class="label-text-alt text-error">{{ error }}</span>
+                    </label>
+                    {% endfor %}
                     {% endif %}
                 </div>
 
-                <div class="form-control mb-4">
-                    <label class="label pb-1">
-                        <span class="label-text">Verification</span>
+                <div class="form-control w-full mt-4">
+                    <label class="label">
+                        <span class="label-text font-medium">Verification</span>
                     </label>
                     {{ form.captcha }}
                     {% if form.captcha.errors %}
-                    <div class="text-error text-xs mt-1">
-                        Please complete the reCAPTCHA verification
-                    </div>
+                    {% for error in form.captcha.errors %}
+                    <label class="label py-0">
+                        <span class="label-text-alt text-error">{{ error }}</span>
+                    </label>
+                    {% endfor %}
                     {% endif %}
                 </div>
 
@@ -75,13 +81,22 @@
                 <input type="hidden" name="next" value="{{ next }}">
                 {% endif %}
 
-                <button class="btn btn-primary w-full" type="submit">Sign in</button>
+                <div class="form-control mt-6">
+                    <button class="btn btn-primary w-full" type="submit">Sign in</button>
+                </div>
             </form>
 
-            <div class="mt-4 text-center">
-                <a class="link link-primary text-sm" href="{% url 'accounts:password_reset' %}">
-                    Forgot your password?
-                </a>
+            <div class="mt-4 text-center space-y-2">
+                <div>
+                    <a class="link link-primary text-sm" href="{% url 'accounts:password_reset' %}">
+                        Forgot your password?
+                    </a>
+                </div>
+                <div>
+                    <a class="link link-secondary text-sm" href="{% url 'accounts:resend_confirmation' %}">
+                        Didn't receive confirmation email?
+                    </a>
+                </div>
             </div>
 
             <div class="divider">or</div>

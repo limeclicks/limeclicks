@@ -150,6 +150,8 @@ CRISPY_TEMPLATE_PACK = "tailwind"
 
 TEMPLATES[0]["DIRS"] = [BASE_DIR / "templates"]
 
+AUTH_USER_MODEL = 'accounts.User'
+
 LOGIN_URL = "accounts:login"
 LOGIN_REDIRECT_URL = "accounts:register"  # Redirect to register page for now
 LOGOUT_REDIRECT_URL = "accounts:login"
@@ -171,3 +173,31 @@ DEFAULT_FROM_EMAIL = "noreply@limeclicks.com"
 RECAPTCHA_PUBLIC_KEY = os.getenv("GOOGLE_RECAPTCHA_SITE_KEY", "your_site_key_here")
 RECAPTCHA_PRIVATE_KEY = os.getenv("GOOGLE_RECAPTCHA_SECRET_KEY", "your_secret_key_here")
 RECAPTCHA_REQUIRED_SCORE = 0.85
+
+# Celery Configuration
+CELERY_BROKER_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+CELERY_RESULT_BACKEND = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = TIME_ZONE
+
+# Celery task routing
+CELERY_TASK_ROUTES = {
+    'accounts.tasks.*': {'queue': 'accounts'},
+    'limeclicks.tasks.*': {'queue': 'default'},
+}
+
+# Celery beat schedule (for periodic tasks)
+CELERY_BEAT_SCHEDULE = {
+    # Example: Clean expired verification tokens every hour
+    'cleanup-expired-tokens': {
+        'task': 'accounts.tasks.cleanup_expired_tokens',
+        'schedule': 3600.0,  # Every hour
+    },
+}
+
+# Authentication settings
+LOGIN_URL = '/accounts/login/'
+LOGIN_REDIRECT_URL = '/accounts/dashboard/'
+LOGOUT_REDIRECT_URL = '/accounts/login/'

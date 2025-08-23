@@ -5,6 +5,16 @@ import brevo_python
 from brevo_python.rest import ApiException
 
 
+class BrevoTemplateEmailMessage(EmailMessage):
+    """
+    Custom EmailMessage class for Brevo template emails
+    """
+    def __init__(self, template_id, template_params, to=None, from_email=None, **kwargs):
+        super().__init__(to=to, from_email=from_email, **kwargs)
+        self.template_id = template_id
+        self.template_params = template_params
+
+
 class BrevoEmailBackend(BaseEmailBackend):
     """
     Custom email backend for Brevo API integration
@@ -31,13 +41,26 @@ class BrevoEmailBackend(BaseEmailBackend):
         
         for message in email_messages:
             try:
-                # Prepare email data for Brevo
-                send_smtp_email = brevo_python.SendSmtpEmail(
-                    to=[{"email": recipient} for recipient in message.to],
-                    subject=message.subject,
-                    text_content=message.body,
-                    sender={"email": message.from_email or "noreply@limeclicks.com"}
-                )
+                # Check if this is a template email
+                template_id = getattr(message, 'template_id', None)
+                template_params = getattr(message, 'template_params', {})
+                
+                if template_id:
+                    # Send using Brevo template
+                    send_smtp_email = brevo_python.SendSmtpEmail(
+                        to=[{"email": recipient} for recipient in message.to],
+                        template_id=template_id,
+                        params=template_params,
+                        sender={"email": message.from_email or "noreply@limeclicks.com"}
+                    )
+                else:
+                    # Send regular email
+                    send_smtp_email = brevo_python.SendSmtpEmail(
+                        to=[{"email": recipient} for recipient in message.to],
+                        subject=message.subject,
+                        text_content=message.body,
+                        sender={"email": message.from_email or "noreply@limeclicks.com"}
+                    )
                 
                 # Add CC if present
                 if hasattr(message, 'cc') and message.cc:
@@ -59,3 +82,23 @@ class BrevoEmailBackend(BaseEmailBackend):
                     raise e
         
         return sent_count
+    
+    def send_template_email(self, to_emails, template_id, template_params, from_email=None):
+        """
+        Send template-based email using Brevo API
+        """
+        try:
+            send_smtp_email = brevo_python.SendSmtpEmail(
+                to=[{"email": email} for email in to_emails],
+                template_id=template_id,
+                params=template_params,
+                sender={"email": from_email or "noreply@limeclicks.com"}
+            )
+            
+            api_response = self.api_instance.send_transac_email(send_smtp_email)
+            return True
+            
+        except (ApiException, Exception) as e:
+            if not self.fail_silently:
+                raise e
+            return False

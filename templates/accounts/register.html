@@ -2,129 +2,282 @@
 {% block title %}Create account{% endblock %}
 
 {% block content %}
-<div class="max-w-md mx-auto mt-8">
+<div class="max-w-md mx-auto mt-8 px-4">
     <div class="card bg-base-100 shadow-xl">
         <div class="card-body">
-            <h1 class="card-title text-2xl mb-2">Join LimeClicks</h1>
-            <p class="opacity-70 mb-4">Create your account to get started</p>
+            <h1 class="text-2xl font-bold">Join LimeClicks</h1>
+            <p class="text-base-content/60 text-sm">Create your account to get started</p>
 
-            {# Non-field errors (e.g., password validation summary) #}
-            {% if form.non_field_errors %}
-            <div class="alert alert-error mb-4">
-                <ul class="list-disc list-inside">
-                    {% for err in form.non_field_errors %}<li>{{ err }}</li>{% endfor %}
-                </ul>
-            </div>
-            {% endif %}
-
-            <form method="post" novalidate>
+            <form method="post" novalidate class="mt-6">
                 {% csrf_token %}
 
-                <div class="form-control mb-4">
-                    <label class="label pb-1">
-                        <span class="label-text">Full Name</span>
+                <!-- Full Name Field -->
+                <div class="form-control w-full">
+                    <label class="label">
+                        <span class="label-text text-sm font-medium">Full Name</span>
                     </label>
-                    <input 
-                        type="text" 
-                        name="name" 
-                        maxlength="150" 
-                        required
-                        value="{{ form.name.value|default_if_none:'' }}" 
+                    <input type="text" name="name" maxlength="150" required
+                        value="{{ form.name.value|default_if_none:'' }}"
                         class="input input-bordered w-full{% if form.name.errors %} input-error{% endif %}"
-                        placeholder="Enter your full name"
-                        autofocus
-                    >
+                        placeholder="Enter your full name" autofocus>
                     {% if form.name.errors %}
-                    <div class="text-error text-xs mt-1">
-                        Please enter your full name
-                    </div>
+                    {% for error in form.name.errors %}
+                    <label class="label py-0">
+                        <span class="label-text-alt text-error">{{ error }}</span>
+                    </label>
+                    {% endfor %}
                     {% endif %}
                 </div>
 
-                <div class="form-control mb-4">
-                    <label class="label pb-1">
-                        <span class="label-text">Email Address</span>
+                <!-- Email Field -->
+                <div class="form-control w-full mt-4">
+                    <label class="label">
+                        <span class="label-text text-sm font-medium">Email Address</span>
                     </label>
-                    <input 
-                        type="email" 
-                        name="email" 
-                        required 
-                        value="{{ form.email.value|default_if_none:'' }}"
-                        class="input input-bordered w-full{% if form.email.errors %} input-error{% endif %}" 
-                        placeholder="Enter your email address" 
-                        autocomplete="email"
-                    >
+                    <input type="email" name="email" required value="{{ form.email.value|default_if_none:'' }}"
+                        class="input input-bordered w-full{% if form.email.errors %} input-error{% endif %}"
+                        placeholder="Enter your email address" autocomplete="email">
                     {% if form.email.errors %}
-                    <div class="text-error text-xs mt-1">
-                        Please enter a valid email address
-                    </div>
+                    {% for error in form.email.errors %}
+                    <label class="label py-0">
+                        <span class="label-text-alt text-error">{{ error }}</span>
+                    </label>
+                    {% endfor %}
                     {% endif %}
                 </div>
 
-                <div class="form-control mb-4">
-                    <label class="label pb-1">
-                        <span class="label-text">Password</span>
+                <!-- Password Field -->
+                <div class="form-control w-full mt-4">
+                    <label class="label">
+                        <span class="label-text text-sm font-medium">Password</span>
                     </label>
-                    <input 
-                        type="password" 
-                        name="password" 
-                        required 
-                        minlength="8" 
-                        class="input input-bordered w-full{% if form.password.errors %} input-error{% endif %}"
-                        placeholder="Create a strong password"
-                        autocomplete="new-password"
-                    >
+
+                    <div class="relative">
+                        <input type="password" id="password" name="password" required minlength="8"
+                            class="input input-bordered w-full pr-10{% if form.password.errors %} input-error{% endif %}"
+                            placeholder="Enter your password" autocomplete="new-password">
+                        <button type="button" class="absolute inset-y-0 right-0 pr-3 flex items-center"
+                            onclick="togglePassword('password')">
+                            <svg class="h-5 w-5 text-base-content/40" fill="none" viewBox="0 0 24 24"
+                                stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                            </svg>
+                        </button>
+                    </div>
+
+                    <!-- Password hint -->
+                    <label class="label py-0">
+                        <span class="label-text-alt text-base-content/60">Must be at least 8 characters</span>
+                    </label>
+
                     {% if form.password.errors %}
-                    <div class="text-error text-xs mt-1">
-                        Password must be at least 8 characters long
-                    </div>
-                    {% endif %}
-                </div>
-
-                <div class="form-control mb-4">
-                    <label class="label pb-1">
-                        <span class="label-text">Confirm Password</span>
+                    {% for error in form.password.errors %}
+                    <label class="label py-0">
+                        <span class="label-text-alt text-error">{{ error }}</span>
                     </label>
-                    <input 
-                        type="password" 
-                        name="password_confirm" 
-                        required 
-                        minlength="8" 
-                        class="input input-bordered w-full{% if form.password_confirm.errors %} input-error{% endif %}"
-                        placeholder="Confirm your password"
-                        autocomplete="new-password"
-                    >
-                    {% if form.password_confirm.errors %}
-                    <div class="text-error text-xs mt-1">
-                        Passwords do not match
-                    </div>
+                    {% endfor %}
                     {% endif %}
                 </div>
 
-                <div class="form-control mb-4">
-                    <label class="label pb-1">
-                        <span class="label-text">Verification</span>
+                <!-- Confirm Password Field -->
+                <div class="form-control w-full mt-4">
+                    <label class="label">
+                        <span class="label-text text-sm font-medium">Confirm Password</span>
+                    </label>
+                    <div class="relative">
+                        <input type="password" id="password_confirm" name="password_confirm" required minlength="8"
+                            class="input input-bordered w-full pr-10{% if form.password_confirm.errors %} input-error{% endif %}"
+                            placeholder="Confirm your password" autocomplete="new-password">
+                        <button type="button" class="absolute inset-y-0 right-0 pr-3 flex items-center"
+                            onclick="togglePassword('password_confirm')">
+                            <svg class="h-5 w-5 text-base-content/40" fill="none" viewBox="0 0 24 24"
+                                stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                            </svg>
+                        </button>
+                    </div>
+
+                    <div id="passwordMatchIndicator" class="hidden">
+                        <label class="label py-0">
+                            <span id="matchText" class="label-text-alt"></span>
+                        </label>
+                    </div>
+
+                    {% if form.password_confirm.errors %}
+                    {% for error in form.password_confirm.errors %}
+                    <label class="label py-0">
+                        <span class="label-text-alt text-error">{{ error }}</span>
+                    </label>
+                    {% endfor %}
+                    {% endif %}
+                </div>
+
+                <!-- Verification Field -->
+                <div class="form-control w-full mt-4">
+                    <label class="label">
+                        <span class="label-text text-sm font-medium">Verification</span>
                     </label>
                     {{ form.captcha }}
                     {% if form.captcha.errors %}
-                    <div class="text-error text-xs mt-1">
-                        Please complete the reCAPTCHA verification
-                    </div>
+                    {% for error in form.captcha.errors %}
+                    <label class="label py-0">
+                        <span class="label-text-alt text-error">{{ error }}</span>
+                    </label>
+                    {% endfor %}
                     {% endif %}
                 </div>
 
-                <button class="btn btn-primary w-full" type="submit">Create account</button>
+                <!-- Non-field errors -->
+                {% if form.non_field_errors %}
+                {% for error in form.non_field_errors %}
+                <div class="alert alert-error mt-4">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none"
+                        viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span>{{ error }}</span>
+                </div>
+                {% endfor %}
+                {% endif %}
+
+                <button class="btn btn-primary w-full mt-6" type="submit">Create account</button>
             </form>
 
-            <div class="divider">or</div>
-            
-            <p class="text-sm opacity-70">
+            <div class="divider my-6">or</div>
+
+            <p class="text-sm text-center text-base-content/60">
                 Already have an account?
-                <a class="link link-primary" href="{% url 'accounts:login' %}">
+                <a class="link link-primary no-underline" href="{% url 'accounts:login' %}">
                     Sign in here
                 </a>
             </p>
         </div>
     </div>
 </div>
+
+<style>
+    /* Fix input field heights */
+    .input {
+        height: 3rem;
+    }
+
+    /* Ensure consistent spacing */
+    .form-control {
+        margin-bottom: 0;
+    }
+
+    /* Ensure form container properly contains all elements */
+    .card-body {
+        overflow: visible;
+        position: relative;
+    }
+
+    /* Ensure error messages stay within bounds */
+    .label-text-alt {
+        word-break: break-word;
+        max-width: 100%;
+    }
+</style>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const passwordInput = document.getElementById('password');
+        const confirmPasswordInput = document.getElementById('password_confirm');
+        const matchIndicator = document.getElementById('passwordMatchIndicator');
+        const matchText = document.getElementById('matchText');
+
+        // Check password match
+        function checkPasswordMatch() {
+            if (confirmPasswordInput.value.length === 0) {
+                matchIndicator.classList.add('hidden');
+                return;
+            }
+
+            matchIndicator.classList.remove('hidden');
+
+            if (passwordInput.value === confirmPasswordInput.value) {
+                matchText.textContent = '✓ Perfect! Your passwords match';
+                matchText.className = 'label-text-alt text-success';
+                confirmPasswordInput.classList.remove('input-error');
+            } else {
+                matchText.textContent = 'Hmm, these passwords don\'t match yet';
+                matchText.className = 'label-text-alt text-error';
+                confirmPasswordInput.classList.add('input-error');
+            }
+        }
+
+        // Event listeners
+        passwordInput.addEventListener('input', function () {
+            if (confirmPasswordInput.value) {
+                checkPasswordMatch();
+            }
+        });
+
+        confirmPasswordInput.addEventListener('input', checkPasswordMatch);
+
+        // Simple form validation on submit
+        const form = document.querySelector('form');
+        form.addEventListener('submit', function (e) {
+            // Remove any existing client-side error messages
+            document.querySelectorAll('.client-error').forEach(el => el.remove());
+
+            let hasError = false;
+
+            // Check minimum password length
+            if (passwordInput.value.length < 8) {
+                e.preventDefault();
+                hasError = true;
+
+                const errorLabel = document.createElement('label');
+                errorLabel.className = 'label py-0 client-error';
+                errorLabel.innerHTML = '<span class="label-text-alt text-error">Password must be at least 8 characters long</span>';
+                passwordInput.parentElement.parentElement.appendChild(errorLabel);
+                passwordInput.classList.add('input-error');
+            }
+
+            // Check password match
+            if (passwordInput.value !== confirmPasswordInput.value) {
+                e.preventDefault();
+                hasError = true;
+
+                const errorLabel = document.createElement('label');
+                errorLabel.className = 'label py-0 client-error';
+                errorLabel.innerHTML = '<span class="label-text-alt text-error">Passwords do not match</span>';
+                confirmPasswordInput.parentElement.parentElement.appendChild(errorLabel);
+                confirmPasswordInput.classList.add('input-error');
+            }
+
+            if (hasError) {
+                return false;
+            }
+        });
+    });
+
+    // Toggle password visibility
+    function togglePassword(fieldId) {
+        const field = document.getElementById(fieldId);
+        const button = field.nextElementSibling;
+        const svg = button.querySelector('svg');
+
+        if (field.type === 'password') {
+            field.type = 'text';
+            svg.innerHTML = `
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+        `;
+        } else {
+            field.type = 'password';
+            svg.innerHTML = `
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+        `;
+        }
+    }
+</script>
 {% endblock %}
