@@ -1,15 +1,97 @@
 {% if messages %}
-<div class="container mx-auto px-6 mt-4">
+<!-- Compact Toast Container -->
+<div class="toast toast-top toast-end z-50 p-2">
     {% for message in messages %}
     {% if "error" in message.tags %}
-    <div class="alert alert-error mb-3"><span>{{ message }}</span></div>
+    <div class="alert alert-error py-2 px-3 min-h-0 rounded-lg shadow-md" id="toast-{{ forloop.counter }}">
+        <i class="fas fa-times-circle text-lg"></i>
+        <span class="text-sm flex-1 truncate">{{ message }}</span>
+        <i class="fas fa-times text-xs cursor-pointer hover:text-white/80 transition-colors" onclick="closeToast('toast-{{ forloop.counter }}')"></i>
+    </div>
     {% elif "warning" in message.tags %}
-    <div class="alert alert-warning mb-3"><span>{{ message }}</span></div>
+    <div class="alert alert-warning py-2 px-3 min-h-0 rounded-lg shadow-md" id="toast-{{ forloop.counter }}">
+        <i class="fas fa-exclamation-triangle text-lg"></i>
+        <span class="text-sm flex-1 truncate">{{ message }}</span>
+        <i class="fas fa-times text-xs cursor-pointer hover:text-black/60 transition-colors" onclick="closeToast('toast-{{ forloop.counter }}')"></i>
+    </div>
     {% elif "success" in message.tags %}
-    <div class="alert alert-success mb-3"><span>{{ message }}</span></div>
+    <div class="alert alert-success py-2 px-3 min-h-0 rounded-lg shadow-md" id="toast-{{ forloop.counter }}">
+        <i class="fas fa-check-circle text-lg"></i>
+        <span class="text-sm flex-1 truncate">{{ message }}</span>
+        <i class="fas fa-times text-xs cursor-pointer hover:text-white/80 transition-colors" onclick="closeToast('toast-{{ forloop.counter }}')"></i>
+    </div>
     {% else %}
-    <div class="alert alert-info mb-3"><span>{{ message }}</span></div>
+    <div class="alert alert-info py-2 px-3 min-h-0 rounded-lg shadow-md" id="toast-{{ forloop.counter }}">
+        <i class="fas fa-info-circle text-lg"></i>
+        <span class="text-sm flex-1 truncate">{{ message }}</span>
+        <i class="fas fa-times text-xs cursor-pointer hover:text-white/80 transition-colors" onclick="closeToast('toast-{{ forloop.counter }}')"></i>
+    </div>
     {% endif %}
     {% endfor %}
 </div>
+
+<style>
+/* Compact toast styling */
+.toast .alert {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    max-width: 350px;
+    margin-bottom: 0.5rem;
+}
+
+.toast .alert:last-child {
+    margin-bottom: 0;
+}
+
+/* Ensure single line height */
+.toast .alert {
+    height: auto;
+    min-height: auto;
+}
+</style>
+
+<script>
+// Compact toast notification functions
+function closeToast(toastId) {
+    const toast = document.getElementById(toastId);
+    if (toast) {
+        toast.style.transition = 'all 0.2s ease-out';
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateX(100%) scale(0.95)';
+        setTimeout(() => {
+            toast.remove();
+        }, 200);
+    }
+}
+
+// Auto-hide toasts with faster animations
+document.addEventListener('DOMContentLoaded', function() {
+    const toasts = document.querySelectorAll('[id^="toast-"]');
+    // console.log('Toast system loaded. Found toasts:', toasts.length);
+    
+    toasts.forEach((toast, index) => {
+        // console.log('Processing toast:', toast.id, toast.textContent.trim());
+        
+        // Faster slide-in animation
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateX(100%) scale(0.9)';
+        setTimeout(() => {
+            toast.style.transition = 'all 0.2s ease-out';
+            toast.style.opacity = '1';
+            toast.style.transform = 'translateX(0) scale(1)';
+        }, index * 50); // Faster stagger
+        
+        // Auto-hide timing
+        const isError = toast.classList.contains('alert-error');
+        const hideDelay = isError ? 6000 : 4000; // Shorter delays
+        
+        setTimeout(() => {
+            if (document.contains(toast)) {
+                closeToast(toast.id);
+            }
+        }, hideDelay);
+    });
+});
+</script>
 {% endif %}

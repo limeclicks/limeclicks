@@ -67,18 +67,43 @@ def register_view(request):
 
 def login_view(request):
     form = LoginForm(request.POST or None)
-    if request.method == "POST" and form.is_valid():
-        username = form.cleaned_data["username"]
-        password = form.cleaned_data["password"]
-        user = authenticate(request, username=username, password=password)
-        if user is not None:
-            if not user.email_verified:
-                messages.error(request, "Please verify your email address before logging in. Check your inbox for the verification link.")
-                return render(request, "accounts/login.html", {"form": form})
-            login(request, user)
-            return redirect("accounts:dashboard")
+    if request.method == "POST":
+        # Get email and password from POST data first
+        email = request.POST.get('username', '').strip()
+        password = request.POST.get('password', '').strip()
+        
+        if form.is_valid():
+            username = form.cleaned_data["username"]
+            password = form.cleaned_data["password"]
+            user = authenticate(request, username=username, password=password)
+            if user is not None:
+                if not user.email_verified:
+                    form.add_error('password', "Please verify your email address before logging in. Check your inbox for the verification link.")
+                    return render(request, "accounts/login.html", {"form": form})
+                login(request, user)
+                return redirect("accounts:dashboard")
+            else:
+                form.add_error('password', "Invalid email or password.")
         else:
-            messages.error(request, "Invalid email or password.")
+            # Always check authentication if email and password are provided
+            if email and password:
+                from django.core.validators import validate_email
+                from django.core.exceptions import ValidationError
+                try:
+                    validate_email(email)
+                    user = authenticate(request, username=email, password=password)
+                    if user is not None:
+                        if not user.email_verified:
+                            form.add_error('password', "Please verify your email address before logging in. Check your inbox for the verification link.")
+                        else:
+                            # Valid credentials but form validation failed (likely captcha)
+                            form.add_error('password', "Please complete the verification to continue.")
+                    else:
+                        # Invalid credentials - add error to password field
+                        form.add_error('password', "Invalid email or password.")
+                except ValidationError:
+                    # Invalid email format - let form validation handle this
+                    pass
     
     return render(request, "accounts/login.html", {"form": form})
 
