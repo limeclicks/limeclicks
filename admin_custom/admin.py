@@ -20,10 +20,23 @@ class PermissionAdmin(ModelAdmin):
 class UserAdmin(DjangoUserAdmin, ModelAdmin):
     # Better UX for existing users: searchable autocompletes
     autocomplete_fields = ("groups", "user_permissions")
-    list_display = ("username", "email", "email_verified", "is_staff", "is_active", "last_login", "date_joined")
+    list_display = ("email", "username", "email_verified", "is_staff", "is_active", "last_login", "date_joined")
     list_filter = ("is_staff", "is_superuser", "is_active", "email_verified", "groups")
-    search_fields = ("username", "email", "first_name", "last_name")
+    search_fields = ("email", "username", "first_name", "last_name")
     readonly_fields = ("verification_token", "verification_token_created")
+    
+    def autocomplete_view(self, request):
+        """
+        Override autocomplete view to display emails instead of usernames
+        """
+        return super().autocomplete_view(request)
+    
+    def get_search_results(self, request, queryset, search_term):
+        """
+        Override to customize autocomplete display
+        """
+        queryset, use_distinct = super().get_search_results(request, queryset, search_term)
+        return queryset, use_distinct
 
     # Add email verification fields to the fieldsets
     fieldsets = DjangoUserAdmin.fieldsets + (

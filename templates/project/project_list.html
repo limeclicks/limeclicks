@@ -1,0 +1,501 @@
+{% extends "dashboard_base.html" %}
+{% block title %}Projects - LimeClicks{% endblock %}
+{% block page_title %}Projects{% endblock %}
+
+{% block extra_head %}
+<!-- Preload favicons for better performance -->
+{% for project in projects %}
+<link rel="preload" href="{{ project.get_cached_favicon_url }}" as="image">
+{% endfor %}
+{% endblock %}
+
+{% block content %}
+<!-- Header Section -->
+<div class="flex justify-between items-center mb-6">
+    <div>
+        <h2 class="text-2xl font-bold text-base-content">Projects</h2>
+        <p class="text-base-content/60 mt-1">Manage your domain projects ({{ total_projects }} total)</p>
+    </div>
+    <button class="btn btn-primary" onclick="openCreateProjectModal()">
+        <i class="fas fa-plus mr-2"></i>Create Project
+    </button>
+</div>
+
+<!-- Search Bar -->
+<div class="card bg-base-100 shadow-sm mb-6">
+    <div class="card-body py-4">
+        <form method="GET" class="flex gap-3">
+            <div class="flex-1">
+                <input 
+                    type="text" 
+                    name="search" 
+                    value="{{ search_query }}"
+                    placeholder="Search projects by domain or title..."
+                    class="input input-bordered w-full"
+                />
+            </div>
+            <button type="submit" class="btn btn-outline">
+                <i class="fas fa-search mr-2"></i>Search
+            </button>
+            {% if search_query %}
+            <a href="{% url 'project:list' %}" class="btn btn-ghost">
+                <i class="fas fa-times mr-2"></i>Clear
+            </a>
+            {% endif %}
+        </form>
+    </div>
+</div>
+
+<!-- Projects Grid -->
+{% if projects %}
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
+    {% for project in projects %}
+    <div class="card bg-base-100 shadow-md hover:shadow-lg transition-shadow" data-project-id="{{ project.id }}">
+        <div class="card-body">
+            <!-- Status Badge -->
+            <div class="flex justify-between items-start mb-3">
+                <div class="badge {% if project.active %}badge-success{% else %}badge-error{% endif %} badge-sm">
+                    <i class="fas {% if project.active %}fa-check{% else %}fa-times{% endif %} mr-1"></i>
+                    {% if project.active %}Active{% else %}Inactive{% endif %}
+                </div>
+                <div class="dropdown dropdown-end">
+                    <div tabindex="0" role="button" class="btn btn-ghost btn-xs btn-circle">
+                        <i class="fas fa-ellipsis-v"></i>
+                    </div>
+                    <ul tabindex="0" class="dropdown-content z-[1] menu p-2 shadow-lg bg-base-100 rounded-box w-48">
+                        <li>
+                            <a onclick="toggleProjectActive({{ project.id }}, {{ project.active|yesno:'true,false' }})">
+                                <i class="fas {% if project.active %}fa-pause{% else %}fa-play{% endif %}"></i>
+                                {% if project.active %}Deactivate{% else %}Activate{% endif %}
+                            </a>
+                        </li>
+                        <li>
+                            <a class="text-error" onclick="deleteProject({{ project.id }}, '{{ project.domain }}')">
+                                <i class="fas fa-trash"></i>Delete
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+            
+            <!-- Domain with Favicon -->
+            <div class="flex items-center gap-3 mb-2">
+                <img src="{{ project.get_cached_favicon_url }}" alt="{{ project.domain }} favicon" 
+                     class="w-8 h-8 rounded-sm flex-shrink-0" 
+                     loading="lazy"
+                     onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                <div class="w-8 h-8 bg-base-300 rounded-sm flex items-center justify-center flex-shrink-0" style="display: none;">
+                    <i class="fas fa-globe text-base-content/60 text-sm"></i>
+                </div>
+                <h3 class="font-bold text-lg text-primary break-all flex-1">{{ project.domain }}</h3>
+            </div>
+            
+            <!-- Title -->
+            <p class="text-base-content/70 mb-3">{{ project.title|default:"Untitled" }}</p>
+            
+            <!-- Stats -->
+            <div class="flex justify-between items-center text-sm text-base-content/60 mb-3">
+                <span>
+                    <i class="fas fa-calendar mr-1"></i>
+                    {{ project.created_at|date:"M d, Y" }}
+                </span>
+                <span>
+                    <i class="fas fa-clock mr-1"></i>
+                    {{ project.updated_at|timesince }} ago
+                </span>
+            </div>
+            
+            <!-- Quick Actions -->
+            <div class="flex gap-2">
+                <button class="btn btn-sm btn-outline flex-1">
+                    <i class="fas fa-chart-line mr-1"></i>Analytics
+                </button>
+                <button class="btn btn-sm btn-outline">
+                    <i class="fas fa-external-link-alt"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Pagination -->
+{% if projects.has_other_pages %}
+<div class="flex justify-center">
+    <div class="join">
+        {% if projects.has_previous %}
+        <a href="?page={{ projects.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}" 
+           class="join-item btn btn-outline">
+            <i class="fas fa-chevron-left"></i>
+        </a>
+        {% endif %}
+        
+        {% for page_num in projects.paginator.page_range %}
+        {% if page_num == projects.number %}
+        <button class="join-item btn btn-active">{{ page_num }}</button>
+        {% elif page_num == 1 or page_num == projects.paginator.num_pages or page_num >= projects.number|add:'-2' and page_num <= projects.number|add:'2' %}
+        <a href="?page={{ page_num }}{% if search_query %}&search={{ search_query }}{% endif %}" 
+           class="join-item btn btn-outline">{{ page_num }}</a>
+        {% elif page_num == projects.number|add:'-3' or page_num == projects.number|add:'3' %}
+        <button class="join-item btn btn-disabled">...</button>
+        {% endif %}
+        {% endfor %}
+        
+        {% if projects.has_next %}
+        <a href="?page={{ projects.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}" 
+           class="join-item btn btn-outline">
+            <i class="fas fa-chevron-right"></i>
+        </a>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
+{% else %}
+<!-- Empty State -->
+<div class="text-center py-16">
+    <div class="mb-6">
+        <div class="w-24 h-24 bg-base-300 rounded-full flex items-center justify-center mx-auto mb-4">
+            <i class="fas fa-folder-open text-4xl text-base-content/40"></i>
+        </div>
+        <h3 class="text-xl font-semibold mb-2">
+            {% if search_query %}No projects found{% else %}No projects yet{% endif %}
+        </h3>
+        <p class="text-base-content/60 mb-6">
+            {% if search_query %}
+                No projects match your search "{{ search_query }}". Try a different search term.
+            {% else %}
+                Create your first project to get started with domain management.
+            {% endif %}
+        </p>
+        {% if search_query %}
+        <a href="{% url 'project:list' %}" class="btn btn-outline">Clear Search</a>
+        {% else %}
+        <button class="btn btn-primary" onclick="openCreateProjectModal()">
+            <i class="fas fa-plus mr-2"></i>Create Your First Project
+        </button>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
+<!-- Create Project Modal -->
+<div id="create-project-modal" class="modal" onclick="if(event.target === this) closeCreateProjectModal()">
+    <div class="modal-box max-w-md">
+        <div class="flex justify-between items-center mb-6">
+            <h3 class="font-bold text-lg">Create project</h3>
+            <button onclick="closeCreateProjectModal()" class="btn btn-sm btn-circle btn-ghost">✕</button>
+        </div>
+        
+        <form id="project-create-form">
+            <div class="form-control w-full mb-4">
+                <label class="label">
+                    <span class="label-text font-medium">Domain</span>
+                </label>
+                <input 
+                    type="text" 
+                    id="domain-input"
+                    name="domain"
+                    placeholder="domain.com" 
+                    class="input input-bordered w-full" 
+                    required 
+                />
+                <div id="domain-error" class="text-error text-sm mt-1 hidden"></div>
+                <label class="label">
+                    <span class="label-text-alt text-base-content/60">Enter a domain or subdomain. Subfolders not supported.</span>
+                </label>
+            </div>
+            
+            <div class="form-control w-full mb-4">
+                <label class="label">
+                    <span class="label-text font-medium">Project Name</span>
+                    <span class="label-text-alt text-base-content/60">(optional)</span>
+                </label>
+                <input 
+                    type="text" 
+                    id="title-input"
+                    name="title"
+                    placeholder="Auto-generated if left blank" 
+                    class="input input-bordered w-full" 
+                />
+            </div>
+            
+            <div class="form-control mb-6">
+                <label class="label cursor-pointer justify-start gap-3">
+                    <input type="checkbox" id="active-input" name="active" class="checkbox" checked />
+                    <span class="label-text">Share once created</span>
+                </label>
+            </div>
+            
+            <div class="modal-action">
+                <button type="submit" class="btn btn-primary" id="create-btn">
+                    Create project
+                </button>
+                <button type="button" onclick="closeCreateProjectModal()" class="btn btn-ghost">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+// Get CSRF token
+function getCookie(name) {
+    const m = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
+    return m ? m.pop() : '';
+}
+
+// Domain validation functions
+function cleanDomain(domain) {
+    // Remove protocol and convert to lowercase
+    let cleaned = domain.toLowerCase().trim();
+    cleaned = cleaned.replace(/^https?:\/\//, '');
+    cleaned = cleaned.replace(/\/$/, ''); // Remove trailing slash
+    cleaned = cleaned.replace(/^www\./, ''); // Remove www. prefix
+    return cleaned;
+}
+
+function validateDomain(domain) {
+    if (!domain) {
+        return { valid: false, message: 'Domain is required.' };
+    }
+    
+    // Must contain at least one dot
+    if (!domain.includes('.')) {
+        return { valid: false, message: 'Please enter a valid domain or subdomain name (must contain at least one dot).' };
+    }
+    
+    // Check for invalid characters
+    if (!/^[a-zA-Z0-9.-]+$/.test(domain)) {
+        return { valid: false, message: 'Domain name contains invalid characters. Only letters, numbers, dots, and hyphens are allowed.' };
+    }
+    
+    // Check domain format
+    const domainPattern = /^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)*[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$/;
+    if (!domainPattern.test(domain)) {
+        return { valid: false, message: 'Please enter a valid domain or subdomain name.' };
+    }
+    
+    // Additional validations
+    if (domain.startsWith('.') || domain.endsWith('.')) {
+        return { valid: false, message: 'Domain cannot start or end with a dot.' };
+    }
+    
+    if (domain.includes('..')) {
+        return { valid: false, message: 'Domain cannot contain consecutive dots.' };
+    }
+    
+    if (domain.startsWith('-') || domain.endsWith('-')) {
+        return { valid: false, message: 'Domain cannot start or end with a hyphen.' };
+    }
+    
+    return { valid: true };
+}
+
+// Modal functions
+function openCreateProjectModal() {
+    const modal = document.getElementById('create-project-modal');
+    modal.classList.add('modal-open');
+    document.getElementById('project-create-form').reset();
+    document.getElementById('domain-error').classList.add('hidden');
+    document.getElementById('active-input').checked = true;
+}
+
+function closeCreateProjectModal() {
+    const modal = document.getElementById('create-project-modal');
+    modal.classList.remove('modal-open');
+}
+
+// Close modal on Escape key
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        const modal = document.getElementById('create-project-modal');
+        if (modal.classList.contains('modal-open')) {
+            closeCreateProjectModal();
+        }
+    }
+});
+
+// Real-time domain validation
+document.getElementById('domain-input').addEventListener('input', function(e) {
+    const domain = cleanDomain(e.target.value);
+    e.target.value = domain;
+    
+    const errorDiv = document.getElementById('domain-error');
+    if (domain) {
+        const validation = validateDomain(domain);
+        if (!validation.valid) {
+            errorDiv.textContent = validation.message;
+            errorDiv.classList.remove('hidden');
+            e.target.classList.add('input-error');
+        } else {
+            errorDiv.classList.add('hidden');
+            e.target.classList.remove('input-error');
+        }
+    } else {
+        errorDiv.classList.add('hidden');
+        e.target.classList.remove('input-error');
+    }
+});
+
+// Form submission
+document.getElementById('project-create-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(e.target);
+    const domain = cleanDomain(formData.get('domain'));
+    
+    // Validate domain
+    const validation = validateDomain(domain);
+    if (!validation.valid) {
+        const errorDiv = document.getElementById('domain-error');
+        errorDiv.textContent = validation.message;
+        errorDiv.classList.remove('hidden');
+        return;
+    }
+    
+    const createBtn = document.getElementById('create-btn');
+    const originalText = createBtn.textContent;
+    createBtn.textContent = 'Creating...';
+    createBtn.disabled = true;
+    
+    try {
+        const response = await fetch('{% url "project:create" %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            body: JSON.stringify({
+                domain: domain,
+                title: formData.get('title') || '',
+                active: formData.get('active') === 'on'
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            // Close modal and refresh page
+            closeCreateProjectModal();
+            
+            // Show success message
+            const toast = document.createElement('div');
+            toast.className = 'alert alert-success fixed top-4 right-4 w-auto z-50';
+            toast.innerHTML = `<i class="fas fa-check"></i> ${data.message}`;
+            document.body.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.remove();
+            }, 3000);
+            
+            // Refresh page to show new project
+            setTimeout(() => {
+                window.location.reload();
+            }, 1000);
+        } else {
+            // Show errors
+            if (data.errors.domain) {
+                const errorDiv = document.getElementById('domain-error');
+                errorDiv.textContent = data.errors.domain[0];
+                errorDiv.classList.remove('hidden');
+            }
+            
+            if (data.errors.__all__) {
+                alert(data.errors.__all__[0]);
+            }
+        }
+    } catch (error) {
+        alert('An error occurred. Please try again.');
+        console.error('Error:', error);
+    } finally {
+        createBtn.textContent = originalText;
+        createBtn.disabled = false;
+    }
+});
+
+// Project actions
+async function toggleProjectActive(projectId, currentActive) {
+    try {
+        const response = await fetch(`/projects/${projectId}/toggle-active/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken')
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            // Show success message
+            const toast = document.createElement('div');
+            toast.className = 'alert alert-success fixed top-4 right-4 w-auto z-50';
+            toast.innerHTML = `<i class="fas fa-check"></i> ${data.message}`;
+            document.body.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.remove();
+            }, 3000);
+            
+            // Refresh page to update UI
+            setTimeout(() => {
+                window.location.reload();
+            }, 1000);
+        } else {
+            alert(data.message);
+        }
+    } catch (error) {
+        alert('An error occurred. Please try again.');
+        console.error('Error:', error);
+    }
+}
+
+
+async function deleteProject(projectId, domain) {
+    if (!confirm(`Are you sure you want to delete the project "${domain}"? This action cannot be undone.`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/projects/${projectId}/delete/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken')
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            // Show success message
+            const toast = document.createElement('div');
+            toast.className = 'alert alert-success fixed top-4 right-4 w-auto z-50';
+            toast.innerHTML = `<i class="fas fa-check"></i> ${data.message}`;
+            document.body.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.remove();
+            }, 3000);
+            
+            // Remove the project card from DOM
+            const projectCard = document.querySelector(`[data-project-id="${projectId}"]`);
+            if (projectCard) {
+                projectCard.remove();
+            }
+            
+            // Refresh page if no projects left visible
+            const remainingProjects = document.querySelectorAll('[data-project-id]');
+            if (remainingProjects.length === 0) {
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1000);
+            }
+        } else {
+            alert(data.message);
+        }
+    } catch (error) {
+        alert('An error occurred. Please try again.');
+        console.error('Error:', error);
+    }
+}
+</script>
+{% endblock %}

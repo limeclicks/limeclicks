@@ -1,0 +1,135 @@
+import requests
+from django.core.files.base import ContentFile
+from django.core.files.storage import default_storage
+from celery import shared_task
+from .models import Project
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+@shared_task(bind=True, max_retries=3)
+def fetch_favicon(self, project_id):
+    """
+    Fetch favicon using Google's favicon service and save it locally
+    """
+    try:
+        project = Project.objects.get(id=project_id)
+        domain = project.domain
+        
+        # Mark as attempted regardless of success
+        project.favicon_fetched = True
+        
+        logger.info(f"Fetching favicon for domain: {domain}")
+        
+        # Use Google's favicon service
+        google_favicon_url = f"https://www.google.com/s2/favicons?domain={domain}&sz=64"
+        
+        try:
+            response = requests.get(
+                google_favicon_url, 
+                timeout=10,
+                headers={'User-Agent': 'Mozilla/5.0 (LimeClicks Favicon Fetcher)'}
+            )
+            
+            if response.status_code == 200 and len(response.content) > 0:
+                # Save the favicon directly (Google returns optimized images)
+                filename = f"{domain}_{project.id}.png"
+                content_file = ContentFile(response.content, name=filename)
+                
+                # Delete old favicon if exists
+                if project.favicon:
+                    try:
+                        default_storage.delete(project.favicon.path)
+                    except Exception as e:
+                        logger.warning(f"Failed to delete old favicon: {e}")
+                
+                # Save new favicon
+                project.favicon.save(filename, content_file, save=False)
+                project.save()
+                
+                logger.info(f"Successfully saved favicon for {domain} from Google's service")
+                return {
+                    'success': True, 
+                    'message': f'Favicon fetched successfully for {domain}',
+                    'url': google_favicon_url
+                }
+            else:
+                project.save()
+                logger.warning(f"Failed to fetch favicon from Google service for {domain}")
+                return {
+                    'success': False, 
+                    'message': f'Failed to fetch favicon from Google service for {domain}'
+                }
+                
+        except Exception as e:
+            logger.warning(f"Error fetching favicon from Google service: {e}")
+            project.save()
+            return {
+                'success': False, 
+                'message': f'Error fetching favicon from Google service: {str(e)}'
+            }
+            
+    except Project.DoesNotExist:
+        logger.error(f"Project with id {project_id} does not exist")
+        return {
+            'success': False, 
+            'message': f'Project with id {project_id} does not exist'
+        }
+    except Exception as e:
+        logger.error(f"Error fetching favicon for project {project_id}: {e}")
+        
+        # Retry with exponential backoff
+        if self.request.retries < self.max_retries:
+            retry_delay = 2 ** self.request.retries  # 2, 4, 8 seconds
+            logger.info(f"Retrying favicon fetch for project {project_id} in {retry_delay} seconds")
+            raise self.retry(countdown=retry_delay, exc=e)
+        
+        # Mark as attempted even on final failure
+        try:
+            project = Project.objects.get(id=project_id)
+            project.favicon_fetched = True
+            project.save()
+        except:
+            pass
+        
+        return {
+            'success': False, 
+            'message': f'Failed to fetch favicon after {self.max_retries} retries: {str(e)}'
+        }
+
+
+@shared_task
+def fetch_all_missing_favicons():
+    """
+    Fetch favicons for all projects that don't have them yet
+    """
+    projects_without_favicons = Project.objects.filter(
+        favicon_fetched=False
+    ).values_list('id', flat=True)
+    
+    count = 0
+    for project_id in projects_without_favicons:
+        fetch_favicon.delay(project_id)
+        count += 1
+    
+    logger.info(f"Queued favicon fetch for {count} projects")
+    return f"Queued favicon fetch for {count} projects"
+
+
+@shared_task
+def refresh_favicon(project_id):
+    """
+    Force refresh favicon for a specific project
+    """
+    try:
+        project = Project.objects.get(id=project_id)
+        project.favicon_fetched = False
+        project.save()
+        
+        return fetch_favicon.delay(project_id)
+    except Project.DoesNotExist:
+        return {
+            'success': False,
+            'message': f'Project with id {project_id} does not exist'
+        }

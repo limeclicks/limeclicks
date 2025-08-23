@@ -369,6 +369,12 @@
                         </a>
                     </li>
                     <li>
+                        <a href="{% url 'project:list' %}" class="flex items-center gap-3 {% if request.resolver_match.app_name == 'project' %}active{% endif %}">
+                            <i class="fas fa-folder w-4"></i>
+                            <span>Projects</span>
+                        </a>
+                    </li>
+                    <li>
                         <a href="#" class="flex items-center gap-3">
                             <i class="fas fa-link w-4"></i>
                             <span>Links</span>

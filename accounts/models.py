@@ -43,3 +43,9 @@ class User(AbstractUser):
         self.password_reset_token = None
         self.password_reset_token_created = None
         self.save()
+    
+    def __str__(self):
+        """Display email instead of username in admin dropdowns"""
+        if self.email:
+            return f"{self.email} - {self.get_full_name() or self.username}"
+        return self.username

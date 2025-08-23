@@ -1,3 +1,3 @@
 from django.contrib import admin
 
-# Register your models here.
+# User admin is already configured in admin_custom/admin.py
