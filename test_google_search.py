@@ -148,14 +148,27 @@ def demonstrate_google_search():
         print(f"  → {uule[:50]}...")
     
     # URL Building Example
-    print("\n8. Complete URL Example:")
+    print("\n8. Complete URL Example with Country-Specific Domains:")
     print("-" * 40)
     print("""
-    Final Google URL structure:
-    https://www.google.com/search?
+    Final Google URL structure (varies by country):
+    
+    For US (default):
+    https://www.google.com/search?q=python+django&num=100&gl=us&hl=en
+    
+    For UK:
+    https://www.google.co.uk/search?q=python+django&num=100&gl=gb&hl=en
+    
+    For France:
+    https://www.google.fr/search?q=python+django&num=100&gl=fr&hl=fr
+    
+    For Japan:
+    https://www.google.co.jp/search?q=python+django&num=100&gl=jp&hl=ja
+    
+    Parameters:
         q=python+django              # Search query
         &num=100                     # Number of results
-        &gl=us                       # Country for results
+        &gl=us                       # Country for results (also determines domain)
         &hl=en                       # Interface language
         &uule=w+CAIQICI...          # Exact location (optional)
         &safe=moderate              # Safe search (optional)
@@ -168,12 +181,40 @@ def demonstrate_google_search():
     - geoCode=us (proxy location)
     """)
     
+    # Show country-specific domains
+    print("\n9. Country-Specific Google Domains:")
+    print("-" * 40)
+    print("The service automatically uses the correct Google domain based on country:")
+    print()
+    
+    example_domains = [
+        ('US', 'www.google.com'),
+        ('GB/UK', 'www.google.co.uk'),
+        ('CA', 'www.google.ca'),
+        ('AU', 'www.google.com.au'),
+        ('FR', 'www.google.fr'),
+        ('DE', 'www.google.de'),
+        ('JP', 'www.google.co.jp'),
+        ('IN', 'www.google.co.in'),
+        ('BR', 'www.google.com.br'),
+        ('ES', 'www.google.es'),
+        ('IT', 'www.google.it'),
+        ('MX', 'www.google.com.mx'),
+    ]
+    
+    for country, domain in example_domains:
+        print(f"  {country:6} → {domain}")
+    
+    print("\n  ... and 115+ more countries supported!")
+    print("  Unknown countries default to www.google.com")
+    
     print("\n" + "=" * 70)
     print("Key Features:")
     print("-" * 15)
     print("✓ Support for up to 100 results per request (num=100)")
+    print("✓ Country-specific Google domains (127 countries)")
     print("✓ UULE encoding for precise location targeting")
-    print("✓ gl parameter for country-specific results")
+    print("✓ gl parameter for country-specific results and domain")
     print("✓ hl parameter for interface language")
     print("✓ 60-second timeout for large result sets")
     print("✓ Pagination support for getting more results")

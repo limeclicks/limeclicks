@@ -26,8 +26,195 @@ class ScrapeDoService:
     """
     
     BASE_URL = "https://api.scrape.do"
-    DEFAULT_TIMEOUT = 60  # Increased to 60 seconds for Google searches
+    DEFAULT_TIMEOUT = 30  # 30 seconds timeout for API requests
     CACHE_TTL = 3600  # 1 hour cache for successful responses
+    
+    # Scrape.do supported geoCode mapping (from documentation)
+    SCRAPE_DO_GEO_CODES = {
+        'AL': 'AL',  # Albania
+        'ID': 'ID',  # Indonesia
+        'LV': 'LV',  # Latvia
+        'FI': 'FI',  # Finland
+        'AU': 'AU',  # Australia
+        'CA': 'CA',  # Canada
+        'CL': 'CL',  # Chile
+        'CN': 'CN',  # China
+        'HR': 'HR',  # Croatia
+        'ES': 'ES',  # Spain
+        'LT': 'LT',  # Lithuania
+        'DK': 'DK',  # Denmark
+        'CZ': 'CZ',  # Czech Republic
+        'US': 'US',  # United States
+        'GB': 'GB',  # Great Britain
+        'DE': 'DE',  # Germany
+        'HU': 'HU',  # Hungary
+        'EE': 'EE',  # Estonia
+        'AR': 'AR',  # Argentina
+        'RO': 'RO',  # Romania
+        'JP': 'JP',  # Japan
+        'MY': 'MY',  # Malaysia
+        'AT': 'AT',  # Austria
+        'TR': 'TR',  # Turkey
+        'RU': 'RU',  # Russia
+        'FR': 'FR',  # France
+        'RS': 'RS',  # Serbia
+        'IL': 'IL',  # Israel
+        'PT': 'PT',  # Portugal
+        'IN': 'IN',  # India
+        'BR': 'BR',  # Brazil
+        'BE': 'BE',  # Belgium
+        'ZA': 'ZA',  # South Africa
+        'UA': 'UA',  # Ukraine
+        'PK': 'PK',  # Pakistan
+        'HK': 'HK',  # Hong Kong
+        'MT': 'MT',  # Malta
+        'SE': 'SE',  # Sweden
+        'PL': 'PL',  # Poland
+        'NL': 'NL',  # Netherlands
+        'NO': 'NO',  # Norway
+        'AE': 'AE',  # United Arab Emirates
+        'SA': 'SA',  # Saudi Arabia
+        'MX': 'MX',  # Mexico
+        'GR': 'GR',  # Greece
+        'EG': 'EG',  # Egypt
+        'SK': 'SK',  # Slovakia
+        'CH': 'CH',  # Switzerland
+        'IT': 'IT',  # Italy
+        'SG': 'SG',  # Singapore
+        # UK is an alias for GB
+        'UK': 'GB',  # United Kingdom -> Great Britain
+    }
+    
+    # Country-specific Google domains mapping
+    GOOGLE_DOMAINS = {
+        'US': 'www.google.com',
+        'GB': 'www.google.co.uk',
+        'UK': 'www.google.co.uk',  # Alias for GB
+        'CA': 'www.google.ca',
+        'JP': 'www.google.co.jp',
+        'FR': 'www.google.fr',
+        'AU': 'www.google.com.au',
+        'IN': 'www.google.co.in',
+        'IE': 'www.google.ie',
+        'TR': 'www.google.com.tr',
+        'BE': 'www.google.be',
+        'GR': 'www.google.gr',
+        'MX': 'www.google.com.mx',
+        'DK': 'www.google.dk',
+        'AR': 'www.google.com.ar',
+        'CH': 'www.google.ch',
+        'ES': 'www.google.es',
+        'DE': 'www.google.de',
+        'IT': 'www.google.it',
+        'NL': 'www.google.nl',
+        'BR': 'www.google.com.br',
+        'PT': 'www.google.pt',
+        'SE': 'www.google.se',
+        'NO': 'www.google.no',
+        'FI': 'www.google.fi',
+        'PL': 'www.google.pl',
+        'AT': 'www.google.at',
+        'RU': 'www.google.ru',
+        'KR': 'www.google.co.kr',
+        'CN': 'www.google.com.hk',  # Google.cn redirects to HK
+        'HK': 'www.google.com.hk',
+        'TW': 'www.google.com.tw',
+        'SG': 'www.google.com.sg',
+        'NZ': 'www.google.co.nz',
+        'ZA': 'www.google.co.za',
+        'EG': 'www.google.com.eg',
+        'AE': 'www.google.ae',
+        'SA': 'www.google.com.sa',
+        'IL': 'www.google.co.il',
+        'TH': 'www.google.co.th',
+        'ID': 'www.google.co.id',
+        'MY': 'www.google.com.my',
+        'PH': 'www.google.com.ph',
+        'VN': 'www.google.com.vn',
+        'CZ': 'www.google.cz',
+        'HU': 'www.google.hu',
+        'RO': 'www.google.ro',
+        'BG': 'www.google.bg',
+        'HR': 'www.google.hr',
+        'RS': 'www.google.rs',
+        'SK': 'www.google.sk',
+        'SI': 'www.google.si',
+        'LT': 'www.google.lt',
+        'LV': 'www.google.lv',
+        'EE': 'www.google.ee',
+        'IS': 'www.google.is',
+        'CL': 'www.google.cl',
+        'CO': 'www.google.com.co',
+        'PE': 'www.google.com.pe',
+        'VE': 'www.google.co.ve',
+        'EC': 'www.google.com.ec',
+        'UY': 'www.google.com.uy',
+        'PY': 'www.google.com.py',
+        'BO': 'www.google.com.bo',
+        'CR': 'www.google.co.cr',
+        'PA': 'www.google.com.pa',
+        'GT': 'www.google.com.gt',
+        'HN': 'www.google.hn',
+        'SV': 'www.google.com.sv',
+        'NI': 'www.google.com.ni',
+        'DO': 'www.google.com.do',
+        'PR': 'www.google.com.pr',
+        'JM': 'www.google.com.jm',
+        'TT': 'www.google.tt',
+        'CU': 'www.google.com.cu',
+        'NG': 'www.google.com.ng',
+        'KE': 'www.google.co.ke',
+        'GH': 'www.google.com.gh',
+        'UG': 'www.google.co.ug',
+        'TZ': 'www.google.co.tz',
+        'ZW': 'www.google.co.zw',
+        'BW': 'www.google.co.bw',
+        'MA': 'www.google.co.ma',
+        'DZ': 'www.google.dz',
+        'TN': 'www.google.tn',
+        'LY': 'www.google.com.ly',
+        'ET': 'www.google.com.et',
+        'PK': 'www.google.com.pk',
+        'BD': 'www.google.com.bd',
+        'LK': 'www.google.lk',
+        'NP': 'www.google.com.np',
+        'MM': 'www.google.com.mm',
+        'KH': 'www.google.com.kh',
+        'LA': 'www.google.la',
+        'KZ': 'www.google.kz',
+        'UZ': 'www.google.co.uz',
+        'KG': 'www.google.kg',
+        'TJ': 'www.google.com.tj',
+        'TM': 'www.google.tm',
+        'AF': 'www.google.com.af',
+        'MN': 'www.google.mn',
+        'JO': 'www.google.jo',
+        'LB': 'www.google.com.lb',
+        'KW': 'www.google.com.kw',
+        'BH': 'www.google.com.bh',
+        'QA': 'www.google.com.qa',
+        'OM': 'www.google.com.om',
+        'PS': 'www.google.ps',
+        'IQ': 'www.google.iq',
+        'GE': 'www.google.ge',
+        'AM': 'www.google.am',
+        'AZ': 'www.google.az',
+        'BY': 'www.google.by',
+        'MD': 'www.google.md',
+        'UA': 'www.google.com.ua',
+        'BA': 'www.google.ba',
+        'ME': 'www.google.me',
+        'AL': 'www.google.al',
+        'MK': 'www.google.mk',
+        'MT': 'www.google.com.mt',
+        'CY': 'www.google.com.cy',
+        'LU': 'www.google.lu',
+        'LI': 'www.google.li',
+        'AD': 'www.google.ad',
+        'MC': 'www.google.com.mc',
+        'SM': 'www.google.sm',
+        'VA': 'www.google.com.va'
+    }
     
     def __init__(self, api_key: Optional[str] = None):
         """
@@ -51,6 +238,7 @@ class ScrapeDoService:
         country_code: Optional[str] = None,
         render: bool = False,
         wait_for: Optional[int] = None,
+        waitUntil: Optional[str] = None,
         block_resources: Optional[bool] = None,
         custom_headers: Optional[Dict[str, str]] = None,
         use_cache: bool = True,
@@ -100,7 +288,9 @@ class ScrapeDoService:
             if render:
                 params['render'] = 'true'
                 if wait_for:
-                    params['waitFor'] = wait_for
+                    params['waitUntil'] = wait_for
+                elif waitUntil:
+                    params['waitUntil'] = waitUntil
             
             if block_resources:
                 params['blockResources'] = 'true'
@@ -212,6 +402,20 @@ class ScrapeDoService:
         logger.error(f"All retries failed for URL: {url}")
         return None
     
+    def get_google_domain(self, country_code: str) -> str:
+        """
+        Get the Google domain for a specific country code
+        
+        Args:
+            country_code: Two-letter country code (e.g., 'US', 'GB', 'FR')
+        
+        Returns:
+            Google domain for the country (e.g., 'www.google.co.uk')
+            Defaults to 'www.google.com' if country not found
+        """
+        country = country_code.upper() if country_code else 'US'
+        return self.GOOGLE_DOMAINS.get(country, self.GOOGLE_DOMAINS['US'])
+    
     def encode_uule(self, location: str) -> str:
         """
         Encode location string to Google's UULE format
@@ -243,67 +447,67 @@ class ScrapeDoService:
     def scrape_google_search(
         self, 
         query: str, 
-        country_code: Optional[str] = 'us',
-        num_results: int = 100,  # Increased default to 100
+        country_code: Optional[str] = 'US',
+        num_results: int = 100,
         location: Optional[str] = None,
-        language: Optional[str] = None,
-        gl: Optional[str] = None,  # Country for results (e.g., 'us', 'uk')
         hl: Optional[str] = None,  # Interface language (e.g., 'en', 'es')
         safe: Optional[str] = None,  # Safe search ('active', 'moderate', 'off')
-        start: int = 0,  # Starting position for results
         use_exact_location: bool = False
     ) -> Optional[Dict[str, Any]]:
         """
-        Enhanced Google search scraping with location and language support
+        Google search scraping with country-specific domains (single page only)
         
         Args:
             query: Search query
-            country_code: Country code for Scrape.do proxy location
+            country_code: Country code (determines Google domain and Scrape.do proxy)
             num_results: Number of results to fetch (default: 100)
             location: Location for UULE parameter (e.g., "New York,New York,United States")
-            language: Language for search results (deprecated, use hl instead)
-            gl: Country code for Google results (e.g., 'us' for USA)
             hl: Interface language code (e.g., 'en' for English)
             safe: Safe search setting ('active', 'moderate', 'off')
-            start: Starting position for pagination
             use_exact_location: Whether to use UULE for exact location
         
         Returns:
-            Scraped Google search results
+            Scraped Google search results (first page only)
         
         Examples:
-            # Search from USA in English
-            scraper.scrape_google_search("python django", gl='us', hl='en')
+            # Search from USA
+            scraper.scrape_google_search("python django", country_code='US')
             
-            # Search from Germany in German
-            scraper.scrape_google_search("python django", gl='de', hl='de')
+            # Search from UK with British English
+            scraper.scrape_google_search("python django", country_code='GB', hl='en-GB')
             
-            # Search with exact location (New York)
-            scraper.scrape_google_search(
-                "restaurants", 
-                location="New York,New York,United States",
-                use_exact_location=True
-            )
+            # Search from Germany with German interface
+            scraper.scrape_google_search("python django", country_code='DE', hl='de')
         """
+        # Normalize country code
+        country = (country_code or 'US').upper()
+        
+        # Get the appropriate Google domain for the country
+        google_domain = self.GOOGLE_DOMAINS.get(country, self.GOOGLE_DOMAINS['US'])
+        
+        # Map country to Scrape.do geoCode (fallback to US if not supported)
+        geo_code = self.SCRAPE_DO_GEO_CODES.get(country, 'US')
+        
         # Build query parameters
         params = {
             'q': query,  # Search query
             'num': str(num_results),  # Number of results
         }
         
-        # Add country for results (affects which Google domain and results)
-        if gl:
-            params['gl'] = gl
-        elif country_code:
-            params['gl'] = country_code
-            
         # Add interface language
         if hl:
             params['hl'] = hl
-        elif language:
-            params['hl'] = language
         else:
-            params['hl'] = 'en'  # Default to English
+            # Default language based on country
+            default_languages = {
+                'US': 'en', 'GB': 'en', 'UK': 'en', 'AU': 'en', 'CA': 'en',
+                'FR': 'fr', 'DE': 'de', 'ES': 'es', 'IT': 'it', 'PT': 'pt',
+                'JP': 'ja', 'CN': 'zh-CN', 'RU': 'ru', 'BR': 'pt-BR',
+                'NL': 'nl', 'SE': 'sv', 'NO': 'no', 'DK': 'da', 'FI': 'fi',
+                'PL': 'pl', 'TR': 'tr', 'GR': 'el', 'IN': 'en', 'IL': 'he',
+                'SA': 'ar', 'AE': 'ar', 'EG': 'ar', 'MX': 'es-MX', 'AR': 'es'
+            }
+            params['hl'] = default_languages.get(country, 'en')
         
         # Add location-based search using UULE
         if location and use_exact_location:
@@ -314,65 +518,23 @@ class ScrapeDoService:
         # Add safe search if specified
         if safe:
             params['safe'] = safe
-            
-        # Add start position for pagination
-        if start > 0:
-            params['start'] = str(start)
         
-        # Build the Google search URL with all parameters
-        base_url = "https://www.google.com/search"
+        # Build the Google search URL with country-specific domain
+        base_url = f"https://{google_domain}/search"
         query_string = urlencode(params, safe='', quote_via=quote)
         google_url = f"{base_url}?{query_string}"
         
         logger.info(f"Google search URL: {google_url}")
+        logger.info(f"Using domain: {google_domain} | Scrape.do geoCode: {geo_code}")
         
-        # Use Scrape.do to fetch the results
-        # Pass country_code for proxy location
+        # Use Scrape.do to fetch the results with proper geoCode
         return self.scrape(
             google_url,
-            country_code=country_code,
+            country_code=geo_code,  # Use mapped geoCode for Scrape.do
             render=True,  # Google requires JS rendering
-            wait_for=3000,  # Wait 3 seconds for results to load
-            timeout=60000  # 60 second timeout for Google searches
+            waitUntil='networkidle2'  # Wait for network to be idle
         )
     
-    def scrape_google_search_pages(
-        self,
-        query: str,
-        pages: int = 1,
-        results_per_page: int = 100,
-        **kwargs
-    ) -> list:
-        """
-        Scrape multiple pages of Google search results
-        
-        Args:
-            query: Search query
-            pages: Number of pages to fetch
-            results_per_page: Results per page (max 100)
-            **kwargs: Additional parameters for scrape_google_search
-        
-        Returns:
-            List of scraped results from all pages
-        """
-        all_results = []
-        
-        for page in range(pages):
-            start = page * results_per_page
-            result = self.scrape_google_search(
-                query,
-                num_results=results_per_page,
-                start=start,
-                **kwargs
-            )
-            
-            if result and result.get('success'):
-                all_results.append(result)
-            else:
-                logger.warning(f"Failed to fetch page {page + 1} for query: {query}")
-                break
-        
-        return all_results
     
     def _generate_cache_key(self, url: str, *args, **kwargs) -> str:
         """
