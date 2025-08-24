@@ -48,7 +48,8 @@ INSTALLED_APPS = [
     "crispy_tailwind",
     "django_recaptcha",
     "accounts",
-    "project"
+    "project",
+    "siteconfig"
 ]
 
 MIDDLEWARE = [
@@ -206,3 +207,6 @@ AUTHENTICATION_BACKENDS = [
 LOGIN_URL = '/accounts/login/'
 LOGIN_REDIRECT_URL = '/accounts/dashboard/'
 LOGOUT_REDIRECT_URL = '/accounts/login/'
+
+# Scrape.do API Configuration
+SCRAPPER_API_KEY = os.getenv('SCRAPPER_API_KEY')
