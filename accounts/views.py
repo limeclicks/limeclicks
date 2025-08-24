@@ -1,6 +1,7 @@
 from django.contrib import messages
-from django.contrib.auth import authenticate, login, logout, get_user_model
+from django.contrib.auth import authenticate, login, logout, get_user_model, update_session_auth_hash
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.forms import PasswordChangeForm
 from django.core.mail import send_mail, get_connection
 from django.shortcuts import render, redirect, get_object_or_404
 from django.utils.text import slugify
@@ -70,6 +71,13 @@ def register_view(request):
 
 def login_view(request):
     form = LoginForm(request.POST or None)
+    
+    # Get the next URL from session or query parameter
+    next_url = request.GET.get('next') or request.session.get('next_url', '')
+    if next_url and request.session.get('next_url'):
+        # Clear it from session once we've retrieved it
+        del request.session['next_url']
+    
     if request.method == "POST":
         # Get email and password from POST data first
         email = request.POST.get('username', '').strip()
@@ -84,6 +92,10 @@ def login_view(request):
                     form.add_error('password', "Please verify your email address before logging in. Check your inbox for the verification link.")
                     return render(request, "accounts/login.html", {"form": form})
                 login(request, user)
+                
+                # Redirect to next URL if it exists and is safe
+                if next_url and next_url.startswith('/'):
+                    return redirect(next_url)
                 return redirect("accounts:dashboard")
             else:
                 form.add_error('password', "Invalid email or password.")
@@ -103,6 +115,9 @@ def login_view(request):
                             # If only captcha failed, log the user in anyway
                             if 'captcha' in form.errors and len(form.errors) == 1:
                                 login(request, user)
+                                # Redirect to next URL if it exists and is safe
+                                if next_url and next_url.startswith('/'):
+                                    return redirect(next_url)
                                 return redirect("accounts:dashboard")
                             else:
                                 form.add_error('password', "Please complete the verification to continue.")
@@ -365,7 +380,7 @@ def root_view(request):
     if request.user.is_authenticated:
         return redirect("accounts:dashboard")
     else:
-        messages.info(request, "Please sign in to access your dashboard.")
+        # Don't add message here as middleware will handle it
         return redirect("accounts:login")
 
 
@@ -390,3 +405,69 @@ def dashboard_view(request):
         'welcome_message': f"Welcome back, {request.user.first_name or request.user.username}!"
     }
     return render(request, "accounts/dashboard.html", context)
+
+
+@login_required
+def profile_settings_view(request):
+    """
+    Profile settings view for editing user profile information
+    """
+    user = request.user
+    
+    if request.method == "POST":
+        # Get form data
+        first_name = request.POST.get('first_name', '').strip()
+        last_name = request.POST.get('last_name', '').strip()
+        email = request.POST.get('email', '').strip().lower()
+        
+        # Validate email uniqueness if changed
+        if email != user.email:
+            if User.objects.filter(email__iexact=email).exclude(id=user.id).exists():
+                messages.error(request, "This email address is already in use.")
+            else:
+                # Update user information
+                user.email = email
+                user.first_name = first_name
+                user.last_name = last_name
+                user.save()
+                messages.success(request, "Profile updated successfully!")
+                return redirect("accounts:profile_settings")
+        else:
+            # Update user information
+            user.first_name = first_name
+            user.last_name = last_name
+            user.save()
+            messages.success(request, "Profile updated successfully!")
+            return redirect("accounts:profile_settings")
+    
+    context = {
+        'user': user,
+        'active_tab': 'profile'
+    }
+    return render(request, "accounts/profile_settings.html", context)
+
+
+@login_required
+def security_settings_view(request):
+    """
+    Security settings view for changing password and managing security options
+    """
+    if request.method == 'POST':
+        form = PasswordChangeForm(request.user, request.POST)
+        if form.is_valid():
+            user = form.save()
+            # Update session auth hash to keep user logged in after password change
+            update_session_auth_hash(request, user)
+            messages.success(request, 'Your password was successfully updated!')
+            return redirect('accounts:security_settings')
+        else:
+            messages.error(request, 'Please correct the error below.')
+    else:
+        form = PasswordChangeForm(request.user)
+    
+    context = {
+        'form': form,
+        'active_tab': 'security',
+        'user': request.user
+    }
+    return render(request, 'accounts/security_settings.html', context)

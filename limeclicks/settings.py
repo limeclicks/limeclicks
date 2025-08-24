@@ -60,7 +60,8 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'simple_history.middleware.HistoryRequestMiddleware',
-    "django_htmx.middleware.HtmxMiddleware"
+    "django_htmx.middleware.HtmxMiddleware",
+    'accounts.middleware.AuthenticationMiddleware',  # Custom auth middleware
 ]
 
 ROOT_URLCONF = 'limeclicks.urls'
@@ -153,9 +154,7 @@ TEMPLATES[0]["DIRS"] = [BASE_DIR / "templates"]
 
 AUTH_USER_MODEL = 'accounts.User'
 
-LOGIN_URL = "accounts:login"
-LOGIN_REDIRECT_URL = "accounts:register"  # Redirect to register page for now
-LOGOUT_REDIRECT_URL = "accounts:login"
+# Authentication URLs are configured at the bottom of the file
 
 MESSAGE_TAGS = {
     messages.DEBUG: "alert",

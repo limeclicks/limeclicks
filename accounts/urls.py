@@ -13,6 +13,10 @@ urlpatterns = [
     
     # Dashboard
     path("dashboard/", views.dashboard_view, name="dashboard"),
+    
+    # Account Settings
+    path("settings/profile/", views.profile_settings_view, name="profile_settings"),
+    path("settings/security/", views.security_settings_view, name="security_settings"),
 
     # Email verification
     path("verify-email/<uuid:token>/", views.verify_email_view, name="verify_email"),

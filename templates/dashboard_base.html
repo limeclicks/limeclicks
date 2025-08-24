@@ -291,8 +291,8 @@
                                     </div>
                                 </div>
                             </li>
-                            <li><a href="#" class="text-sm py-3"><i class="fas fa-user mr-3"></i>Profile Settings</a></li>
-                            <li><a href="#" class="text-sm py-3"><i class="fas fa-cog mr-3"></i>Account Settings</a></li>
+                            <li><a href="{% url 'accounts:profile_settings' %}" class="text-sm py-3"><i class="fas fa-user mr-3"></i>Profile Settings</a></li>
+                            <li><a href="{% url 'accounts:security_settings' %}" class="text-sm py-3"><i class="fas fa-shield-alt mr-3"></i>Security Settings</a></li>
                             <li><a href="#" class="text-sm py-3"><i class="fas fa-credit-card mr-3"></i>Billing & Usage</a></li>
                             <li><a href="#" class="text-sm py-3"><i class="fas fa-question-circle mr-3"></i>Help & Support</a></li>
                             <li><hr class="my-2"></li>
@@ -416,13 +416,13 @@
                         </a>
                     </li>
                     <li>
-                        <a href="#" class="flex items-center gap-3">
+                        <a href="{% url 'accounts:profile_settings' %}" class="flex items-center gap-3 {% if request.resolver_match.url_name == 'profile_settings' %}active{% endif %}">
                             <i class="fas fa-user-cog w-4"></i>
                             <span>Profile Settings</span>
                         </a>
                     </li>
                     <li>
-                        <a href="#" class="flex items-center gap-3">
+                        <a href="{% url 'accounts:security_settings' %}" class="flex items-center gap-3 {% if request.resolver_match.url_name == 'security_settings' %}active{% endif %}">
                             <i class="fas fa-shield-alt w-4"></i>
                             <span>Security</span>
                         </a>

@@ -1,0 +1,252 @@
+{% extends "dashboard_base.html" %}
+
+{% block title %}Profile Settings - LimeClicks{% endblock %}
+
+{% block page_title %}Account Settings{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto">
+    <!-- Settings Header -->
+    <div class="mb-6">
+        <h1 class="text-3xl font-bold mb-2">Account Settings</h1>
+        <p class="text-base-content/60">Manage your account settings and preferences</p>
+    </div>
+
+    <!-- Settings Tabs -->
+    <div class="tabs tabs-boxed mb-6 bg-base-100 p-1">
+        <a href="{% url 'accounts:profile_settings' %}" class="tab tab-lg {% if active_tab == 'profile' %}tab-active{% endif %}">
+            <i class="fas fa-user mr-2"></i>Profile
+        </a>
+        <a href="{% url 'accounts:security_settings' %}" class="tab tab-lg {% if active_tab == 'security' %}tab-active{% endif %}">
+            <i class="fas fa-shield-alt mr-2"></i>Security
+        </a>
+    </div>
+
+    <!-- Profile Information Card -->
+    <div class="card bg-base-100 shadow-sm border border-base-300 mb-6">
+        <div class="card-body">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <i class="fas fa-user-circle text-primary text-lg"></i>
+                </div>
+                <div>
+                    <h2 class="text-xl font-semibold">Profile Information</h2>
+                </div>
+            </div>
+            
+            <form method="POST" action="{% url 'accounts:profile_settings' %}">
+                {% csrf_token %}
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    <!-- First Name -->
+                    <div class="form-control">
+                        <label class="label pb-1">
+                            <span class="label-text text-sm font-medium">First Name</span>
+                        </label>
+                        <input type="text" 
+                               name="first_name" 
+                               value="{{ user.first_name }}" 
+                               placeholder="Enter your first name" 
+                               class="input input-bordered w-full" 
+                               required>
+                        <label class="label pt-1">
+                            <span class="label-text-alt text-xs text-base-content/50">Your first name as it will appear in the system</span>
+                        </label>
+                    </div>
+
+                    <!-- Last Name -->
+                    <div class="form-control">
+                        <label class="label pb-1">
+                            <span class="label-text text-sm font-medium">Last Name</span>
+                        </label>
+                        <input type="text" 
+                               name="last_name" 
+                               value="{{ user.last_name }}" 
+                               placeholder="Enter your last name" 
+                               class="input input-bordered w-full">
+                        <label class="label pt-1">
+                            <span class="label-text-alt text-xs text-base-content/50">Optional: Your last name</span>
+                        </label>
+                    </div>
+
+                    <!-- Email -->
+                    <div class="form-control md:col-span-2">
+                        <label class="label pb-1">
+                            <span class="label-text text-sm font-medium">Email Address</span>
+                            {% if user.email_verified %}
+                            <span class="badge badge-success badge-sm gap-1">
+                                <i class="fas fa-check-circle text-xs"></i>
+                                Verified
+                            </span>
+                            {% else %}
+                            <span class="badge badge-warning badge-sm gap-1">
+                                <i class="fas fa-exclamation-circle text-xs"></i>
+                                Unverified
+                            </span>
+                            {% endif %}
+                        </label>
+                        <input type="email" 
+                               name="email" 
+                               value="{{ user.email }}" 
+                               placeholder="your@email.com" 
+                               class="input input-bordered w-full" 
+                               required>
+                        <label class="label pt-1">
+                            <span class="label-text-alt text-xs text-base-content/50">Your primary email address for account notifications</span>
+                        </label>
+                    </div>
+
+                    <!-- Username (Read-only) -->
+                    <div class="form-control md:col-span-2">
+                        <label class="label pb-1">
+                            <span class="label-text text-sm font-medium">Username</span>
+                            <span class="badge badge-ghost badge-sm">Read-only</span>
+                        </label>
+                        <input type="text" 
+                               value="{{ user.username }}" 
+                               class="input input-bordered w-full bg-base-200/50" 
+                               disabled>
+                        <label class="label pt-1">
+                            <span class="label-text-alt text-xs text-base-content/50">Your unique username cannot be changed</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Actions -->
+                <div class="flex justify-between items-center pt-6 mt-6 border-t border-base-300">
+                    <div class="text-sm text-base-content/60 flex items-center gap-2">
+                        <i class="fas fa-info-circle text-xs"></i>
+                        <span>Changes will take effect immediately</span>
+                    </div>
+                    <div class="flex gap-3">
+                        <a href="{% url 'accounts:dashboard' %}" class="btn btn-ghost">Cancel</a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save mr-2"></i>
+                            Save Changes
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Account Information Card -->
+    <div class="card bg-base-100 shadow-sm border border-base-300 mb-6">
+        <div class="card-body">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-10 h-10 rounded-lg bg-base-200 flex items-center justify-center">
+                    <i class="fas fa-info-circle text-base-content/60 text-lg"></i>
+                </div>
+                <div>
+                    <h2 class="text-xl font-semibold">Account Information</h2>
+                </div>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="bg-base-50 border border-base-300 rounded-lg p-4">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-xs text-base-content/60 uppercase tracking-wider mb-1">Member Since</p>
+                            <p class="text-lg font-semibold">{{ user.date_joined|date:"M d, Y" }}</p>
+                        </div>
+                        <div class="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                            <i class="fas fa-calendar text-primary text-sm"></i>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-base-50 border border-base-300 rounded-lg p-4">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-xs text-base-content/60 uppercase tracking-wider mb-1">Last Login</p>
+                            <p class="text-lg font-semibold">{{ user.last_login|date:"M d, Y" }}</p>
+                            <p class="text-xs text-base-content/50">{{ user.last_login|date:"H:i" }}</p>
+                        </div>
+                        <div class="w-10 h-10 rounded-lg bg-info/10 flex items-center justify-center">
+                            <i class="fas fa-clock text-info text-sm"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Danger Zone -->
+    <div class="card bg-base-100 shadow-sm border border-error/20">
+        <div class="card-body">
+            <div class="flex items-center gap-3 mb-4">
+                <div class="w-10 h-10 rounded-lg bg-error/10 flex items-center justify-center">
+                    <i class="fas fa-exclamation-triangle text-error text-lg"></i>
+                </div>
+                <div>
+                    <h2 class="text-xl font-semibold text-error">Danger Zone</h2>
+                </div>
+            </div>
+            
+            <div class="bg-error/5 border border-error/20 rounded-lg p-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="font-medium text-sm mb-1">Delete Account</p>
+                        <p class="text-xs text-base-content/60">Once you delete your account, there is no going back. Please be certain.</p>
+                    </div>
+                    <button class="btn btn-error btn-sm" onclick="confirmDeleteAccount()">
+                        Delete Account
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Account Modal -->
+<dialog id="delete_account_modal" class="modal">
+    <div class="modal-box">
+        <h3 class="font-bold text-lg text-error">
+            <i class="fas fa-exclamation-triangle mr-2"></i>
+            Delete Account
+        </h3>
+        <p class="py-4">
+            This action cannot be undone. All your data will be permanently deleted.
+        </p>
+        <p class="text-sm text-base-content/60">
+            To delete your account, please contact our support team at support@limeclicks.com
+        </p>
+        <div class="modal-action">
+            <form method="dialog">
+                <button class="btn btn-ghost">Cancel</button>
+                <a href="mailto:support@limeclicks.com?subject=Account Deletion Request" class="btn btn-error ml-2">
+                    Contact Support
+                </a>
+            </form>
+        </div>
+    </div>
+    <form method="dialog" class="modal-backdrop">
+        <button>close</button>
+    </form>
+</dialog>
+
+<script>
+function confirmDeleteAccount() {
+    document.getElementById('delete_account_modal').showModal();
+}
+</script>
+
+<style>
+/* Custom styles for better UX */
+.input:focus {
+    outline-offset: 0;
+}
+
+.card {
+    transition: all 0.2s ease;
+}
+
+.card:hover {
+    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+}
+
+.bg-base-50 {
+    background-color: hsl(var(--b2) / 0.3);
+}
+</style>
+{% endblock %}
