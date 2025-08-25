@@ -66,7 +66,8 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'simple_history.middleware.HistoryRequestMiddleware',
     "django_htmx.middleware.HtmxMiddleware",
-    'accounts.middleware.AuthenticationMiddleware',  # Custom auth middleware
+    'accounts.session_fix_middleware.SessionFixMiddleware',  # Fix session issues after login
+    # 'accounts.middleware.AuthenticationMiddleware',  # Temporarily disabled - may conflict
 ]
 
 ROOT_URLCONF = 'limeclicks.urls'

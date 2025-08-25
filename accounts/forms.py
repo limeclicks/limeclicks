@@ -2,6 +2,7 @@ from django import forms
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
+from django.conf import settings
 from django_recaptcha.fields import ReCaptchaField
 from django_recaptcha.widgets import ReCaptchaV2Checkbox
 import re
@@ -38,6 +39,7 @@ class RegisterForm(forms.Form):
             'required': 'Please confirm your password'
         }
     )
+    # Always include reCAPTCHA for registration
     captcha = ReCaptchaField(
         widget=ReCaptchaV2Checkbox,
         error_messages={
@@ -96,12 +98,17 @@ class LoginForm(forms.Form):
             'required': 'Please enter your password'
         }
     )
-    captcha = ReCaptchaField(
-        widget=ReCaptchaV2Checkbox,
-        error_messages={
-            'required': 'Please complete the verification'
-        }
-    )
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Only add reCAPTCHA if not in debug mode (for easier testing)
+        if not settings.DEBUG:
+            self.fields['captcha'] = ReCaptchaField(
+                widget=ReCaptchaV2Checkbox,
+                error_messages={
+                    'required': 'Please complete the verification'
+                }
+            )
 
 
 class PasswordResetForm(forms.Form):

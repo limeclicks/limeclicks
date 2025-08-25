@@ -1,16 +1,17 @@
-{% load static %}
-<!doctype html>
-<html lang="en" data-theme="light" id="html-root">
+<!DOCTYPE html><html lang="en" data-theme="light" id="html-root"><head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Dashboard - LimeClicks</title>
+    <link rel="icon" type="image/png" href="/static/img/favicon.png">
+    <link rel="stylesheet" href="/static/dist/tailwind.css?v=1756147120">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css" integrity="sha512-Kc323vGBEqzTmouAECnVceyQqyqdsSiqLQISBL29aUW4U/M7pSPA/gEUZQqv1cwx4OnYxTxve5UMg5GT6L4JJg==" crossorigin="anonymous" referrerpolicy="no-referrer">
+    <script src="https://unpkg.com/htmx.org@1.9.12" defer=""></script>
+    
+<!-- Ensure page loads fresh -->
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 
-<head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>{% block title %}Dashboard - LimeClicks{% endblock %}</title>
-    <link rel="icon" type="image/png" href="{% static 'img/favicon.png' %}">
-    <link rel="stylesheet" href="{% static 'dist/tailwind.css' %}?v={% now 'U' %}">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css" integrity="sha512-Kc323vGBEqzTmouAECnVceyQqyqdsSiqLQISBL29aUW4U/M7pSPA/gEUZQqv1cwx4OnYxTxve5UMg5GT6L4JJg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
-    <script src="https://unpkg.com/htmx.org@1.9.12" defer></script>
-    {% block extra_head %}{% endblock %}
     <style>
         /* Hide drawer toggle checkbox but keep it functional */
         .drawer-toggle {
@@ -184,7 +185,7 @@
             transform: scale(1.05);
         }
     </style>
-</head>
+<style>                      .htmx-indicator{opacity:0}                      .htmx-request .htmx-indicator{opacity:1; transition: opacity 200ms ease-in;}                      .htmx-request.htmx-indicator{opacity:1; transition: opacity 200ms ease-in;}                    </style></head>
 
 <body class="bg-base-200 min-h-screen">
     <!-- Loading indicator (hidden by default for faster load) -->
@@ -195,10 +196,10 @@
         </div>
     </div>
     
-    {% include "includes/messages.html" %}
+    
     
     <div class="drawer lg:drawer-open" id="main-drawer">
-        <input id="sidebar-toggle" type="checkbox" class="drawer-toggle" />
+        <input id="sidebar-toggle" type="checkbox" class="drawer-toggle" style="">
         
         <!-- Page content -->
         <div class="drawer-content flex flex-col min-h-screen">
@@ -215,7 +216,7 @@
                     </button>
                 </div>
                 <div class="flex-1 px-2">
-                    <span class="text-xl font-semibold">{% block page_title %}Dashboard{% endblock %}</span>
+                    <span class="text-xl font-semibold">Dashboard</span>
                 </div>
                 <div class="flex-none gap-2 px-2">
                     <!-- Theme Toggle -->
@@ -245,7 +246,7 @@
                                 <a class="theme-option flex items-center gap-3" data-theme="auto">
                                     <i class="fas fa-adjust text-base-content"></i>
                                     <span>System</span>
-                                    <i class="fas fa-check ml-auto text-primary hidden" id="auto-check"></i>
+                                    <i class="fas fa-check ml-auto text-primary" id="auto-check"></i>
                                 </a>
                             </li>
                         </ul>
@@ -260,7 +261,7 @@
                             <div class="card-body p-0">
                                 <h3 class="font-bold mb-3">Quick Search</h3>
                                 <div class="form-control">
-                                    <input type="text" placeholder="Search links, analytics..." class="input input-bordered input-sm w-full" />
+                                    <input type="text" placeholder="Search links, analytics..." class="input input-bordered input-sm w-full" style="">
                                 </div>
                             </div>
                         </div>
@@ -316,7 +317,7 @@
                     <div class="dropdown dropdown-end">
                         <div tabindex="0" role="button" class="btn btn-ghost btn-circle avatar">
                             <div class="w-10 h-10 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-white shadow-md">
-                                <span class="text-sm font-bold">{{ user.first_name|first|default:user.username|first|upper }}</span>
+                                <span class="text-sm font-bold">T</span>
                             </div>
                         </div>
                         <div tabindex="0" class="dropdown-content mt-3 z-[100] bg-white dark:bg-base-100 rounded-2xl shadow-xl border border-base-200 w-72 overflow-hidden">
@@ -324,11 +325,11 @@
                             <div class="p-4 bg-gradient-to-r from-violet-50 to-purple-50 dark:from-base-200 dark:to-base-200 border-b border-base-200">
                                 <div class="flex items-center gap-3">
                                     <div class="w-14 h-14 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-white shadow-lg">
-                                        <span class="text-xl font-bold">{{ user.first_name|first|default:user.username|first|upper }}</span>
+                                        <span class="text-xl font-bold">T</span>
                                     </div>
                                     <div class="flex-1">
-                                        <p class="font-semibold text-base-content">{{ user.first_name|default:user.username }} {{ user.last_name|default:"" }}</p>
-                                        <p class="text-sm text-base-content/60 truncate">{{ user.email }}</p>
+                                        <p class="font-semibold text-base-content">Test User </p>
+                                        <p class="text-sm text-base-content/60 truncate">tomuaaz+test1@gmail.com</p>
                                     </div>
                                 </div>
                             </div>
@@ -336,7 +337,7 @@
                             <!-- Menu Items -->
                             <ul class="menu p-2">
                                 <li>
-                                    <a href="{% url 'accounts:profile_settings' %}" class="flex items-center gap-3 hover:bg-base-100 dark:hover:bg-base-200 rounded-lg py-2.5">
+                                    <a href="/accounts/settings/profile/" class="flex items-center gap-3 hover:bg-base-100 dark:hover:bg-base-200 rounded-lg py-2.5">
                                         <span class="w-8 h-8 rounded-lg bg-base-200 dark:bg-base-300 flex items-center justify-center">
                                             <i class="fas fa-user text-sm"></i>
                                         </span>
@@ -344,7 +345,7 @@
                                     </a>
                                 </li>
                                 <li>
-                                    <a href="{% url 'accounts:security_settings' %}" class="flex items-center gap-3 hover:bg-base-100 dark:hover:bg-base-200 rounded-lg py-2.5">
+                                    <a href="/accounts/settings/security/" class="flex items-center gap-3 hover:bg-base-100 dark:hover:bg-base-200 rounded-lg py-2.5">
                                         <span class="w-8 h-8 rounded-lg bg-base-200 dark:bg-base-300 flex items-center justify-center">
                                             <i class="fas fa-shield-alt text-sm"></i>
                                         </span>
@@ -356,7 +357,7 @@
                                         <span class="w-8 h-8 rounded-lg bg-base-200 dark:bg-base-300 flex items-center justify-center">
                                             <i class="fas fa-credit-card text-sm"></i>
                                         </span>
-                                        <span class="text-sm font-medium">Billing & Usage</span>
+                                        <span class="text-sm font-medium">Billing &amp; Usage</span>
                                     </a>
                                 </li>
                                 <li>
@@ -364,14 +365,14 @@
                                         <span class="w-8 h-8 rounded-lg bg-base-200 dark:bg-base-300 flex items-center justify-center">
                                             <i class="fas fa-question-circle text-sm"></i>
                                         </span>
-                                        <span class="text-sm font-medium">Help & Support</span>
+                                        <span class="text-sm font-medium">Help &amp; Support</span>
                                     </a>
                                 </li>
                             </ul>
                             
                             <!-- Sign Out Section -->
                             <div class="border-t border-base-200 p-2">
-                                <a href="{% url 'accounts:logout' %}" class="flex items-center gap-3 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg py-2.5 px-2 text-red-600 dark:text-red-400 transition-colors">
+                                <a href="/accounts/logout/" class="flex items-center gap-3 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg py-2.5 px-2 text-red-600 dark:text-red-400 transition-colors">
                                     <span class="w-8 h-8 rounded-lg bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
                                         <i class="fas fa-sign-out-alt text-sm"></i>
                                     </span>
@@ -385,7 +386,182 @@
             
             <!-- Main Content Area -->
             <main class="flex-1 p-6 bg-base-200">
-                {% block content %}{% endblock %}
+                
+<!-- Welcome Section -->
+<div class="hero bg-gradient-to-r from-primary/10 to-secondary/10 rounded-xl mb-8">
+    <div class="hero-content text-center py-12">
+        <div class="max-w-md">
+            <div class="flex justify-center mb-4">
+                <div class="w-20 h-20 bg-primary/20 rounded-full flex items-center justify-center">
+                    <i class="fas fa-bolt text-3xl text-primary"></i>
+                </div>
+            </div>
+            <h1 class="text-4xl font-bold mb-4">Welcome back, Test User!</h1>
+            <p class="text-base-content/70 mb-6">
+                Welcome to your LimeClicks dashboard. Here you can manage your account, view analytics, and access all platform features.
+            </p>
+            <div class="flex justify-center gap-3">
+                <button class="btn btn-primary">Get Started</button>
+                <button class="btn btn-outline">Learn More</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Actions -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+    <div class="card bg-base-100 shadow-md hover:shadow-lg transition-shadow cursor-pointer">
+        <div class="card-body">
+            <div class="flex items-center gap-4">
+                <div class="w-12 h-12 bg-info/20 rounded-lg flex items-center justify-center">
+                    <i class="fas fa-chart-bar text-info text-xl"></i>
+                </div>
+                <div>
+                    <h3 class="font-semibold">Analytics</h3>
+                    <p class="text-sm text-base-content/60">View your performance metrics</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card bg-base-100 shadow-md hover:shadow-lg transition-shadow cursor-pointer">
+        <div class="card-body">
+            <div class="flex items-center gap-4">
+                <div class="w-12 h-12 bg-success/20 rounded-lg flex items-center justify-center">
+                    <i class="fas fa-users text-success text-xl"></i>
+                </div>
+                <div>
+                    <h3 class="font-semibold">Team</h3>
+                    <p class="text-sm text-base-content/60">Manage your team members</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <a href="/projects/" class="card bg-base-100 shadow-md hover:shadow-lg transition-shadow cursor-pointer" style="border: 3px solid red; background-color: yellow;">
+        <div class="card-body">
+            <div class="flex items-center gap-4">
+                <div class="w-12 h-12 bg-primary/20 rounded-lg flex items-center justify-center">
+                    <i class="fas fa-folder text-primary text-xl"></i>
+                </div>
+                <div>
+                    <h3 class="font-semibold">Projects</h3>
+                    <p class="text-sm text-base-content/60">Manage your domain projects</p>
+                </div>
+            </div>
+        </div>
+    </a>
+
+    <div class="card bg-base-100 shadow-md hover:shadow-lg transition-shadow cursor-pointer">
+        <div class="card-body">
+            <div class="flex items-center gap-4">
+                <div class="w-12 h-12 bg-warning/20 rounded-lg flex items-center justify-center">
+                    <i class="fas fa-cog text-warning text-xl"></i>
+                </div>
+                <div>
+                    <h3 class="font-semibold">Settings</h3>
+                    <p class="text-sm text-base-content/60">Configure your preferences</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Stats Cards -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+    <div class="stat bg-base-100 shadow-md rounded-lg">
+        <div class="stat-figure text-primary">
+            <i class="fas fa-link text-2xl"></i>
+        </div>
+        <div class="stat-title">Total Links</div>
+        <div class="stat-value text-primary">0</div>
+        <div class="stat-desc">Links created</div>
+    </div>
+    
+    <div class="stat bg-base-100 shadow-md rounded-lg">
+        <div class="stat-figure text-secondary">
+            <i class="fas fa-mouse-pointer text-2xl"></i>
+        </div>
+        <div class="stat-title">Total Clicks</div>
+        <div class="stat-value text-secondary">0</div>
+        <div class="stat-desc">Clicks received</div>
+    </div>
+    
+    <div class="stat bg-base-100 shadow-md rounded-lg">
+        <div class="stat-figure text-accent">
+            <i class="fas fa-eye text-2xl"></i>
+        </div>
+        <div class="stat-title">Views Today</div>
+        <div class="stat-value text-accent">0</div>
+        <div class="stat-desc">24h activity</div>
+    </div>
+    
+    <div class="stat bg-base-100 shadow-md rounded-lg">
+        <div class="stat-figure text-info">
+            <i class="fas fa-chart-line text-2xl"></i>
+        </div>
+        <div class="stat-title">Conversion</div>
+        <div class="stat-value text-info">0%</div>
+        <div class="stat-desc">Click rate</div>
+    </div>
+</div>
+
+<!-- Account Info -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <!-- Account Details -->
+    <div class="card bg-base-100 shadow-md">
+        <div class="card-body">
+            <h3 class="card-title mb-4"><i class="fas fa-user mr-2"></i>Account Information</h3>
+            <div class="space-y-3">
+                <div class="flex justify-between items-center py-2">
+                    <span class="text-base-content/70">Name:</span>
+                    <span class="font-medium">Test User</span>
+                </div>
+                <div class="flex justify-between items-center py-2">
+                    <span class="text-base-content/70">Email:</span>
+                    <div class="flex items-center gap-2">
+                        <span class="font-medium">tomuaaz+test1@gmail.com</span>
+                        
+                        <div class="badge badge-success badge-sm"><i class="fas fa-check mr-1"></i>Verified</div>
+                        
+                    </div>
+                </div>
+                <div class="flex justify-between items-center py-2">
+                    <span class="text-base-content/70">Member since:</span>
+                    <span class="font-medium">Aug 23, 2025</span>
+                </div>
+                <div class="flex justify-between items-center py-2">
+                    <span class="text-base-content/70">Last login:</span>
+                    <span class="font-medium">Aug 25, 2025 18:38</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Activity -->
+    <div class="card bg-base-100 shadow-md">
+        <div class="card-body">
+            <h3 class="card-title mb-4"><i class="fas fa-history mr-2"></i>Recent Activity</h3>
+            <div class="space-y-4">
+                <div class="flex items-start gap-3">
+                    <div class="w-2 h-2 bg-primary rounded-full mt-2"></div>
+                    <div>
+                        <p class="text-sm">Welcome email sent</p>
+                        <p class="text-xs text-base-content/60">Account verification completed</p>
+                    </div>
+                </div>
+                <div class="flex items-start gap-3">
+                    <div class="w-2 h-2 bg-success rounded-full mt-2"></div>
+                    <div>
+                        <p class="text-sm">Account created</p>
+                        <p class="text-xs text-base-content/60">Aug 23, 2025</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
             </main>
             
             <!-- Footer -->
@@ -419,10 +595,10 @@
             <aside class="bg-base-100 min-h-full w-60 shadow-xl">
                 <!-- Sidebar Header -->
                 <div class="sidebar-header p-4 border-b border-base-300 flex items-center">
-                    <a href="{% url 'accounts:dashboard' %}" class="flex items-center flex-1">
+                    <a href="/accounts/dashboard/" class="flex items-center flex-1">
                         <div class="brand-text">
-                            <img src="{{ logo_light }}" alt="{{ site_name }}" class="block dark:hidden" style="height: 32px; width: auto; object-fit: contain;">
-                            <img src="{{ logo_dark }}" alt="{{ site_name }}" class="hidden dark:block" style="height: 32px; width: auto; object-fit: contain;">
+                            <img src="/static/img/logo-light-admin.png" alt="LimeClicks" class="block dark:hidden" style="height: 32px; width: auto; object-fit: contain;">
+                            <img src="/static/img/logo-dark-admin.png" alt="LimeClicks" class="hidden dark:block" style="height: 32px; width: auto; object-fit: contain;">
                             <p class="text-xs text-base-content/60 mt-1">SEO Management Platform</p>
                         </div>
                     </a>
@@ -435,7 +611,7 @@
                         <span class="text-xs uppercase font-semibold text-base-content/60">Main</span>
                     </li>
                     <li>
-                        <a href="{% url 'accounts:dashboard' %}" class="flex items-center gap-3 {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">
+                        <a href="/accounts/dashboard/" class="flex items-center gap-3 active">
                             <i class="fas fa-home w-4"></i>
                             <span>Dashboard</span>
                         </a>
@@ -448,7 +624,7 @@
                         </a>
                     </li>
                     <li>
-                        <a href="{% url 'project:list' %}" class="flex items-center gap-3 {% if request.resolver_match.app_name == 'project' %}active{% endif %}">
+                        <a href="/projects/" class="flex items-center gap-3 ">
                             <i class="fas fa-folder w-4"></i>
                             <span>Projects</span>
                         </a>
@@ -495,13 +671,13 @@
                         </a>
                     </li>
                     <li>
-                        <a href="{% url 'accounts:profile_settings' %}" class="flex items-center gap-3 {% if request.resolver_match.url_name == 'profile_settings' %}active{% endif %}">
+                        <a href="/accounts/settings/profile/" class="flex items-center gap-3 ">
                             <i class="fas fa-user-cog w-4"></i>
                             <span>Profile Settings</span>
                         </a>
                     </li>
                     <li>
-                        <a href="{% url 'accounts:security_settings' %}" class="flex items-center gap-3 {% if request.resolver_match.url_name == 'security_settings' %}active{% endif %}">
+                        <a href="/accounts/settings/security/" class="flex items-center gap-3 ">
                             <i class="fas fa-shield-alt w-4"></i>
                             <span>Security</span>
                         </a>
@@ -752,6 +928,6 @@
             hideLoader();
         }
     </script>
-</body>
 
-</html>
+
+</body></html>

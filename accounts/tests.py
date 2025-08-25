@@ -116,10 +116,17 @@ class AccountsTestCase(TestCase):
             'username': 'test@example.com',  # Login uses email
             'password': 'TestPass123!',
             'g-recaptcha-response': 'test'
-        })
+        }, follow=False)  # Don't follow redirects to test the actual redirect
         
-        # Should redirect after successful login
+        # Should redirect after successful login with status 302
         self.assertEqual(response.status_code, 302)
+        # Check redirect URL is the dashboard
+        self.assertEqual(response.url, reverse('accounts:dashboard'))
+        
+        # Now follow the redirect and verify we reach the dashboard
+        response = self.client.get(response.url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Dashboard')
     
     def test_login_with_nonexistent_user(self, mock_recaptcha):
         """Test login fails with non-existent username"""

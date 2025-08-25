@@ -259,9 +259,12 @@ def create_onpage_audit_for_project(project_id: int, trigger_type: str = 'projec
     try:
         project = Project.objects.get(id=project_id)
         
-        # Create or get the on-page audit
+        # Create or get the on-page audit with 10k page limit
         audit, created = OnPageAudit.objects.get_or_create(
-            project=project
+            project=project,
+            defaults={
+                'max_pages_to_crawl': 10000  # Set to 10,000 pages for new projects
+            }
         )
         
         if created:

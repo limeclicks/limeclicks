@@ -7,7 +7,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.utils.text import slugify
 from django.conf import settings
 from django.urls import reverse
-from django.http import Http404
+from django.http import Http404, HttpResponseRedirect
 from .forms import RegisterForm, LoginForm, PasswordResetForm, ResendConfirmationForm
 from .email_backend import BrevoTemplateEmailMessage
 import logging
@@ -94,19 +94,21 @@ def login_view(request):
                 # Login the user properly
                 login(request, user)
                 
-                # Set a flag for fresh login
-                request.session['fresh_login'] = True
-                request.session.save()
-                
                 # Log successful login
                 logger.info(f"User {user.email} logged in successfully")
                 
-                # Force redirect with HttpResponseRedirect for reliability
-                from django.http import HttpResponseRedirect
-                dashboard_url = reverse("accounts:dashboard")
+                # Force session save to ensure login is persisted
+                request.session.modified = True
+                request.session.save()
+                
+                # Determine redirect URL
                 if next_url and next_url.startswith('/'):
-                    return HttpResponseRedirect(next_url)
-                return HttpResponseRedirect(dashboard_url)
+                    redirect_to = next_url
+                else:
+                    redirect_to = reverse("accounts:dashboard")
+                
+                # Use hard redirect
+                return HttpResponseRedirect(redirect_to)
             else:
                 form.add_error('password', "Invalid email or password.")
         else:
@@ -127,19 +129,21 @@ def login_view(request):
                                 # Login the user properly
                                 login(request, user)
                                 
-                                # Set a flag for fresh login
-                                request.session['fresh_login'] = True
-                                request.session.save()
-                                
                                 # Log successful login
                                 logger.info(f"User {user.email} logged in successfully (captcha bypass)")
                                 
-                                # Force redirect with HttpResponseRedirect for reliability
-                                from django.http import HttpResponseRedirect
-                                dashboard_url = reverse("accounts:dashboard")
+                                # Force session save to ensure login is persisted
+                                request.session.modified = True
+                                request.session.save()
+                                
+                                # Determine redirect URL
                                 if next_url and next_url.startswith('/'):
-                                    return HttpResponseRedirect(next_url)
-                                return HttpResponseRedirect(dashboard_url)
+                                    redirect_to = next_url
+                                else:
+                                    redirect_to = reverse("accounts:dashboard")
+                                
+                                # Use hard redirect
+                                return HttpResponseRedirect(redirect_to)
                             else:
                                 form.add_error('password', "Please complete the verification to continue.")
                     else:
@@ -421,15 +425,9 @@ def dashboard_view(request):
     """
     Dashboard view for authenticated users
     """
-    # Check if this is a fresh login
-    fresh_login = request.session.pop('fresh_login', False)
-    if fresh_login:
-        request.session.save()
-    
     context = {
         'user': request.user,
-        'welcome_message': f"Welcome back, {request.user.first_name or request.user.username}!",
-        'fresh_login': fresh_login
+        'welcome_message': f"Welcome back, {request.user.first_name or request.user.username}!"
     }
     return render(request, "accounts/dashboard.html", context)
 

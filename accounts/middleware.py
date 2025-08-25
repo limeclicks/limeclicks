@@ -22,6 +22,7 @@ class AuthenticationMiddleware:
         '/accounts/resend-confirmation/',
         '/accounts/resend-confirmation/success/',
         '/accounts/registration/success/',
+        '/accounts/login-redirect/',  # Add login redirect page
         '/admin/',
         '/static/',
         '/media/',
