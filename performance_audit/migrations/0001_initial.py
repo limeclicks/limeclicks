@@ -17,7 +17,7 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.CreateModel(
-            name='AuditPage',
+            name='PerformancePage',
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('page_url', models.URLField(help_text='URL of the page to audit (defaults to project domain home page)', max_length=500)),
@@ -33,16 +33,16 @@ class Migration(migrations.Migration):
                 ('last_manual_audit', models.DateTimeField(blank=True, null=True)),
                 ('created_at', models.DateTimeField(auto_now_add=True)),
                 ('updated_at', models.DateTimeField(auto_now=True)),
-                ('project', models.OneToOneField(on_delete=django.db.models.deletion.CASCADE, related_name='audit_page', to='project.project')),
+                ('project', models.OneToOneField(on_delete=django.db.models.deletion.CASCADE, related_name='performance_page', to='project.project')),
             ],
             options={
                 'verbose_name': 'Audit Page',
                 'verbose_name_plural': 'Audit Pages',
-                'db_table': 'audit_pages',
+                'db_table': 'performance_pages',
             },
         ),
         migrations.CreateModel(
-            name='AuditHistory',
+            name='PerformanceHistory',
             fields=[
                 ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
                 ('status', models.CharField(choices=[('pending', 'Pending'), ('running', 'Running'), ('completed', 'Completed'), ('failed', 'Failed')], default='pending', max_length=20)),
@@ -66,40 +66,40 @@ class Migration(migrations.Migration):
                 ('html_report', models.FileField(blank=True, help_text='HTML report for viewing', null=True, storage=limeclicks.storage_backends.AuditHTMLStorage(), upload_to='')),
                 ('error_message', models.TextField(blank=True, null=True)),
                 ('retry_count', models.IntegerField(default=0)),
-                ('audit_page', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='audit_history', to='audits.auditpage')),
+                ('performance_page', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='performance_history', to='performance_audit.auditpage')),
             ],
             options={
                 'verbose_name': 'Audit History',
                 'verbose_name_plural': 'Audit Histories',
-                'db_table': 'audit_history',
+                'db_table': 'performance_history',
                 'ordering': ['-created_at'],
             },
         ),
         migrations.CreateModel(
-            name='AuditSchedule',
+            name='PerformanceSchedule',
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('scheduled_for', models.DateTimeField()),
                 ('task_id', models.CharField(blank=True, max_length=255, null=True)),
                 ('is_processed', models.BooleanField(default=False)),
                 ('processed_at', models.DateTimeField(blank=True, null=True)),
-                ('audit_page', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='schedules', to='audits.auditpage')),
+                ('performance_page', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='schedules', to='performance_audit.auditpage')),
             ],
             options={
-                'db_table': 'audit_schedules',
+                'db_table': 'performance_schedules',
             },
         ),
         migrations.AddIndex(
             model_name='auditpage',
-            index=models.Index(fields=['next_scheduled_audit'], name='audit_pages_next_sc_81110a_idx'),
+            index=models.Index(fields=['next_scheduled_audit'], name='performance_pages_next_sc_81110a_idx'),
         ),
         migrations.AddIndex(
             model_name='auditpage',
-            index=models.Index(fields=['is_audit_enabled', 'next_scheduled_audit'], name='audit_pages_is_audi_bafe7a_idx'),
+            index=models.Index(fields=['is_audit_enabled', 'next_scheduled_audit'], name='performance_pages_is_audi_bafe7a_idx'),
         ),
         migrations.AddIndex(
             model_name='audithistory',
-            index=models.Index(fields=['audit_page', '-created_at'], name='audit_histo_audit_p_af78e2_idx'),
+            index=models.Index(fields=['performance_page', '-created_at'], name='audit_histo_audit_p_af78e2_idx'),
         ),
         migrations.AddIndex(
             model_name='audithistory',
@@ -115,6 +115,6 @@ class Migration(migrations.Migration):
         ),
         migrations.AlterUniqueTogether(
             name='auditschedule',
-            unique_together={('audit_page', 'scheduled_for')},
+            unique_together={('performance_page', 'scheduled_for')},
         ),
     ]

@@ -8,7 +8,7 @@ from django.db.models import Q
 from django.utils import timezone
 from datetime import timedelta
 
-from .models import AuditPage, AuditHistory
+from .models import PerformancePage, PerformanceHistory
 from .tasks import run_manual_audit, generate_audit_report
 from project.models import Project
 
@@ -19,7 +19,7 @@ def audit_dashboard(request, project_id):
     project = get_object_or_404(Project, id=project_id, user=request.user)
     
     # Get or create audit page
-    audit_page, created = AuditPage.objects.get_or_create(
+    performance_page, created = PerformancePage.objects.get_or_create(
         project=project,
         defaults={
             'page_url': f"https://{project.domain}" if not project.domain.startswith('http') else project.domain
@@ -27,27 +27,27 @@ def audit_dashboard(request, project_id):
     )
     
     # Get audit history
-    audit_history = AuditHistory.objects.filter(
-        audit_page=audit_page
+    performance_history = PerformanceHistory.objects.filter(
+        performance_page=performance_page
     ).order_by('-created_at')
     
     # Separate by device type
-    desktop_audits = audit_history.filter(device_type='desktop')[:5]
-    mobile_audits = audit_history.filter(device_type='mobile')[:5]
+    desktop_audits = performance_history.filter(device_type='desktop')[:5]
+    mobile_audits = performance_history.filter(device_type='mobile')[:5]
     
     # Get latest scores
-    latest_desktop = desktop_audits.first()
-    latest_mobile = mobile_audits.first()
+    latest_desktop = desktop_performance_audit.first()
+    latest_mobile = mobile_performance_audit.first()
     
     # Check if manual audit can be run
-    can_run_manual = audit_page.can_run_manual_audit()
+    can_run_manual = performance_page.can_run_manual_audit()
     time_until_manual = None
-    if not can_run_manual and audit_page.last_manual_audit:
-        time_until_manual = (audit_page.last_manual_audit + timedelta(days=1)) - timezone.now()
+    if not can_run_manual and performance_page.last_manual_audit:
+        time_until_manual = (performance_page.last_manual_audit + timedelta(days=1)) - timezone.now()
     
     context = {
         'project': project,
-        'audit_page': audit_page,
+        'performance_page': performance_page,
         'latest_desktop': latest_desktop,
         'latest_mobile': latest_mobile,
         'desktop_audits': desktop_audits,
@@ -56,7 +56,7 @@ def audit_dashboard(request, project_id):
         'time_until_manual': time_until_manual,
     }
     
-    return render(request, 'audits/dashboard.html', context)
+    return render(request, 'performance_audit/dashboard.html', context)
 
 
 @login_required
@@ -66,14 +66,14 @@ def trigger_manual_audit(request, project_id):
     project = get_object_or_404(Project, id=project_id, user=request.user)
     
     # Get the audit page
-    audit_page = get_object_or_404(AuditPage, project=project)
+    performance_page = get_object_or_404(PerformancePage, project=project)
     
     # Trigger the manual audit
-    result = run_manual_audit.delay(audit_page.id, request.user.id)
+    result = run_manual_audit.delay(performance_page.id, request.user.id)
     
     if result:
         messages.success(request, 'Manual audit started successfully. Results will be available soon.')
     else:
         messages.error(request, 'Failed to start audit. Please try again.')
     
-    return redirect('audits:dashboard', project_id=project.id)
+    return redirect('performance_audit:dashboard', project_id=project.id)

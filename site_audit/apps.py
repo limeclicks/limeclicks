@@ -1,6 +1,6 @@
 from django.apps import AppConfig
 
 
-class OnpageauditConfig(AppConfig):
+class SiteAuditConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
-    name = 'onpageaudit'
+    name = 'site_audit'

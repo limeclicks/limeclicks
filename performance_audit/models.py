@@ -7,13 +7,13 @@ import uuid
 from datetime import timedelta
 
 
-class AuditPage(models.Model):
+class PerformancePage(models.Model):
     """Main model for audit pages associated with projects"""
     
     project = models.OneToOneField(
         'project.Project',
         on_delete=models.CASCADE,
-        related_name='audit_page'
+        related_name='performance_page'
     )
     
     page_url = models.URLField(
@@ -64,7 +64,7 @@ class AuditPage(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     
     class Meta:
-        db_table = 'audit_pages'
+        db_table = 'performance_pages'
         verbose_name = 'Audit Page'
         verbose_name_plural = 'Audit Pages'
         indexes = [
@@ -103,19 +103,19 @@ class AuditPage(models.Model):
             self.next_scheduled_audit = timezone.now() + timedelta(days=self.audit_frequency_days)
             self.save(update_fields=['next_scheduled_audit'])
     
-    def update_from_audit_results(self, audit_history):
+    def update_from_audit_results(self, performance_history):
         """Update summary scores from latest audit"""
-        if audit_history and audit_history.status == 'completed':
-            self.last_audit_date = audit_history.completed_at
-            self.performance_score = audit_history.performance_score
-            self.accessibility_score = audit_history.accessibility_score
-            self.best_practices_score = audit_history.best_practices_score
-            self.seo_score = audit_history.seo_score
-            self.pwa_score = audit_history.pwa_score
+        if performance_history and performance_history.status == 'completed':
+            self.last_audit_date = performance_history.completed_at
+            self.performance_score = performance_history.performance_score
+            self.accessibility_score = performance_history.accessibility_score
+            self.best_practices_score = performance_history.best_practices_score
+            self.seo_score = performance_history.seo_score
+            self.pwa_score = performance_history.pwa_score
             self.save()
 
 
-class AuditHistory(models.Model):
+class PerformanceHistory(models.Model):
     """History of all audits for tracking and comparison"""
     
     AUDIT_STATUS_CHOICES = [
@@ -138,10 +138,10 @@ class AuditHistory(models.Model):
     
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     
-    audit_page = models.ForeignKey(
-        AuditPage,
+    performance_page = models.ForeignKey(
+        PerformancePage,
         on_delete=models.CASCADE,
-        related_name='audit_history'
+        related_name='performance_history'
     )
     
     # Audit metadata
@@ -217,25 +217,25 @@ class AuditHistory(models.Model):
     retry_count = models.IntegerField(default=0)
     
     class Meta:
-        db_table = 'audit_history'
+        db_table = 'performance_history'
         verbose_name = 'Audit History'
         verbose_name_plural = 'Audit Histories'
         ordering = ['-created_at']
         indexes = [
-            models.Index(fields=['audit_page', '-created_at']),
+            models.Index(fields=['performance_page', '-created_at']),
             models.Index(fields=['status', 'created_at']),
             models.Index(fields=['device_type', '-created_at']),
         ]
     
     def __str__(self):
-        return f"Audit {self.id} - {self.audit_page.project.domain} ({self.device_type}) - {self.created_at}"
+        return f"Audit {self.id} - {self.performance_page.project.domain} ({self.device_type}) - {self.created_at}"
     
     def get_score_comparison(self, previous_audit=None):
         """Get score changes compared to previous audit"""
         if not previous_audit:
             # Get the previous completed audit
-            previous_audit = AuditHistory.objects.filter(
-                audit_page=self.audit_page,
+            previous_audit = PerformanceHistory.objects.filter(
+                performance_page=self.performance_page,
                 status='completed',
                 device_type=self.device_type,
                 created_at__lt=self.created_at
@@ -273,11 +273,11 @@ class AuditHistory(models.Model):
         }
 
 
-class AuditSchedule(models.Model):
+class PerformanceSchedule(models.Model):
     """Track scheduled audit runs to prevent duplicates"""
     
-    audit_page = models.ForeignKey(
-        AuditPage,
+    performance_page = models.ForeignKey(
+        PerformancePage,
         on_delete=models.CASCADE,
         related_name='schedules'
     )
@@ -288,11 +288,11 @@ class AuditSchedule(models.Model):
     processed_at = models.DateTimeField(null=True, blank=True)
     
     class Meta:
-        db_table = 'audit_schedules'
-        unique_together = ['audit_page', 'scheduled_for']
+        db_table = 'performance_schedules'
+        unique_together = ['performance_page', 'scheduled_for']
         indexes = [
             models.Index(fields=['scheduled_for', 'is_processed']),
         ]
     
     def __str__(self):
-        return f"Schedule for {self.audit_page} at {self.scheduled_for}"
+        return f"Schedule for {self.performance_page} at {self.scheduled_for}"

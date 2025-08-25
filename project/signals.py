@@ -15,15 +15,15 @@ def auto_queue_audits_on_project_creation(sender, instance, created, **kwargs):
     """
     if created:
         try:
-            from audits.tasks import create_audit_for_project
-            from onpageaudit.tasks import create_onpage_audit_for_project
+            from performance_audit.tasks import create_audit_for_project
+            from site_audit.tasks import create_site_audit_for_project
             
             # Queue Lighthouse audit
             lighthouse_result = create_audit_for_project.delay(instance.id, 'project_created')
             logger.info(f"Auto-queued Lighthouse audit for new project {instance.domain}: Task ID={lighthouse_result.id}")
             
             # Queue OnPage audit  
-            onpage_result = create_onpage_audit_for_project.delay(instance.id, 'project_created')
+            onpage_result = create_site_audit_for_project.delay(instance.id, 'project_created')
             logger.info(f"Auto-queued OnPage audit for new project {instance.domain}: Task ID={onpage_result.id}")
             
             logger.info(f"Successfully auto-queued both audits for new project: {instance.domain}")

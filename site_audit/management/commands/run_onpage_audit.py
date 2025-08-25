@@ -5,8 +5,8 @@ Run on-page audit for a specific project
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 from project.models import Project
-from onpageaudit.models import OnPageAudit, OnPageAuditHistory
-from onpageaudit.tasks import run_onpage_audit, run_manual_onpage_audit
+from site_audit.models import SiteAudit, OnPagePerformanceHistory
+from site_audit.tasks import run_site_audit, run_manual_site_audit
 import time
 
 
@@ -54,13 +54,13 @@ class Command(BaseCommand):
             self.stdout.write(self.style.SUCCESS(f'✓ Found project: {project.title}'))
 
             # Get or create audit
-            audit, created = OnPageAudit.objects.get_or_create(
+            audit, created = SiteAudit.objects.get_or_create(
                 project=project,
                 defaults={'max_pages_to_crawl': options['max_pages']}
             )
             
             if created:
-                self.stdout.write(self.style.SUCCESS('✓ Created new OnPageAudit record'))
+                self.stdout.write(self.style.SUCCESS('✓ Created new SiteAudit record'))
             else:
                 self.stdout.write(f'  Using existing audit (ID: {audit.id})')
 
@@ -85,13 +85,13 @@ class Command(BaseCommand):
 
             # Create audit history entry
             trigger_type = 'manual' if options['manual'] else 'command'
-            audit_history = OnPageAuditHistory.objects.create(
+            performance_history = OnPagePerformanceHistory.objects.create(
                 audit=audit,
                 trigger_type=trigger_type,
                 status='pending',
                 max_pages_to_crawl=options['max_pages']
             )
-            self.stdout.write(self.style.SUCCESS(f'✓ Created audit history (ID: {audit_history.id})'))
+            self.stdout.write(self.style.SUCCESS(f'✓ Created audit history (ID: {performance_history.id})'))
 
             # Update rate limiting
             if options['manual']:
@@ -103,10 +103,10 @@ class Command(BaseCommand):
             # Run audit
             if options['sync']:
                 self.stdout.write('\nRunning audit synchronously...')
-                self.run_audit_sync(audit_history)
+                self.run_audit_sync(performance_history)
             else:
                 self.stdout.write('\nQueuing audit to Celery...')
-                result = run_onpage_audit.delay(str(audit_history.id))
+                result = run_site_audit.delay(str(performance_history.id))
                 self.stdout.write(self.style.SUCCESS(f'✓ Audit queued (Task ID: {result.id})'))
                 self.stdout.write('  Check Django admin for progress')
 
@@ -115,17 +115,17 @@ class Command(BaseCommand):
         except Exception as e:
             self.stdout.write(self.style.ERROR(f'✗ Error: {str(e)}'))
 
-    def run_audit_sync(self, audit_history):
+    def run_audit_sync(self, performance_history):
         """Run audit synchronously and display progress"""
-        from onpageaudit.screaming_frog import ScreamingFrogCLI
+        from site_audit.screaming_frog import ScreamingFrogCLI
         import json
         from django.core.files.base import ContentFile
 
         try:
             # Update status
-            audit_history.status = 'running'
-            audit_history.started_at = timezone.now()
-            audit_history.save()
+            performance_history.status = 'running'
+            performance_history.started_at = timezone.now()
+            performance_history.save()
 
             # Initialize Screaming Frog
             sf_cli = ScreamingFrogCLI()
@@ -133,13 +133,13 @@ class Command(BaseCommand):
             # Check installation
             if not sf_cli.check_installation():
                 self.stdout.write(self.style.ERROR('✗ Screaming Frog is not installed'))
-                audit_history.status = 'failed'
-                audit_history.error_message = 'Screaming Frog not installed'
-                audit_history.save()
+                performance_history.status = 'failed'
+                performance_history.error_message = 'Screaming Frog not installed'
+                performance_history.save()
                 return
 
             # Prepare URL
-            url = audit_history.audit.project.domain
+            url = performance_history.audit.project.domain
             if not url.startswith(('http://', 'https://')):
                 url = f'https://{url}'
 
@@ -148,21 +148,21 @@ class Command(BaseCommand):
                 'follow_redirects': True,
                 'crawl_subdomains': False,
                 'check_spelling': True,
-                'crawl_depth': audit_history.crawl_depth
+                'crawl_depth': performance_history.crawl_depth
             }
 
             self.stdout.write(f'\nCrawling {url}...')
             self.stdout.write('  This may take several minutes...')
 
             # Run crawl
-            max_pages = audit_history.max_pages_to_crawl
+            max_pages = performance_history.max_pages_to_crawl
             success, output_dir, error = sf_cli.crawl_website(url, max_pages, config)
 
             if not success:
                 self.stdout.write(self.style.ERROR(f'✗ Crawl failed: {error}'))
-                audit_history.status = 'failed'
-                audit_history.error_message = error
-                audit_history.save()
+                performance_history.status = 'failed'
+                performance_history.error_message = error
+                performance_history.save()
                 return
 
             self.stdout.write(self.style.SUCCESS('✓ Crawl completed'))
@@ -172,9 +172,9 @@ class Command(BaseCommand):
             results = sf_cli.parse_crawl_results(output_dir)
 
             # Save summary
-            audit_history.summary_data = results['summary']
-            audit_history.pages_crawled = results['pages_crawled']
-            audit_history.issues_summary = {
+            performance_history.summary_data = results['summary']
+            performance_history.pages_crawled = results['pages_crawled']
+            performance_history.issues_summary = {
                 'broken_links': results['summary']['broken_links'],
                 'redirect_chains': results['summary']['redirect_chains'],
                 'missing_titles': results['summary']['missing_titles'],
@@ -185,15 +185,15 @@ class Command(BaseCommand):
                 'missing_hreflang': results['summary']['missing_hreflang'],
                 'total_issues': results['summary']['total_issues']
             }
-            audit_history.total_issues = results['summary']['total_issues']
+            performance_history.total_issues = results['summary']['total_issues']
 
             # Save reports
             self.stdout.write('Saving reports to R2...')
             
             # Full report
             full_report = json.dumps(results, indent=2)
-            filename = f"{audit_history.audit.project.domain}_{audit_history.id}_full.json"
-            audit_history.full_report_json.save(
+            filename = f"{performance_history.audit.project.domain}_{performance_history.id}_full.json"
+            performance_history.full_report_json.save(
                 filename,
                 ContentFile(full_report.encode('utf-8')),
                 save=False
@@ -201,20 +201,20 @@ class Command(BaseCommand):
 
             # Issues report
             issues_report = json.dumps(results['details'], indent=2)
-            filename = f"{audit_history.audit.project.domain}_{audit_history.id}_issues.json"
-            audit_history.issues_report_json.save(
+            filename = f"{performance_history.audit.project.domain}_{performance_history.id}_issues.json"
+            performance_history.issues_report_json.save(
                 filename,
                 ContentFile(issues_report.encode('utf-8')),
                 save=False
             )
 
             # Update status
-            audit_history.status = 'completed'
-            audit_history.completed_at = timezone.now()
-            audit_history.save()
+            performance_history.status = 'completed'
+            performance_history.completed_at = timezone.now()
+            performance_history.save()
 
             # Update main audit
-            audit_history.audit.update_from_audit_results(audit_history)
+            performance_history.audit.update_from_audit_results(performance_history)
 
             # Cleanup
             sf_cli.cleanup()
@@ -222,19 +222,19 @@ class Command(BaseCommand):
             # Display results
             self.stdout.write('\n' + self.style.SUCCESS('Audit Results:'))
             self.stdout.write('-' * 40)
-            self.stdout.write(f"  Pages Crawled: {audit_history.pages_crawled}")
-            self.stdout.write(f"  Total Issues: {audit_history.total_issues}")
+            self.stdout.write(f"  Pages Crawled: {performance_history.pages_crawled}")
+            self.stdout.write(f"  Total Issues: {performance_history.total_issues}")
             
-            for key, value in audit_history.issues_summary.items():
+            for key, value in performance_history.issues_summary.items():
                 if key != 'total_issues':
                     label = key.replace('_', ' ').title()
                     self.stdout.write(f"  {label}: {value}")
 
             self.stdout.write('\n' + self.style.SUCCESS('✓ Audit completed successfully'))
-            self.stdout.write(f'  View details in Django admin: /admin/onpageaudit/onpageaudithistory/{audit_history.id}/')
+            self.stdout.write(f'  View details in Django admin: /admin/site_audit/site_audithistory/{performance_history.id}/')
 
         except Exception as e:
             self.stdout.write(self.style.ERROR(f'✗ Audit failed: {str(e)}'))
-            audit_history.status = 'failed'
-            audit_history.error_message = str(e)
-            audit_history.save()
+            performance_history.status = 'failed'
+            performance_history.error_message = str(e)
+            performance_history.save()

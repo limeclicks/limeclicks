@@ -76,13 +76,13 @@ class ScreamingFrogLicense(models.Model):
         return f"Screaming Frog License ({self.license_status})"
 
 
-class OnPageAudit(models.Model):
+class SiteAudit(models.Model):
     """Main model for on-page SEO audits"""
     
     project = models.OneToOneField(
         'project.Project',
         on_delete=models.CASCADE,
-        related_name='onpage_audit'
+        related_name='site_audit'
     )
     
     # Audit settings
@@ -133,7 +133,7 @@ class OnPageAudit(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     
     class Meta:
-        db_table = 'onpage_audits'
+        db_table = 'site_audits'
         verbose_name = 'On-Page Audit'
         verbose_name_plural = 'On-Page Audits'
         indexes = [
@@ -164,13 +164,13 @@ class OnPageAudit(models.Model):
             self.next_scheduled_audit = timezone.now() + timedelta(days=self.audit_frequency_days)
             self.save(update_fields=['next_scheduled_audit'])
     
-    def update_from_audit_results(self, audit_history):
+    def update_from_audit_results(self, performance_history):
         """Update summary from latest audit"""
-        if audit_history and audit_history.status == 'completed':
-            self.last_audit_date = audit_history.completed_at
+        if performance_history and performance_history.status == 'completed':
+            self.last_audit_date = performance_history.completed_at
             
             # Update issue counts
-            summary = audit_history.get_summary_data()
+            summary = performance_history.get_summary_data()
             if summary:
                 self.broken_links_count = summary.get('broken_links', 0)
                 self.redirect_chains_count = summary.get('redirect_chains', 0)
@@ -192,7 +192,7 @@ class OnPageAudit(models.Model):
             self.save()
 
 
-class OnPageAuditHistory(models.Model):
+class OnPagePerformanceHistory(models.Model):
     """History of all on-page audits"""
     
     AUDIT_STATUS_CHOICES = [
@@ -211,9 +211,9 @@ class OnPageAuditHistory(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     
     audit = models.ForeignKey(
-        OnPageAudit,
+        SiteAudit,
         on_delete=models.CASCADE,
-        related_name='audit_history'
+        related_name='performance_history'
     )
     
     # Audit metadata
@@ -279,7 +279,7 @@ class OnPageAuditHistory(models.Model):
     retry_count = models.IntegerField(default=0)
     
     class Meta:
-        db_table = 'onpage_audit_history'
+        db_table = 'onpage_performance_history'
         verbose_name = 'On-Page Audit History'
         verbose_name_plural = 'On-Page Audit Histories'
         ordering = ['-created_at']
@@ -305,7 +305,7 @@ class OnPageAuditHistory(models.Model):
     
     def compare_with_previous(self):
         """Compare with previous audit to find fixed/new issues"""
-        previous = OnPageAuditHistory.objects.filter(
+        previous = OnPagePerformanceHistory.objects.filter(
             audit=self.audit,
             status='completed',
             created_at__lt=self.created_at
@@ -359,7 +359,7 @@ class OnPageAuditHistory(models.Model):
         return comparison
 
 
-class OnPageIssue(models.Model):
+class SiteIssue(models.Model):
     """Individual issues found during on-page audit"""
     
     ISSUE_TYPE_CHOICES = [
@@ -396,8 +396,8 @@ class OnPageIssue(models.Model):
         ('info', 'Info'),
     ]
     
-    audit_history = models.ForeignKey(
-        OnPageAuditHistory,
+    performance_history = models.ForeignKey(
+        OnPagePerformanceHistory,
         on_delete=models.CASCADE,
         related_name='issues'
     )
@@ -432,7 +432,7 @@ class OnPageIssue(models.Model):
         verbose_name = 'On-Page Issue'
         verbose_name_plural = 'On-Page Issues'
         indexes = [
-            models.Index(fields=['audit_history', 'issue_type']),
+            models.Index(fields=['performance_history', 'issue_type']),
             models.Index(fields=['severity']),
             models.Index(fields=['page_url']),
         ]

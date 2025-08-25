@@ -1,7 +1,7 @@
 from django.core.management.base import BaseCommand
 from django.conf import settings
 from django.utils import timezone
-from audits.models import AuditHistory
+from performance_audit.models import PerformanceHistory
 import boto3
 from botocore.exceptions import ClientError
 
@@ -42,7 +42,7 @@ class Command(BaseCommand):
             # Try to list objects in the bucket
             response = s3_client.list_objects_v2(
                 Bucket=settings.AWS_STORAGE_BUCKET_NAME,
-                Prefix='audits/',
+                Prefix='performance_audit/',
                 MaxKeys=5
             )
             
@@ -65,7 +65,7 @@ class Command(BaseCommand):
         
         # Check recent audit with files
         self.stdout.write("\n3. Checking Recent Audit Files:")
-        recent_audit = AuditHistory.objects.filter(
+        recent_audit = PerformanceHistory.objects.filter(
             status='completed',
             json_report__isnull=False
         ).order_by('-created_at').first()
@@ -110,7 +110,7 @@ class Command(BaseCommand):
         self.stdout.write("\n4. Testing File Upload:")
         try:
             from django.core.files.base import ContentFile
-            from audits.models import AuditPage
+            from performance_audit.models import PerformancePage
             import json
             import uuid
             
@@ -123,10 +123,10 @@ class Command(BaseCommand):
             test_content = json.dumps(test_data, indent=2)
             
             # Get or create a test audit
-            audit_page = AuditPage.objects.first()
-            if audit_page:
-                test_audit = AuditHistory.objects.create(
-                    audit_page=audit_page,
+            performance_page = PerformancePage.objects.first()
+            if performance_page:
+                test_audit = PerformanceHistory.objects.create(
+                    performance_page=performance_page,
                     trigger_type='manual',
                     device_type='desktop',
                     status='completed',

@@ -149,7 +149,7 @@ class LighthouseRunner:
         results['pwa_score'] = int(categories.get('pwa', {}).get('score', 0) * 100)
         
         # Extract performance metrics
-        audits = json_data.get('audits', {})
+        audits = json_data.get('performance_audit', {})
         
         # Core Web Vitals and other metrics
         metrics_mapping = {
@@ -162,7 +162,7 @@ class LighthouseRunner:
         }
         
         for audit_key, result_key in metrics_mapping.items():
-            audit_data = audits.get(audit_key, {})
+            audit_data = performance_audit.get(audit_key, {})
             if audit_data and 'numericValue' in audit_data:
                 value = audit_data['numericValue']
                 # Convert milliseconds to seconds for time-based metrics
@@ -177,28 +177,28 @@ class LighthouseRunner:
         
         return results
     
-    def save_audit_results(self, audit_history, results: Dict):
-        """Save audit results to the AuditHistory model"""
+    def save_audit_results(self, performance_history, results: Dict):
+        """Save audit results to the PerformanceHistory model"""
         
         # Update status and timestamps
-        audit_history.status = 'completed'
-        audit_history.started_at = audit_history.started_at or timezone.now()
-        audit_history.completed_at = timezone.now()
+        performance_history.status = 'completed'
+        performance_history.started_at = performance_history.started_at or timezone.now()
+        performance_history.completed_at = timezone.now()
         
         # Update scores
-        audit_history.performance_score = results.get('performance_score')
-        audit_history.accessibility_score = results.get('accessibility_score')
-        audit_history.best_practices_score = results.get('best_practices_score')
-        audit_history.seo_score = results.get('seo_score')
-        audit_history.pwa_score = results.get('pwa_score')
+        performance_history.performance_score = results.get('performance_score')
+        performance_history.accessibility_score = results.get('accessibility_score')
+        performance_history.best_practices_score = results.get('best_practices_score')
+        performance_history.seo_score = results.get('seo_score')
+        performance_history.pwa_score = results.get('pwa_score')
         
         # Update metrics
-        audit_history.first_contentful_paint = results.get('first_contentful_paint')
-        audit_history.largest_contentful_paint = results.get('largest_contentful_paint')
-        audit_history.time_to_interactive = results.get('time_to_interactive')
-        audit_history.speed_index = results.get('speed_index')
-        audit_history.total_blocking_time = results.get('total_blocking_time')
-        audit_history.cumulative_layout_shift = results.get('cumulative_layout_shift')
+        performance_history.first_contentful_paint = results.get('first_contentful_paint')
+        performance_history.largest_contentful_paint = results.get('largest_contentful_paint')
+        performance_history.time_to_interactive = results.get('time_to_interactive')
+        performance_history.speed_index = results.get('speed_index')
+        performance_history.total_blocking_time = results.get('total_blocking_time')
+        performance_history.cumulative_layout_shift = results.get('cumulative_layout_shift')
         
         # Save JSON report to R2 with proper directory structure
         # Format: project.domain/lighthouseaudit/date/report.json
@@ -206,13 +206,13 @@ class LighthouseRunner:
             from django.core.files.base import ContentFile
             
             # Create the path structure
-            domain = audit_history.audit_page.project.domain.replace('https://', '').replace('http://', '').replace('/', '_')
+            domain = performance_history.performance_page.project.domain.replace('https://', '').replace('http://', '').replace('/', '_')
             date_str = timezone.now().strftime('%Y%m%d_%H%M%S')
             
             # Path: domain/lighthouseaudit/date/device_report.json
-            filename = f"{domain}/lighthouseaudit/{date_str}/{audit_history.device_type}_report.json"
+            filename = f"{domain}/lighthouseaudit/{date_str}/{performance_history.device_type}_report.json"
             
-            audit_history.json_report.save(
+            performance_history.json_report.save(
                 filename,
                 ContentFile(results['json_content'].encode('utf-8')),
                 save=False
@@ -220,12 +220,12 @@ class LighthouseRunner:
         
         # Don't save HTML report - JSON only as requested
         
-        audit_history.save()
+        performance_history.save()
         
         # Update the audit page with latest results
-        audit_history.audit_page.update_from_audit_results(audit_history)
+        performance_history.performance_page.update_from_audit_results(performance_history)
         
-        return audit_history
+        return performance_history
 
 
 class LighthouseService:

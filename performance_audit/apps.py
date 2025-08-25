@@ -1,9 +1,9 @@
 from django.apps import AppConfig
 
 
-class AuditsConfig(AppConfig):
+class PerformanceAuditConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
-    name = 'audits'
+    name = 'performance_audit'
     
     def ready(self):
-        import audits.signals
+        import performance_audit.signals

@@ -1,7 +1,7 @@
 from django.core.management.base import BaseCommand
 from django.utils import timezone
-from audits.models import AuditPage, AuditHistory
-from audits.lighthouse_runner import LighthouseRunner, LighthouseService
+from performance_audit.models import PerformancePage, PerformanceHistory
+from performance_audit.lighthouse_runner import LighthouseRunner, LighthouseService
 from project.models import Project
 
 
@@ -43,23 +43,23 @@ class Command(BaseCommand):
                 return
         
         # Create a test audit if project is specified
-        audit_history = None
+        performance_history = None
         if project_id:
             try:
                 project = Project.objects.get(id=project_id)
-                audit_page, created = AuditPage.objects.get_or_create(
+                performance_page, created = PerformancePage.objects.get_or_create(
                     project=project,
                     defaults={'page_url': url}
                 )
                 
-                audit_history = AuditHistory.objects.create(
-                    audit_page=audit_page,
+                performance_history = PerformanceHistory.objects.create(
+                    performance_page=performance_page,
                     trigger_type='manual',
                     device_type=device,
                     status='pending'
                 )
                 
-                self.stdout.write(f'Created audit history: {audit_history.id}')
+                self.stdout.write(f'Created audit history: {performance_history.id}')
             except Project.DoesNotExist:
                 self.stdout.write(self.style.ERROR(f'Project {project_id} not found'))
                 return
@@ -89,14 +89,14 @@ class Command(BaseCommand):
             self.stdout.write(f'Cumulative Layout Shift: {results.get("cumulative_layout_shift")}')
             
             # Save results if we have an audit history
-            if audit_history:
-                runner.save_audit_results(audit_history, results)
-                self.stdout.write(self.style.SUCCESS(f'\nResults saved to audit history {audit_history.id}'))
+            if performance_history:
+                runner.save_audit_results(performance_history, results)
+                self.stdout.write(self.style.SUCCESS(f'\nResults saved to audit history {performance_history.id}'))
                 
                 # Check if files were saved
-                if audit_history.json_report:
-                    self.stdout.write(f'JSON report saved: {audit_history.json_report.name}')
-                if audit_history.html_report:
-                    self.stdout.write(f'HTML report saved: {audit_history.html_report.name}')
+                if performance_history.json_report:
+                    self.stdout.write(f'JSON report saved: {performance_history.json_report.name}')
+                if performance_history.html_report:
+                    self.stdout.write(f'HTML report saved: {performance_history.html_report.name}')
         else:
             self.stdout.write(self.style.ERROR(f'Audit failed: {error}'))

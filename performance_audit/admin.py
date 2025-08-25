@@ -3,12 +3,12 @@ from django.utils.html import format_html
 from django.urls import reverse
 from django.utils import timezone
 from django.contrib import messages
-from .models import AuditPage, AuditHistory, AuditSchedule
+from .models import PerformancePage, PerformanceHistory, PerformanceSchedule
 from .tasks import run_manual_audit, check_scheduled_audits
 
 
-@admin.register(AuditPage)
-class AuditPageAdmin(admin.ModelAdmin):
+@admin.register(PerformancePage)
+class PerformancePageAdmin(admin.ModelAdmin):
     list_display = [
         'project_domain', 
         'page_url_display',
@@ -108,8 +108,8 @@ class AuditPageAdmin(admin.ModelAdmin):
         return format_html(
             '<a class="button" href="{}">View History</a>&nbsp;'
             '<a class="button" href="{}">Run Manual</a>',
-            reverse('admin:audits_audithistory_changelist') + f'?audit_page__id__exact={obj.id}',
-            reverse('admin:audits_auditpage_run_manual', args=[obj.pk])
+            reverse('admin:performance_audit_audithistory_changelist') + f'?performance_page__id__exact={obj.id}',
+            reverse('admin:performance_audit_auditpage_run_manual', args=[obj.pk])
         )
     audit_actions.short_description = 'Actions'
     
@@ -127,20 +127,20 @@ class AuditPageAdmin(admin.ModelAdmin):
     
     def run_manual_audit_view(self, request, pk):
         from django.shortcuts import redirect
-        audit_page = self.get_object(request, pk)
+        performance_page = self.get_object(request, pk)
         
-        if audit_page:
-            result = run_manual_audit.delay(audit_page.id)
+        if performance_page:
+            result = run_manual_audit.delay(performance_page.id)
             if result:
-                messages.success(request, f'Manual audit started for {audit_page.project.domain}')
+                messages.success(request, f'Manual audit started for {performance_page.project.domain}')
             else:
                 messages.error(request, 'Failed to start manual audit')
         
-        return redirect('admin:audits_auditpage_changelist')
+        return redirect('admin:performance_audit_auditpage_changelist')
 
 
-@admin.register(AuditHistory)
-class AuditHistoryAdmin(admin.ModelAdmin):
+@admin.register(PerformanceHistory)
+class PerformanceHistoryAdmin(admin.ModelAdmin):
     list_display = [
         'audit_id_short',
         'project_domain',
@@ -157,17 +157,17 @@ class AuditHistoryAdmin(admin.ModelAdmin):
         'device_type',
         'trigger_type',
         'created_at',
-        'audit_page__project'
+        'performance_page__project'
     ]
     search_fields = [
         'id',
-        'audit_page__project__domain',
-        'audit_page__page_url',
+        'performance_page__project__domain',
+        'performance_page__page_url',
         'error_message'
     ]
     readonly_fields = [
         'id',
-        'audit_page',
+        'performance_page',
         'status',
         'trigger_type',
         'device_type',
@@ -194,7 +194,7 @@ class AuditHistoryAdmin(admin.ModelAdmin):
         ('Audit Information', {
             'fields': (
                 'id',
-                'audit_page',
+                'performance_page',
                 'status',
                 'trigger_type',
                 'device_type'
@@ -242,9 +242,9 @@ class AuditHistoryAdmin(admin.ModelAdmin):
     audit_id_short.short_description = 'Audit ID'
     
     def project_domain(self, obj):
-        return obj.audit_page.project.domain
+        return obj.performance_page.project.domain
     project_domain.short_description = 'Project'
-    project_domain.admin_order_field = 'audit_page__project__domain'
+    project_domain.admin_order_field = 'performance_page__project__domain'
     
     def status_badge(self, obj):
         colors = {
@@ -360,23 +360,23 @@ class AuditHistoryAdmin(admin.ModelAdmin):
         return False
 
 
-@admin.register(AuditSchedule)
-class AuditScheduleAdmin(admin.ModelAdmin):
+@admin.register(PerformanceSchedule)
+class PerformanceScheduleAdmin(admin.ModelAdmin):
     list_display = [
-        'audit_page_domain',
+        'performance_page_domain',
         'scheduled_for',
         'is_processed',
         'processed_at',
         'task_id'
     ]
     list_filter = ['is_processed', 'scheduled_for', 'processed_at']
-    search_fields = ['audit_page__project__domain', 'task_id']
-    readonly_fields = ['audit_page', 'scheduled_for', 'task_id', 'is_processed', 'processed_at']
+    search_fields = ['performance_page__project__domain', 'task_id']
+    readonly_fields = ['performance_page', 'scheduled_for', 'task_id', 'is_processed', 'processed_at']
     
-    def audit_page_domain(self, obj):
-        return obj.audit_page.project.domain
-    audit_page_domain.short_description = 'Project'
-    audit_page_domain.admin_order_field = 'audit_page__project__domain'
+    def performance_page_domain(self, obj):
+        return obj.performance_page.project.domain
+    performance_page_domain.short_description = 'Project'
+    performance_page_domain.admin_order_field = 'performance_page__project__domain'
     
     def has_add_permission(self, request):
         # Prevent manual creation of schedules
@@ -386,7 +386,7 @@ class AuditScheduleAdmin(admin.ModelAdmin):
     
     def run_scheduled_audits_check(self, request, queryset):
         """Admin action to manually trigger scheduled audits check"""
-        result = check_scheduled_audits.delay()
+        result = check_scheduled_performance_audit.delay()
         if result:
             messages.success(request, 'Scheduled audits check has been triggered.')
         else:

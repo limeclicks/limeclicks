@@ -8,7 +8,7 @@ from django.core.mail import send_mail
 from django.conf import settings
 from datetime import timedelta
 
-from onpageaudit.models import ScreamingFrogLicense
+from site_audit.models import ScreamingFrogLicense
 from accounts.models import User
 
 

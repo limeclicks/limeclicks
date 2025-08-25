@@ -15,8 +15,8 @@ django.setup()
 
 from project.models import Project
 from accounts.models import User
-from audits.models import AuditPage, AuditHistory
-from onpageaudit.models import OnPageAudit, OnPageAuditHistory
+from performance_audit.models import PerformancePage, PerformanceHistory
+from site_audit.models import SiteAudit, OnPagePerformanceHistory
 
 
 def test_project_audit_triggers():
@@ -56,35 +56,35 @@ def test_project_audit_triggers():
     # Check if Lighthouse audit was created
     print("\n3. Checking Lighthouse audit...")
     try:
-        audit_page = AuditPage.objects.get(project=project)
-        print(f"   ✓ AuditPage created for project")
-        print(f"   - Page URL: {audit_page.page_url}")
-        print(f"   - Homepage only: {'Yes' if audit_page.page_url == f'https://{test_domain}' else 'No'}")
+        performance_page = PerformancePage.objects.get(project=project)
+        print(f"   ✓ PerformancePage created for project")
+        print(f"   - Page URL: {performance_page.page_url}")
+        print(f"   - Homepage only: {'Yes' if performance_page.page_url == f'https://{test_domain}' else 'No'}")
         
         # Check audit history
-        audit_histories = AuditHistory.objects.filter(audit_page=audit_page)
+        audit_histories = PerformanceHistory.objects.filter(performance_page=performance_page)
         print(f"   - Audit histories created: {audit_histories.count()}")
         for ah in audit_histories:
             print(f"     • {ah.device_type}: Status={ah.status}, Trigger={ah.trigger_type}")
-    except AuditPage.DoesNotExist:
-        print("   ✗ No AuditPage created")
+    except PerformancePage.DoesNotExist:
+        print("   ✗ No PerformancePage created")
     
     # Check if OnPage audit was created
     print("\n4. Checking OnPage audit...")
     try:
-        onpage_audit = OnPageAudit.objects.get(project=project)
-        print(f"   ✓ OnPageAudit created for project")
-        print(f"   - Max pages to crawl: {onpage_audit.max_pages_to_crawl}")
-        print(f"   - Is 10,000 pages: {'Yes' if onpage_audit.max_pages_to_crawl == 10000 else 'No'}")
-        print(f"   - Audit enabled: {onpage_audit.is_audit_enabled}")
+        site_audit = SiteAudit.objects.get(project=project)
+        print(f"   ✓ SiteAudit created for project")
+        print(f"   - Max pages to crawl: {site_audit.max_pages_to_crawl}")
+        print(f"   - Is 10,000 pages: {'Yes' if site_audit.max_pages_to_crawl == 10000 else 'No'}")
+        print(f"   - Audit enabled: {site_audit.is_audit_enabled}")
         
         # Check audit history
-        onpage_histories = OnPageAuditHistory.objects.filter(audit=onpage_audit)
+        onpage_histories = OnPagePerformanceHistory.objects.filter(audit=site_audit)
         print(f"   - Audit histories created: {onpage_histories.count()}")
         for oh in onpage_histories:
             print(f"     • Status={oh.status}, Trigger={oh.trigger_type}")
-    except OnPageAudit.DoesNotExist:
-        print("   ✗ No OnPageAudit created")
+    except SiteAudit.DoesNotExist:
+        print("   ✗ No SiteAudit created")
     
     # Check Celery task queue (if Celery is running)
     print("\n5. Checking Celery tasks...")
@@ -117,19 +117,19 @@ def test_project_audit_triggers():
     print("SUMMARY:")
     print("="*60)
     
-    has_lighthouse = AuditPage.objects.filter(project=project).exists()
-    has_onpage = OnPageAudit.objects.filter(project=project).exists()
+    has_lighthouse = PerformancePage.objects.filter(project=project).exists()
+    has_onpage = SiteAudit.objects.filter(project=project).exists()
     
     if has_lighthouse:
-        audit_page = AuditPage.objects.get(project=project)
-        is_homepage = audit_page.page_url == f'https://{test_domain}'
+        performance_page = PerformancePage.objects.get(project=project)
+        is_homepage = performance_page.page_url == f'https://{test_domain}'
         print(f"✓ Lighthouse audit: Created (Homepage only: {'Yes' if is_homepage else 'No'})")
     else:
         print("✗ Lighthouse audit: Not created")
     
     if has_onpage:
-        onpage_audit = OnPageAudit.objects.get(project=project)
-        is_10k = onpage_audit.max_pages_to_crawl == 10000
+        site_audit = SiteAudit.objects.get(project=project)
+        is_10k = site_audit.max_pages_to_crawl == 10000
         print(f"✓ OnPage audit: Created (10k page limit: {'Yes' if is_10k else 'No'})")
     else:
         print("✗ OnPage audit: Not created")

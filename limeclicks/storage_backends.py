@@ -28,7 +28,7 @@ class LighthouseAuditStorage(CloudflareR2Storage):
         return super().get_valid_name(name)
 
 
-class OnPageAuditStorage(CloudflareR2Storage):
+class SiteAuditStorage(CloudflareR2Storage):
     """Storage specifically for OnPage audit JSON files with proper directory structure"""
     file_overwrite = False
     
@@ -47,5 +47,5 @@ class AuditJSONStorage(LighthouseAuditStorage):
 
 class AuditHTMLStorage(CloudflareR2Storage):
     """Legacy storage class - no longer used, keeping for compatibility"""
-    location = 'audits/html'
+    location = 'performance_audit/html'
     file_overwrite = False

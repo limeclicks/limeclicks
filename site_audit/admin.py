@@ -4,8 +4,8 @@ from django.urls import reverse
 from django.utils import timezone
 from django.contrib import messages
 from datetime import timedelta
-from .models import ScreamingFrogLicense, OnPageAudit, OnPageAuditHistory, OnPageIssue
-from .tasks import run_manual_onpage_audit, validate_screaming_frog_license, check_scheduled_onpage_audits
+from .models import ScreamingFrogLicense, SiteAudit, OnPagePerformanceHistory, SiteIssue
+from .tasks import run_manual_site_audit, validate_screaming_frog_license, check_scheduled_site_audits
 
 
 @admin.register(ScreamingFrogLicense)
@@ -137,7 +137,7 @@ class ScreamingFrogLicenseAdmin(admin.ModelAdmin):
     def actions_display(self, obj):
         return format_html(
             '<a class="button" href="{}">Validate Now</a>',
-            reverse('admin:onpageaudit_screamingfroglicense_validate', args=[obj.pk])
+            reverse('admin:site_audit_screamingfroglicense_validate', args=[obj.pk])
         )
     actions_display.short_description = 'Actions'
     
@@ -148,7 +148,7 @@ class ScreamingFrogLicenseAdmin(admin.ModelAdmin):
             path(
                 '<int:pk>/validate/',
                 self.admin_site.admin_view(self.validate_license_view),
-                name='onpageaudit_screamingfroglicense_validate'
+                name='site_audit_screamingfroglicense_validate'
             ),
         ]
         return custom_urls + urls
@@ -164,11 +164,11 @@ class ScreamingFrogLicenseAdmin(admin.ModelAdmin):
             else:
                 messages.error(request, 'Failed to start license validation')
         
-        return redirect('admin:onpageaudit_screamingfroglicense_changelist')
+        return redirect('admin:site_audit_screamingfroglicense_changelist')
 
 
-@admin.register(OnPageAudit)
-class OnPageAuditAdmin(admin.ModelAdmin):
+@admin.register(SiteAudit)
+class SiteAuditAdmin(admin.ModelAdmin):
     list_display = [
         'project_domain',
         'issues_badge',
@@ -347,14 +347,14 @@ class OnPageAuditAdmin(admin.ModelAdmin):
         # View History button
         buttons.append(format_html(
             '<a class="button" href="{}">View History</a>',
-            reverse('admin:onpageaudit_onpageaudithistory_changelist') + f'?audit__id__exact={obj.id}'
+            reverse('admin:site_audit_site_audithistory_changelist') + f'?audit__id__exact={obj.id}'
         ))
         
         # Run Manual button (if allowed)
         if obj.can_run_manual_audit():
             buttons.append(format_html(
                 '<a class="button" href="{}">Run Manual</a>',
-                reverse('admin:onpageaudit_onpageaudit_run_manual', args=[obj.pk])
+                reverse('admin:site_audit_site_audit_run_manual', args=[obj.pk])
             ))
         
         return format_html(' '.join(buttons))
@@ -367,7 +367,7 @@ class OnPageAuditAdmin(admin.ModelAdmin):
             path(
                 '<int:pk>/run-manual/',
                 self.admin_site.admin_view(self.run_manual_audit_view),
-                name='onpageaudit_onpageaudit_run_manual'
+                name='site_audit_site_audit_run_manual'
             ),
         ]
         return custom_urls + urls
@@ -377,17 +377,17 @@ class OnPageAuditAdmin(admin.ModelAdmin):
         audit = self.get_object(request, pk)
         
         if audit:
-            result = run_manual_onpage_audit.delay(audit.id)
+            result = run_manual_site_audit.delay(audit.id)
             if result:
                 messages.success(request, f'Manual on-page audit started for {audit.project.domain}')
             else:
                 messages.error(request, 'Failed to start manual audit')
         
-        return redirect('admin:onpageaudit_onpageaudit_changelist')
+        return redirect('admin:site_audit_site_audit_changelist')
 
 
-@admin.register(OnPageAuditHistory)
-class OnPageAuditHistoryAdmin(admin.ModelAdmin):
+@admin.register(OnPagePerformanceHistory)
+class OnPagePerformanceHistoryAdmin(admin.ModelAdmin):
     list_display = [
         'audit_id_short',
         'project_domain',
@@ -553,7 +553,7 @@ class OnPageAuditHistoryAdmin(admin.ModelAdmin):
         # View issues link
         buttons.append(format_html(
             '<a class="button" href="{}">View Issues</a>',
-            reverse('admin:onpageaudit_onpageissue_changelist') + f'?audit_history__id__exact={obj.id}'
+            reverse('admin:site_audit_onpageissue_changelist') + f'?performance_history__id__exact={obj.id}'
         ))
         
         return format_html(' '.join(buttons)) if buttons else '-'
@@ -599,8 +599,8 @@ class OnPageAuditHistoryAdmin(admin.ModelAdmin):
         return False
 
 
-@admin.register(OnPageIssue)
-class OnPageIssueAdmin(admin.ModelAdmin):
+@admin.register(SiteIssue)
+class SiteIssueAdmin(admin.ModelAdmin):
     list_display = [
         'issue_type',
         'severity_badge',
@@ -610,10 +610,10 @@ class OnPageIssueAdmin(admin.ModelAdmin):
     ]
     
     list_filter = ['issue_type', 'severity', 'created_at']
-    search_fields = ['page_url', 'description', 'audit_history__audit__project__domain']
+    search_fields = ['page_url', 'description', 'performance_history__audit__project__domain']
     
     readonly_fields = [
-        'audit_history',
+        'performance_history',
         'issue_type',
         'severity',
         'page_url',
@@ -658,7 +658,7 @@ class OnPageIssueAdmin(admin.ModelAdmin):
     page_url_short.short_description = 'Page URL'
     
     def audit_project(self, obj):
-        return obj.audit_history.audit.project.domain
+        return obj.performance_history.audit.project.domain
     audit_project.short_description = 'Project'
     
     def has_add_permission(self, request):

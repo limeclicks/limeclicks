@@ -4,8 +4,8 @@ Test Screaming Frog CLI integration and license validation
 
 from django.core.management.base import BaseCommand
 from django.utils import timezone
-from onpageaudit.screaming_frog import ScreamingFrogCLI, ScreamingFrogService
-from onpageaudit.models import ScreamingFrogLicense
+from site_audit.screaming_frog import ScreamingFrogCLI, ScreamingFrogService
+from site_audit.models import ScreamingFrogLicense
 import json
 import pprint
 

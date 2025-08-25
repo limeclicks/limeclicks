@@ -37,7 +37,7 @@ class Migration(migrations.Migration):
             },
         ),
         migrations.CreateModel(
-            name='OnPageAudit',
+            name='SiteAudit',
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('audit_frequency_days', models.IntegerField(default=30, help_text='Days between automatic audits (minimum 30)')),
@@ -64,16 +64,16 @@ class Migration(migrations.Migration):
                 ('total_pages_crawled', models.IntegerField(default=0)),
                 ('created_at', models.DateTimeField(auto_now_add=True)),
                 ('updated_at', models.DateTimeField(auto_now=True)),
-                ('project', models.OneToOneField(on_delete=django.db.models.deletion.CASCADE, related_name='onpage_audit', to='project.project')),
+                ('project', models.OneToOneField(on_delete=django.db.models.deletion.CASCADE, related_name='site_audit', to='project.project')),
             ],
             options={
                 'verbose_name': 'On-Page Audit',
                 'verbose_name_plural': 'On-Page Audits',
-                'db_table': 'onpage_audits',
+                'db_table': 'site_audits',
             },
         ),
         migrations.CreateModel(
-            name='OnPageAuditHistory',
+            name='OnPagePerformanceHistory',
             fields=[
                 ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
                 ('status', models.CharField(choices=[('pending', 'Pending'), ('running', 'Running'), ('completed', 'Completed'), ('failed', 'Failed')], default='pending', max_length=20)),
@@ -94,17 +94,17 @@ class Migration(migrations.Migration):
                 ('issues_report_json', models.FileField(blank=True, help_text='Processed issues report', null=True, storage=limeclicks.storage_backends.CloudflareR2Storage(), upload_to='onpage/')),
                 ('error_message', models.TextField(blank=True, null=True)),
                 ('retry_count', models.IntegerField(default=0)),
-                ('audit', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='audit_history', to='onpageaudit.onpageaudit')),
+                ('audit', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='performance_history', to='site_audit.site_audit')),
             ],
             options={
                 'verbose_name': 'On-Page Audit History',
                 'verbose_name_plural': 'On-Page Audit Histories',
-                'db_table': 'onpage_audit_history',
+                'db_table': 'onpage_performance_history',
                 'ordering': ['-created_at'],
             },
         ),
         migrations.CreateModel(
-            name='OnPageIssue',
+            name='SiteIssue',
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('issue_type', models.CharField(choices=[('broken_link', 'Broken Link (4xx/5xx)'), ('redirect_chain', 'Redirect Chain'), ('missing_title', 'Missing Title'), ('duplicate_title', 'Duplicate Title'), ('title_too_long', 'Title Too Long'), ('title_too_short', 'Title Too Short'), ('missing_meta_description', 'Missing Meta Description'), ('duplicate_meta_description', 'Duplicate Meta Description'), ('meta_description_too_long', 'Meta Description Too Long'), ('meta_description_too_short', 'Meta Description Too Short'), ('blocked_by_robots', 'Blocked by Robots'), ('noindex_page', 'Noindex Page'), ('missing_hreflang', 'Missing Hreflang'), ('invalid_hreflang', 'Invalid Hreflang'), ('duplicate_content', 'Duplicate Content'), ('near_duplicate', 'Near Duplicate Content'), ('spelling_error', 'Spelling/Grammar Error'), ('missing_h1', 'Missing H1'), ('multiple_h1', 'Multiple H1 Tags'), ('missing_alt_text', 'Missing Alt Text'), ('page_too_large', 'Page Too Large'), ('slow_page', 'Slow Loading Page'), ('orphan_page', 'Orphan Page')], max_length=50)),
@@ -121,7 +121,7 @@ class Migration(migrations.Migration):
                 ('source_url', models.URLField(blank=True, max_length=2000, null=True)),
                 ('anchor_text', models.CharField(blank=True, max_length=500, null=True)),
                 ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('audit_history', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='issues', to='onpageaudit.onpageaudithistory')),
+                ('performance_history', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='issues', to='site_audit.site_audithistory')),
             ],
             options={
                 'verbose_name': 'On-Page Issue',
@@ -130,24 +130,24 @@ class Migration(migrations.Migration):
             },
         ),
         migrations.AddIndex(
-            model_name='onpageaudit',
+            model_name='site_audit',
             index=models.Index(fields=['next_scheduled_audit'], name='onpage_audi_next_sc_6b2b61_idx'),
         ),
         migrations.AddIndex(
-            model_name='onpageaudit',
+            model_name='site_audit',
             index=models.Index(fields=['is_audit_enabled', 'next_scheduled_audit'], name='onpage_audi_is_audi_644137_idx'),
         ),
         migrations.AddIndex(
-            model_name='onpageaudithistory',
+            model_name='site_audithistory',
             index=models.Index(fields=['audit', '-created_at'], name='onpage_audi_audit_i_de58dc_idx'),
         ),
         migrations.AddIndex(
-            model_name='onpageaudithistory',
+            model_name='site_audithistory',
             index=models.Index(fields=['status', 'created_at'], name='onpage_audi_status_6d31e2_idx'),
         ),
         migrations.AddIndex(
             model_name='onpageissue',
-            index=models.Index(fields=['audit_history', 'issue_type'], name='onpage_issu_audit_h_67f6d9_idx'),
+            index=models.Index(fields=['performance_history', 'issue_type'], name='onpage_issu_audit_h_67f6d9_idx'),
         ),
         migrations.AddIndex(
             model_name='onpageissue',

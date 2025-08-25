@@ -8,29 +8,29 @@ import json
 import os
 from typing import Optional
 
-from .models import OnPageAudit, OnPageAuditHistory, OnPageIssue, ScreamingFrogLicense
+from .models import SiteAudit, OnPagePerformanceHistory, SiteIssue, ScreamingFrogLicense
 from .screaming_frog import ScreamingFrogCLI, ScreamingFrogService
 
 logger = get_task_logger(__name__)
 
 
 @shared_task(bind=True, max_retries=3, default_retry_delay=300)
-def run_onpage_audit(self, audit_history_id: str):
+def run_site_audit(self, performance_history_id: str):
     """
     Run a comprehensive on-page SEO audit using Screaming Frog
     
     Args:
-        audit_history_id: UUID of the OnPageAuditHistory record
+        performance_history_id: UUID of the OnPagePerformanceHistory record
     """
     try:
-        audit_history = OnPageAuditHistory.objects.get(id=audit_history_id)
-        audit = audit_history.audit
+        performance_history = OnPagePerformanceHistory.objects.get(id=performance_history_id)
+        audit = performance_history.audit
         project = audit.project
         
         # Update status to running
-        audit_history.status = 'running'
-        audit_history.started_at = timezone.now()
-        audit_history.save(update_fields=['status', 'started_at'])
+        performance_history.status = 'running'
+        performance_history.started_at = timezone.now()
+        performance_history.save(update_fields=['status', 'started_at'])
         
         logger.info(f"Starting on-page audit for {project.domain}")
         
@@ -55,7 +55,7 @@ def run_onpage_audit(self, audit_history_id: str):
             'follow_redirects': True,
             'crawl_subdomains': False,
             'check_spelling': True,
-            'crawl_depth': audit_history.crawl_depth
+            'crawl_depth': performance_history.crawl_depth
         }
         
         # Run crawl
@@ -68,9 +68,9 @@ def run_onpage_audit(self, audit_history_id: str):
         results = sf_cli.parse_crawl_results(output_dir)
         
         # Save summary data
-        audit_history.summary_data = results['summary']
-        audit_history.pages_crawled = results['pages_crawled']
-        audit_history.issues_summary = {
+        performance_history.summary_data = results['summary']
+        performance_history.pages_crawled = results['pages_crawled']
+        performance_history.issues_summary = {
             'broken_links': results['summary']['broken_links'],
             'redirect_chains': results['summary']['redirect_chains'],
             'missing_titles': results['summary']['missing_titles'],
@@ -83,51 +83,51 @@ def run_onpage_audit(self, audit_history_id: str):
         }
         
         # Compare with previous audit
-        comparison = audit_history.compare_with_previous()
+        comparison = performance_history.compare_with_previous()
         if comparison:
-            audit_history.issues_fixed = len(comparison['fixed_issues'])
-            audit_history.issues_introduced = len(comparison['new_issues'])
+            performance_history.issues_fixed = len(comparison['fixed_issues'])
+            performance_history.issues_introduced = len(comparison['new_issues'])
         
-        audit_history.total_issues = results['summary']['total_issues']
+        performance_history.total_issues = results['summary']['total_issues']
         
         # Save detailed reports to R2 with proper directory structure
-        # Format: project.domain/onpageaudit/date/report.json
+        # Format: project.domain/site_audit/date/report.json
         
         # Create the path structure
         domain = project.domain.replace('https://', '').replace('http://', '').replace('/', '_')
         date_str = timezone.now().strftime('%Y%m%d_%H%M%S')
         
-        # Full JSON report - Path: domain/onpageaudit/date/full_report.json
+        # Full JSON report - Path: domain/site_audit/date/full_report.json
         full_report = json.dumps(results, indent=2)
-        filename = f"{domain}/onpageaudit/{date_str}/full_report.json"
-        audit_history.full_report_json.save(
+        filename = f"{domain}/site_audit/{date_str}/full_report.json"
+        performance_history.full_report_json.save(
             filename,
             ContentFile(full_report.encode('utf-8')),
             save=False
         )
         
-        # Issues report - Path: domain/onpageaudit/date/issues_report.json
+        # Issues report - Path: domain/site_audit/date/issues_report.json
         issues_report = json.dumps(results['details'], indent=2)
-        filename = f"{domain}/onpageaudit/{date_str}/issues_report.json"
-        audit_history.issues_report_json.save(
+        filename = f"{domain}/site_audit/{date_str}/issues_report.json"
+        performance_history.issues_report_json.save(
             filename,
             ContentFile(issues_report.encode('utf-8')),
             save=False
         )
         
         # Save individual issues to database (for quick filtering)
-        _save_individual_issues(audit_history, results['details'])
+        _save_individual_issues(performance_history, results['details'])
         
         # Update status
-        audit_history.status = 'completed'
-        audit_history.completed_at = timezone.now()
-        audit_history.save()
+        performance_history.status = 'completed'
+        performance_history.completed_at = timezone.now()
+        performance_history.save()
         
         # Update main audit model with latest results
-        audit.update_from_audit_results(audit_history)
+        audit.update_from_audit_results(performance_history)
         
         # Schedule next audit if this was scheduled
-        if audit_history.trigger_type == 'scheduled':
+        if performance_history.trigger_type == 'scheduled':
             audit.schedule_next_audit()
         
         # Cleanup temporary files
@@ -137,13 +137,13 @@ def run_onpage_audit(self, audit_history_id: str):
         
         return {
             'success': True,
-            'audit_id': str(audit_history.id),
+            'audit_id': str(performance_history.id),
             'pages_crawled': results['pages_crawled'],
             'total_issues': results['summary']['total_issues']
         }
         
-    except OnPageAuditHistory.DoesNotExist:
-        logger.error(f"OnPageAuditHistory {audit_history_id} not found")
+    except OnPagePerformanceHistory.DoesNotExist:
+        logger.error(f"OnPagePerformanceHistory {performance_history_id} not found")
         return {'success': False, 'error': 'Audit history not found'}
         
     except Exception as e:
@@ -151,11 +151,11 @@ def run_onpage_audit(self, audit_history_id: str):
         
         # Update audit history with error
         try:
-            audit_history = OnPageAuditHistory.objects.get(id=audit_history_id)
-            audit_history.status = 'failed'
-            audit_history.error_message = str(e)
-            audit_history.retry_count += 1
-            audit_history.save()
+            performance_history = OnPagePerformanceHistory.objects.get(id=performance_history_id)
+            performance_history.status = 'failed'
+            performance_history.error_message = str(e)
+            performance_history.retry_count += 1
+            performance_history.save()
         except:
             pass
         
@@ -167,13 +167,13 @@ def run_onpage_audit(self, audit_history_id: str):
         return {'success': False, 'error': str(e)}
 
 
-def _save_individual_issues(audit_history, details):
+def _save_individual_issues(performance_history, details):
     """Save individual issues to database"""
     
     # Broken links
     for item in details.get('broken_links', []):
-        OnPageIssue.objects.create(
-            audit_history=audit_history,
+        SiteIssue.objects.create(
+            performance_history=performance_history,
             issue_type='broken_link',
             severity='high' if item['status_code'] >= 500 else 'medium',
             page_url=item['url'],
@@ -186,8 +186,8 @@ def _save_individual_issues(audit_history, details):
     
     # Missing titles
     for item in details.get('missing_titles', []):
-        OnPageIssue.objects.create(
-            audit_history=audit_history,
+        SiteIssue.objects.create(
+            performance_history=performance_history,
             issue_type='missing_title',
             severity='high',
             page_url=item['url'],
@@ -198,8 +198,8 @@ def _save_individual_issues(audit_history, details):
     # Duplicate titles
     for item in details.get('duplicate_titles', []):
         for url in item['urls']:
-            OnPageIssue.objects.create(
-                audit_history=audit_history,
+            SiteIssue.objects.create(
+                performance_history=performance_history,
                 issue_type='duplicate_title',
                 severity='medium',
                 page_url=url,
@@ -211,8 +211,8 @@ def _save_individual_issues(audit_history, details):
     
     # Missing meta descriptions
     for item in details.get('missing_meta_descriptions', []):
-        OnPageIssue.objects.create(
-            audit_history=audit_history,
+        SiteIssue.objects.create(
+            performance_history=performance_history,
             issue_type='missing_meta_description',
             severity='medium',
             page_url=item['url'],
@@ -223,8 +223,8 @@ def _save_individual_issues(audit_history, details):
     # Duplicate meta descriptions
     for item in details.get('duplicate_meta_descriptions', []):
         for url in item['urls']:
-            OnPageIssue.objects.create(
-                audit_history=audit_history,
+            SiteIssue.objects.create(
+                performance_history=performance_history,
                 issue_type='duplicate_meta_description',
                 severity='low',
                 page_url=url,
@@ -235,8 +235,8 @@ def _save_individual_issues(audit_history, details):
     
     # Blocked by robots
     for item in details.get('blocked_by_robots', []):
-        OnPageIssue.objects.create(
-            audit_history=audit_history,
+        SiteIssue.objects.create(
+            performance_history=performance_history,
             issue_type='blocked_by_robots',
             severity='high' if 'noindex' in item['directive'] else 'medium',
             page_url=item['url'],
@@ -246,7 +246,7 @@ def _save_individual_issues(audit_history, details):
 
 
 @shared_task
-def create_onpage_audit_for_project(project_id: int, trigger_type: str = 'project_created'):
+def create_site_audit_for_project(project_id: int, trigger_type: str = 'project_created'):
     """
     Create and run an on-page audit when a new project is added
     
@@ -260,7 +260,7 @@ def create_onpage_audit_for_project(project_id: int, trigger_type: str = 'projec
         project = Project.objects.get(id=project_id)
         
         # Create or get the on-page audit with 10k page limit
-        audit, created = OnPageAudit.objects.get_or_create(
+        audit, created = SiteAudit.objects.get_or_create(
             project=project,
             defaults={
                 'max_pages_to_crawl': 10000  # Set to 10,000 pages for new projects
@@ -276,7 +276,7 @@ def create_onpage_audit_for_project(project_id: int, trigger_type: str = 'projec
             return {'success': False, 'error': 'Rate limited'}
         
         # Create audit history entry
-        audit_history = OnPageAuditHistory.objects.create(
+        performance_history = OnPagePerformanceHistory.objects.create(
             audit=audit,
             trigger_type=trigger_type,
             status='pending'
@@ -287,11 +287,11 @@ def create_onpage_audit_for_project(project_id: int, trigger_type: str = 'projec
         audit.save(update_fields=['last_automatic_audit'])
         
         # Queue the audit
-        run_onpage_audit.delay(str(audit_history.id))
+        run_site_audit.delay(str(performance_history.id))
         
         logger.info(f"Queued on-page audit for project {project.domain}")
         
-        return {'success': True, 'project_id': project_id, 'audit_id': str(audit_history.id)}
+        return {'success': True, 'project_id': project_id, 'audit_id': str(performance_history.id)}
         
     except Project.DoesNotExist:
         logger.error(f"Project {project_id} not found")
@@ -302,16 +302,16 @@ def create_onpage_audit_for_project(project_id: int, trigger_type: str = 'projec
 
 
 @shared_task
-def run_manual_onpage_audit(audit_id: int, user_id: Optional[int] = None):
+def run_manual_site_audit(audit_id: int, user_id: Optional[int] = None):
     """
     Run a manual on-page audit with rate limiting (3 days)
     
     Args:
-        audit_id: ID of the OnPageAudit
+        audit_id: ID of the SiteAudit
         user_id: Optional user ID who triggered the audit
     """
     try:
-        audit = OnPageAudit.objects.get(id=audit_id)
+        audit = SiteAudit.objects.get(id=audit_id)
         
         # Check rate limiting (3 days)
         if not audit.can_run_manual_audit():
@@ -328,24 +328,24 @@ def run_manual_onpage_audit(audit_id: int, user_id: Optional[int] = None):
         audit.save(update_fields=['last_manual_audit'])
         
         # Create audit history entry
-        audit_history = OnPageAuditHistory.objects.create(
+        performance_history = OnPagePerformanceHistory.objects.create(
             audit=audit,
             trigger_type='manual',
             status='pending'
         )
         
         # Queue the audit
-        run_onpage_audit.delay(str(audit_history.id))
+        run_site_audit.delay(str(performance_history.id))
         
         logger.info(f"Manual on-page audit triggered for {audit.project.domain}")
         
         return {
             'success': True,
-            'audit_id': str(audit_history.id),
+            'audit_id': str(performance_history.id),
             'message': 'Manual on-page audit started'
         }
         
-    except OnPageAudit.DoesNotExist:
+    except SiteAudit.DoesNotExist:
         return {'success': False, 'error': 'Audit not found'}
     except Exception as e:
         logger.error(f"Error running manual on-page audit: {str(e)}")
@@ -353,7 +353,7 @@ def run_manual_onpage_audit(audit_id: int, user_id: Optional[int] = None):
 
 
 @shared_task
-def check_scheduled_onpage_audits():
+def check_scheduled_site_audits():
     """
     Check for on-page audits that need to be run (30-day schedule)
     This should be run periodically (e.g., daily)
@@ -361,14 +361,14 @@ def check_scheduled_onpage_audits():
     now = timezone.now()
     
     # Find audits that need to run
-    audits = OnPageAudit.objects.filter(
+    audits = SiteAudit.objects.filter(
         is_audit_enabled=True,
         next_scheduled_audit__lte=now
     )
     
     scheduled_count = 0
     
-    for audit in audits:
+    for audit in performance_audit:
         try:
             # Check if we can run (30-day limit)
             if not audit.can_run_automatic_audit():
@@ -377,7 +377,7 @@ def check_scheduled_onpage_audits():
             
             with transaction.atomic():
                 # Create audit history entry
-                audit_history = OnPageAuditHistory.objects.create(
+                performance_history = OnPagePerformanceHistory.objects.create(
                     audit=audit,
                     trigger_type='scheduled',
                     status='pending'
@@ -388,7 +388,7 @@ def check_scheduled_onpage_audits():
                 audit.save(update_fields=['last_automatic_audit'])
                 
                 # Queue the audit
-                run_onpage_audit.delay(str(audit_history.id))
+                run_site_audit.delay(str(performance_history.id))
                 
                 # Schedule next audit
                 audit.schedule_next_audit()
@@ -464,7 +464,7 @@ def check_license_expiry_reminder():
 
 
 @shared_task
-def cleanup_old_onpage_audits(days_to_keep: int = 90):
+def cleanup_old_site_audits(days_to_keep: int = 90):
     """
     Clean up old on-page audit history records
     
@@ -474,13 +474,13 @@ def cleanup_old_onpage_audits(days_to_keep: int = 90):
     cutoff_date = timezone.now() - timedelta(days=days_to_keep)
     
     # Get audits to delete
-    old_audits = OnPageAuditHistory.objects.filter(
+    old_audits = OnPagePerformanceHistory.objects.filter(
         created_at__lt=cutoff_date
     )
     
     deleted_count = 0
     
-    for audit in old_audits:
+    for audit in old_performance_audit:
         try:
             # Delete associated files from R2
             if audit.full_report_json:

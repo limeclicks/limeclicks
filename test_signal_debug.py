@@ -71,14 +71,14 @@ project = Project.objects.create(
 print(f"✓ Project created: {project.domain}")
 
 # Check if audits were created
-from audits.models import AuditPage
-from onpageaudit.models import OnPageAudit
+from performance_audit.models import PerformancePage
+from site_audit.models import SiteAudit
 
 import time
 time.sleep(1)
 
-has_lighthouse = AuditPage.objects.filter(project=project).exists()
-has_onpage = OnPageAudit.objects.filter(project=project).exists()
+has_lighthouse = PerformancePage.objects.filter(project=project).exists()
+has_onpage = SiteAudit.objects.filter(project=project).exists()
 
 print(f"\nAudit check:")
 print(f"  Lighthouse audit created: {has_lighthouse}")
