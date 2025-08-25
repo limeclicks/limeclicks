@@ -7,9 +7,10 @@
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>{% block title %}Dashboard - LimeClicks{% endblock %}</title>
     <link rel="icon" type="image/png" href="{% static 'img/favicon.png' %}">
-    <link rel="stylesheet" href="{% static 'dist/tailwind.css' %}">
+    <link rel="stylesheet" href="{% static 'dist/tailwind.css' %}?v={% now 'U' %}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css" integrity="sha512-Kc323vGBEqzTmouAECnVceyQqyqdsSiqLQISBL29aUW4U/M7pSPA/gEUZQqv1cwx4OnYxTxve5UMg5GT6L4JJg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
-    <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+    <script src="https://unpkg.com/htmx.org@1.9.12" defer></script>
+    {% block extra_head %}{% endblock %}
     <style>
         /* Hide drawer toggle checkbox but keep it functional */
         .drawer-toggle {
@@ -148,10 +149,52 @@
             min-height: 4rem;
             height: 4rem;
         }
+        
+        /* User dropdown menu styling */
+        .dropdown-content {
+            animation: slideDown 0.2s ease-out;
+        }
+        
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        /* Remove default menu styling for custom design */
+        .dropdown-content .menu li > * {
+            border-radius: 0.5rem;
+        }
+        
+        .dropdown-content .menu li {
+            margin: 0;
+        }
+        
+        /* Avatar gradient animation on hover */
+        .avatar div {
+            transition: transform 0.2s ease;
+        }
+        
+        .avatar:hover div {
+            transform: scale(1.05);
+        }
     </style>
 </head>
 
 <body class="bg-base-200 min-h-screen">
+    <!-- Loading indicator -->
+    <div id="page-loader" class="fixed inset-0 bg-base-100 z-50 flex items-center justify-center">
+        <div class="text-center">
+            <div class="loading loading-spinner loading-lg text-primary"></div>
+            <p class="mt-4 text-base-content/70">Loading...</p>
+        </div>
+    </div>
+    
     {% include "includes/messages.html" %}
     
     <div class="drawer lg:drawer-open" id="main-drawer">
@@ -271,34 +314,71 @@
                     
                     <!-- User Profile Dropdown -->
                     <div class="dropdown dropdown-end">
-                        <div tabindex="0" role="button" class="btn btn-ghost btn-circle avatar placeholder">
-                            <div class="bg-primary text-primary-content rounded-full w-10">
-                                <span class="text-xs font-semibold">{{ user.first_name|first|default:user.username|first|upper }}</span>
+                        <div tabindex="0" role="button" class="btn btn-ghost btn-circle avatar">
+                            <div class="w-10 h-10 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-white shadow-md">
+                                <span class="text-sm font-bold">{{ user.first_name|first|default:user.username|first|upper }}</span>
                             </div>
                         </div>
-                        <ul tabindex="0" class="menu menu-sm dropdown-content mt-3 z-[1] p-2 shadow-lg bg-base-100 rounded-box w-64 border">
-                            <li>
-                                <div class="px-4 py-3 border-b border-base-300">
-                                    <div class="flex items-center gap-3">
-                                        <div class="avatar placeholder">
-                                            <div class="bg-primary text-primary-content rounded-full w-12">
-                                                <span class="text-lg font-bold">{{ user.first_name|first|default:user.username|first|upper }}</span>
-                                            </div>
-                                        </div>
-                                        <div>
-                                            <p class="font-semibold">{{ user.first_name|default:user.username }}</p>
-                                            <p class="text-sm text-base-content/60">{{ user.email }}</p>
-                                        </div>
+                        <div tabindex="0" class="dropdown-content mt-3 z-[100] bg-white dark:bg-base-100 rounded-2xl shadow-xl border border-base-200 w-72 overflow-hidden">
+                            <!-- User Header Section -->
+                            <div class="p-4 bg-gradient-to-r from-violet-50 to-purple-50 dark:from-base-200 dark:to-base-200 border-b border-base-200">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-14 h-14 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-white shadow-lg">
+                                        <span class="text-xl font-bold">{{ user.first_name|first|default:user.username|first|upper }}</span>
+                                    </div>
+                                    <div class="flex-1">
+                                        <p class="font-semibold text-base-content">{{ user.first_name|default:user.username }} {{ user.last_name|default:"" }}</p>
+                                        <p class="text-sm text-base-content/60 truncate">{{ user.email }}</p>
                                     </div>
                                 </div>
-                            </li>
-                            <li><a href="{% url 'accounts:profile_settings' %}" class="text-sm py-3"><i class="fas fa-user mr-3"></i>Profile Settings</a></li>
-                            <li><a href="{% url 'accounts:security_settings' %}" class="text-sm py-3"><i class="fas fa-shield-alt mr-3"></i>Security Settings</a></li>
-                            <li><a href="#" class="text-sm py-3"><i class="fas fa-credit-card mr-3"></i>Billing & Usage</a></li>
-                            <li><a href="#" class="text-sm py-3"><i class="fas fa-question-circle mr-3"></i>Help & Support</a></li>
-                            <li><hr class="my-2"></li>
-                            <li><a href="{% url 'accounts:logout' %}" class="text-sm py-3 text-error"><i class="fas fa-sign-out-alt mr-3"></i>Sign Out</a></li>
-                        </ul>
+                            </div>
+                            
+                            <!-- Menu Items -->
+                            <ul class="menu p-2">
+                                <li>
+                                    <a href="{% url 'accounts:profile_settings' %}" class="flex items-center gap-3 hover:bg-base-100 dark:hover:bg-base-200 rounded-lg py-2.5">
+                                        <span class="w-8 h-8 rounded-lg bg-base-200 dark:bg-base-300 flex items-center justify-center">
+                                            <i class="fas fa-user text-sm"></i>
+                                        </span>
+                                        <span class="text-sm font-medium">Profile Settings</span>
+                                    </a>
+                                </li>
+                                <li>
+                                    <a href="{% url 'accounts:security_settings' %}" class="flex items-center gap-3 hover:bg-base-100 dark:hover:bg-base-200 rounded-lg py-2.5">
+                                        <span class="w-8 h-8 rounded-lg bg-base-200 dark:bg-base-300 flex items-center justify-center">
+                                            <i class="fas fa-shield-alt text-sm"></i>
+                                        </span>
+                                        <span class="text-sm font-medium">Security Settings</span>
+                                    </a>
+                                </li>
+                                <li>
+                                    <a href="#" class="flex items-center gap-3 hover:bg-base-100 dark:hover:bg-base-200 rounded-lg py-2.5">
+                                        <span class="w-8 h-8 rounded-lg bg-base-200 dark:bg-base-300 flex items-center justify-center">
+                                            <i class="fas fa-credit-card text-sm"></i>
+                                        </span>
+                                        <span class="text-sm font-medium">Billing & Usage</span>
+                                    </a>
+                                </li>
+                                <li>
+                                    <a href="#" class="flex items-center gap-3 hover:bg-base-100 dark:hover:bg-base-200 rounded-lg py-2.5">
+                                        <span class="w-8 h-8 rounded-lg bg-base-200 dark:bg-base-300 flex items-center justify-center">
+                                            <i class="fas fa-question-circle text-sm"></i>
+                                        </span>
+                                        <span class="text-sm font-medium">Help & Support</span>
+                                    </a>
+                                </li>
+                            </ul>
+                            
+                            <!-- Sign Out Section -->
+                            <div class="border-t border-base-200 p-2">
+                                <a href="{% url 'accounts:logout' %}" class="flex items-center gap-3 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg py-2.5 px-2 text-red-600 dark:text-red-400 transition-colors">
+                                    <span class="w-8 h-8 rounded-lg bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+                                        <i class="fas fa-sign-out-alt text-sm"></i>
+                                    </span>
+                                    <span class="text-sm font-medium">Sign Out</span>
+                                </a>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -644,6 +724,26 @@
                 toggleBodyScroll();
             });
         });
+        
+        // Hide page loader when everything is ready
+        window.addEventListener('load', function() {
+            const loader = document.getElementById('page-loader');
+            if (loader) {
+                loader.style.transition = 'opacity 0.3s ease';
+                loader.style.opacity = '0';
+                setTimeout(function() {
+                    loader.style.display = 'none';
+                }, 300);
+            }
+        });
+        
+        // Also hide loader immediately if document is already loaded
+        if (document.readyState === 'complete') {
+            const loader = document.getElementById('page-loader');
+            if (loader) {
+                loader.style.display = 'none';
+            }
+        }
     </script>
 </body>
 

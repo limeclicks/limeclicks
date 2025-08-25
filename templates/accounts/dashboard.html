@@ -2,6 +2,38 @@
 {% block title %}Dashboard - LimeClicks{% endblock %}
 {% block page_title %}Dashboard{% endblock %}
 
+{% block extra_head %}
+<!-- Force reload on first visit to fix any caching issues -->
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+
+<script>
+// Check if this is a fresh page load after login
+document.addEventListener('DOMContentLoaded', function() {
+    // Check if we just navigated here (not a refresh)
+    if (performance.navigation.type === 0) {
+        // Check if the referrer was the login page
+        if (document.referrer.includes('/login/') || !sessionStorage.getItem('dashboard_loaded')) {
+            // Mark that we're loading the dashboard
+            sessionStorage.setItem('dashboard_loaded', 'true');
+            // Force a complete page reload
+            setTimeout(function() {
+                window.location.reload(true);
+            }, 100);
+        }
+    }
+});
+
+// Clear the flag when user logs out or navigates away
+window.addEventListener('beforeunload', function() {
+    if (window.location.pathname !== '/accounts/dashboard/') {
+        sessionStorage.removeItem('dashboard_loaded');
+    }
+});
+</script>
+{% endblock %}
+
 {% block content %}
 <!-- Welcome Section -->
 <div class="hero bg-gradient-to-r from-primary/10 to-secondary/10 rounded-xl mb-8">

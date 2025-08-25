@@ -51,6 +51,8 @@ INSTALLED_APPS = [
     "project",
     "siteconfig",
     "keywords",
+    "audits",
+    "onpageaudit",
     "django_celery_beat"
 ]
 
@@ -369,20 +371,30 @@ LOGIN_URL = '/accounts/login/'
 LOGIN_REDIRECT_URL = '/accounts/dashboard/'
 LOGOUT_REDIRECT_URL = '/accounts/login/'
 
+# Session configuration for proper login persistence
+SESSION_ENGINE = 'django.contrib.sessions.backends.db'  # Use database-backed sessions
+SESSION_COOKIE_AGE = 86400 * 30  # 30 days
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = 'Lax'
+SESSION_SAVE_EVERY_REQUEST = True  # Save session on every request
+SESSION_EXPIRE_AT_BROWSER_CLOSE = False
+
+# CSRF settings for secure form submissions
+CSRF_COOKIE_SAMESITE = 'Lax'
+CSRF_COOKIE_HTTPONLY = False  # Must be False for JavaScript access
+CSRF_USE_SESSIONS = False  # Use cookies instead of sessions for CSRF
+
 # Scrape.do API Configuration
 SCRAPPER_API_KEY = os.getenv('SCRAPPER_API_KEY')
 
-# Cloudflare R2 Storage Configuration
-R2_ACCESS_KEY_ID = os.getenv('R2_ACCESS_KEY_ID')
-R2_SECRET_ACCESS_KEY = os.getenv('R2_SECRET_ACCESS_KEY')
-R2_BUCKET_NAME = os.getenv('R2_BUCKET_NAME')
-R2_ENDPOINT_URL = os.getenv('R2_ENDPOINT_URL')
+# Screaming Frog License
+SCREAMING_FROG_LICENSE = os.getenv('SCREAMING_FROG_LICENSE')
 
-# AWS S3 Settings for django-storages (R2 is S3-compatible)
-AWS_ACCESS_KEY_ID = R2_ACCESS_KEY_ID
-AWS_SECRET_ACCESS_KEY = R2_SECRET_ACCESS_KEY
-AWS_STORAGE_BUCKET_NAME = R2_BUCKET_NAME
-AWS_S3_ENDPOINT_URL = R2_ENDPOINT_URL
+# AWS S3 Settings for django-storages (Cloudflare R2 is S3-compatible)
+AWS_ACCESS_KEY_ID = os.getenv('R2_ACCESS_KEY_ID')
+AWS_SECRET_ACCESS_KEY = os.getenv('R2_SECRET_ACCESS_KEY')
+AWS_STORAGE_BUCKET_NAME = os.getenv('R2_BUCKET_NAME')
+AWS_S3_ENDPOINT_URL = os.getenv('R2_ENDPOINT_URL')
 AWS_S3_REGION_NAME = 'auto'
 AWS_S3_SIGNATURE_VERSION = 's3v4'
 AWS_S3_FILE_OVERWRITE = False

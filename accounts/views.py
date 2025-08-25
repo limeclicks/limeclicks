@@ -91,12 +91,22 @@ def login_view(request):
                 if not user.email_verified:
                     form.add_error('password', "Please verify your email address before logging in. Check your inbox for the verification link.")
                     return render(request, "accounts/login.html", {"form": form})
+                # Login the user properly
                 login(request, user)
                 
-                # Redirect to next URL if it exists and is safe
+                # Set a flag for fresh login
+                request.session['fresh_login'] = True
+                request.session.save()
+                
+                # Log successful login
+                logger.info(f"User {user.email} logged in successfully")
+                
+                # Force redirect with HttpResponseRedirect for reliability
+                from django.http import HttpResponseRedirect
+                dashboard_url = reverse("accounts:dashboard")
                 if next_url and next_url.startswith('/'):
-                    return redirect(next_url)
-                return redirect("accounts:dashboard")
+                    return HttpResponseRedirect(next_url)
+                return HttpResponseRedirect(dashboard_url)
             else:
                 form.add_error('password', "Invalid email or password.")
         else:
@@ -114,11 +124,22 @@ def login_view(request):
                             # Valid credentials but form validation failed (likely captcha)
                             # If only captcha failed, log the user in anyway
                             if 'captcha' in form.errors and len(form.errors) == 1:
+                                # Login the user properly
                                 login(request, user)
-                                # Redirect to next URL if it exists and is safe
+                                
+                                # Set a flag for fresh login
+                                request.session['fresh_login'] = True
+                                request.session.save()
+                                
+                                # Log successful login
+                                logger.info(f"User {user.email} logged in successfully (captcha bypass)")
+                                
+                                # Force redirect with HttpResponseRedirect for reliability
+                                from django.http import HttpResponseRedirect
+                                dashboard_url = reverse("accounts:dashboard")
                                 if next_url and next_url.startswith('/'):
-                                    return redirect(next_url)
-                                return redirect("accounts:dashboard")
+                                    return HttpResponseRedirect(next_url)
+                                return HttpResponseRedirect(dashboard_url)
                             else:
                                 form.add_error('password', "Please complete the verification to continue.")
                     else:
@@ -400,9 +421,15 @@ def dashboard_view(request):
     """
     Dashboard view for authenticated users
     """
+    # Check if this is a fresh login
+    fresh_login = request.session.pop('fresh_login', False)
+    if fresh_login:
+        request.session.save()
+    
     context = {
         'user': request.user,
-        'welcome_message': f"Welcome back, {request.user.first_name or request.user.username}!"
+        'welcome_message': f"Welcome back, {request.user.first_name or request.user.username}!",
+        'fresh_login': fresh_login
     }
     return render(request, "accounts/dashboard.html", context)
 

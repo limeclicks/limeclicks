@@ -7,6 +7,50 @@
 {% for project in projects %}
 <link rel="preload" href="{{ project.get_cached_favicon_url }}" as="image">
 {% endfor %}
+
+<!-- Fix dropdown overflow issues -->
+<style>
+    /* Ensure dropdowns can overflow the card boundaries */
+    .card {
+        position: relative;
+    }
+    
+    /* Prevent grid from clipping dropdown content */
+    .grid {
+        overflow: visible !important;
+    }
+    
+    /* Ensure dropdown menu appears above other elements */
+    .dropdown-content {
+        position: absolute !important;
+        z-index: 1000 !important;
+    }
+    
+    /* Add scrollbar for long dropdown menus */
+    .dropdown-content.menu {
+        max-height: 200px;
+        overflow-y: auto;
+    }
+    
+    /* Optional: Style the scrollbar */
+    .dropdown-content.menu::-webkit-scrollbar {
+        width: 4px;
+    }
+    
+    .dropdown-content.menu::-webkit-scrollbar-track {
+        background: rgba(0, 0, 0, 0.1);
+        border-radius: 2px;
+    }
+    
+    .dropdown-content.menu::-webkit-scrollbar-thumb {
+        background: rgba(0, 0, 0, 0.3);
+        border-radius: 2px;
+    }
+    
+    .dropdown-content.menu::-webkit-scrollbar-thumb:hover {
+        background: rgba(0, 0, 0, 0.5);
+    }
+</style>
 {% endblock %}
 
 {% block content %}
@@ -48,9 +92,9 @@
 
 <!-- Projects Grid -->
 {% if projects %}
-<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6 relative">
     {% for project in projects %}
-    <div class="card bg-base-100 shadow-md hover:shadow-lg transition-shadow" data-project-id="{{ project.id }}">
+    <div class="card bg-base-100 shadow-md hover:shadow-lg transition-shadow overflow-visible" data-project-id="{{ project.id }}">
         <div class="card-body">
             <!-- Status Badge -->
             <div class="flex justify-between items-start mb-3">
@@ -62,7 +106,7 @@
                     <div tabindex="0" role="button" class="btn btn-ghost btn-xs btn-circle">
                         <i class="fas fa-ellipsis-v"></i>
                     </div>
-                    <ul tabindex="0" class="dropdown-content z-[1] menu p-2 shadow-lg bg-base-100 rounded-box w-48">
+                    <ul tabindex="0" class="dropdown-content z-[100] menu p-2 shadow-lg bg-base-100 rounded-box w-48 max-h-96 overflow-y-auto">
                         <li>
                             <a onclick="toggleProjectActive({{ project.id }}, {{ project.active|yesno:'true,false' }})">
                                 <i class="fas {% if project.active %}fa-pause{% else %}fa-play{% endif %}"></i>

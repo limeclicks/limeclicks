@@ -49,7 +49,7 @@ def project_create(request):
         if form.is_valid():
             project = form.save(commit=False)
             project.user = request.user
-            project.save()
+            project.save()  # This will trigger the signal to auto-queue audits
             
             return JsonResponse({
                 'success': True,
