@@ -1,0 +1,18 @@
+# SERP-focused Development Procfile
+# Use: honcho -f Procfile.dev.serp start
+# For development and testing of SERP fetching and ranking
+
+# Core services
+web: python manage.py runserver 0.0.0.0:8000
+css: npx tailwindcss -i ./static/src/input.css -o ./static/dist/tailwind.css --watch
+
+# SERP processing workers (multiple for better throughput)
+worker_high: celery -A limeclicks worker --loglevel=info --pool=threads --concurrency=2 -Q serp_high -n worker_high@%h
+worker_default: celery -A limeclicks worker --loglevel=info --pool=threads --concurrency=4 -Q serp_default -n worker_default@%h
+worker_general: celery -A limeclicks worker --loglevel=info --pool=threads --concurrency=2 -Q celery,accounts,default -n worker_general@%h
+
+# Scheduler - runs every minute to queue keywords
+beat: celery -A limeclicks beat --loglevel=info
+
+# Monitoring
+flower: celery -A limeclicks flower --port=5555

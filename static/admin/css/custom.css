@@ -1,0 +1,59 @@
+/* Custom styles for LimeClicks Admin */
+
+/* Main logo styling - ensure single display */
+.unfold-sidebar-logo img,
+.unfold-header-logo img,
+img[src*="logo-main"] {
+    max-height: 40px !important;
+    width: auto !important;
+    object-fit: contain !important;
+    display: block;
+}
+
+/* Sidebar logo container */
+.unfold-sidebar-header {
+    padding: 1rem;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+/* Fix logo in collapsed sidebar */
+.unfold-sidebar-collapsed .unfold-sidebar-logo img {
+    max-height: 32px !important;
+}
+
+/* General logo styling */
+img[src*="logo-light-admin"], 
+img[src*="logo-dark-admin"],
+img[src*="logo-main"] {
+    max-height: 40px;
+    width: auto;
+    object-fit: contain;
+}
+
+/* Prevent any duplicate logos */
+.unfold-site-icon {
+    display: none !important;
+}
+
+/* Hide extra logo instances */
+.unfold-header img + img,
+.unfold-sidebar-header img + img {
+    display: none !important;
+}
+
+/* Force single logo display */
+.unfold-logo:not(:first-of-type) {
+    display: none !important;
+}
+
+/* Clean up header spacing */
+.unfold-header {
+    align-items: center;
+}
+
+/* Ensure logo link is properly styled */
+a.unfold-logo {
+    display: inline-flex;
+    align-items: center;
+    text-decoration: none;
+}

@@ -1,0 +1,26 @@
+{
+  "domain": "fastgenerations.co.uk",
+  "tested_at": "2025-08-25T08:51:31.880618+00:00",
+  "results": [
+    {
+      "keyword": "pay per click agency brixton",
+      "rank": null,
+      "status": "Failed",
+      "error": null
+    },
+    {
+      "keyword": "seo agency wandsworth",
+      "rank": 1,
+      "status": "Success",
+      "r2_path": "fastgenerations.co.uk/seo-agency-wandsworth/2025-08-25.json",
+      "review_url": "https://4e6cdcada438244225e0ea9055d4d24e.r2.cloudflarestorage.com/limeclicks/fastgenerations.co.uk/seo-agency-wandsworth/2025-08-25.json?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=3a959a8f88be1e5a919366d78ffe058d%2F20250825%2Fauto%2Fs3%2Faws4_request&X-Amz-Date=20250825T085122Z&X-Amz-Expires=7200&X-Amz-SignedHeaders=host&X-Amz-Signature=809a9dd28b5d222c776c1c32026fab1fdcf82ad1417e0f62815ba03e7cde8a86"
+    },
+    {
+      "keyword": "digital marketing agency clapham",
+      "rank": 1,
+      "status": "Success",
+      "r2_path": "fastgenerations.co.uk/digital-marketing-agency-clapham/2025-08-25.json",
+      "review_url": "https://4e6cdcada438244225e0ea9055d4d24e.r2.cloudflarestorage.com/limeclicks/fastgenerations.co.uk/digital-marketing-agency-clapham/2025-08-25.json?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=3a959a8f88be1e5a919366d78ffe058d%2F20250825%2Fauto%2Fs3%2Faws4_request&X-Amz-Date=20250825T085131Z&X-Amz-Expires=7200&X-Amz-SignedHeaders=host&X-Amz-Signature=e5cf3300a0498911dfb968e850846782c8988eaac1230ad13dd903f2746f98b0"
+    }
+  ]
+}

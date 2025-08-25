@@ -6,6 +6,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>{% block title %}Dashboard - LimeClicks{% endblock %}</title>
+    <link rel="icon" type="image/png" href="{% static 'img/favicon.png' %}">
     <link rel="stylesheet" href="{% static 'dist/tailwind.css' %}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css" integrity="sha512-Kc323vGBEqzTmouAECnVceyQqyqdsSiqLQISBL29aUW4U/M7pSPA/gEUZQqv1cwx4OnYxTxve5UMg5GT6L4JJg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
     <script src="https://unpkg.com/htmx.org@1.9.12"></script>
@@ -338,13 +339,11 @@
             <aside class="bg-base-100 min-h-full w-60 shadow-xl">
                 <!-- Sidebar Header -->
                 <div class="sidebar-header p-4 border-b border-base-300 flex items-center">
-                    <a href="{% url 'accounts:dashboard' %}" class="flex items-center gap-3 flex-1">
-                        <div class="w-10 h-10 bg-primary rounded-xl flex items-center justify-center flex-shrink-0">
-                            <i class="fas fa-bolt text-white text-lg"></i>
-                        </div>
+                    <a href="{% url 'accounts:dashboard' %}" class="flex items-center flex-1">
                         <div class="brand-text">
-                            <span class="text-lg font-bold text-primary">LimeClicks</span>
-                            <p class="text-xs text-base-content/60">Link Management</p>
+                            <img src="{{ logo_light }}" alt="{{ site_name }}" class="block dark:hidden" style="height: 32px; width: auto; object-fit: contain;">
+                            <img src="{{ logo_dark }}" alt="{{ site_name }}" class="hidden dark:block" style="height: 32px; width: auto; object-fit: contain;">
+                            <p class="text-xs text-base-content/60 mt-1">SEO Management Platform</p>
                         </div>
                     </a>
                 </div>

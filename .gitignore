@@ -265,3 +265,6 @@ Desktop.ini
 # Package lock files (uncomment if you prefer to ignore them)
 # package-lock.json
 # yarn.lock
+# SERP HTML Storage (local)
+storage/
+*.tmp

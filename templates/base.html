@@ -6,6 +6,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>{% block title %}LimeClicks{% endblock %}</title>
+    <link rel="icon" type="image/png" href="{% static 'img/favicon.png' %}">
     <link rel="stylesheet" href="{% static 'dist/tailwind.css' %}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css" integrity="sha512-Kc323vGBEqzTmouAECnVceyQqyqdsSiqLQISBL29aUW4U/M7pSPA/gEUZQqv1cwx4OnYxTxve5UMg5GT6L4JJg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
     <script src="https://unpkg.com/htmx.org@1.9.12"></script>
@@ -16,7 +17,10 @@
     {% include "includes/messages.html" %}
     <header class="navbar bg-base-100 shadow-sm border-b border-base-300">
         <div class="flex-1 px-4">
-            <a href="/" class="text-xl font-bold text-primary">LimeClicks</a>
+            <a href="/" class="flex items-center">
+                <img src="{{ logo_light }}" alt="{{ site_name }}" class="block dark:hidden" style="height: 36px; width: auto; object-fit: contain;">
+                <img src="{{ logo_dark }}" alt="{{ site_name }}" class="hidden dark:block" style="height: 36px; width: auto; object-fit: contain;">
+            </a>
         </div>
         <nav class="flex items-center gap-3 px-4">
             <a class="btn btn-ghost btn-sm" href="{% url 'accounts:login' %}">Sign in</a>

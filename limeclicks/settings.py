@@ -50,7 +50,8 @@ INSTALLED_APPS = [
     "accounts",
     "project",
     "siteconfig",
-    "keywords"
+    "keywords",
+    "django_celery_beat"
 ]
 
 MIDDLEWARE = [
@@ -79,6 +80,8 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                "limeclicks.context_processors.logos",
+                "limeclicks.context_processors.site_settings",
             ],
         },
     },
@@ -145,8 +148,159 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 UNFOLD = {
     "SITE_TITLE": "LimeClicks Admin",
     "SITE_HEADER": "LimeClicks",
-    "SITE_URL": "/admin",
-    "THEME": "light",  
+    "SITE_URL": "/",
+    # Single logo configuration
+    "LOGO": {
+        "light": lambda request: "/static/admin/img/logo-main.png",  # Use main logo
+        "dark": lambda request: "/static/admin/img/logo-main-dark.png",
+    },
+    "THEME": "light",
+    "STYLES": [
+        lambda request: "/static/admin/css/custom.css",
+    ],
+    "COLORS": {
+        "primary": {
+            "50": "#f0f9ff",
+            "100": "#e0f2fe",
+            "200": "#bae6fd",
+            "300": "#7dd3fc",
+            "400": "#38bdf8",
+            "500": "#0ea5e9",
+            "600": "#0284c7",
+            "700": "#0369a1",
+            "800": "#075985",
+            "900": "#0c4a6e",
+            "950": "#082f49",
+        },
+    },
+    "EXTENSIONS": {
+        "modeltranslation": {
+            "flags": {
+                "en": "🇬🇧",
+                "fr": "🇫🇷",
+                "nl": "🇳🇱",
+            },
+        },
+    },
+    "SIDEBAR": {
+        "show_search": True,
+        "show_all_applications": False,
+        "navigation": [
+            {
+                "title": "Dashboard",
+                "separator": False,
+                "items": [
+                    {
+                        "title": "Overview",
+                        "icon": "dashboard",
+                        "link": "/admin/",
+                    },
+                ],
+            },
+            {
+                "title": "SEO & Keywords",
+                "separator": True,
+                "collapsible": True,
+                "items": [
+                    {
+                        "title": "Keywords",
+                        "icon": "search",
+                        "link": "/admin/keywords/keyword/",
+                    },
+                    {
+                        "title": "Rankings",
+                        "icon": "trending_up",
+                        "link": "/admin/keywords/rank/",
+                    },
+                    {
+                        "title": "Tags",
+                        "icon": "label",
+                        "link": "/admin/keywords/tag/",
+                    },
+                ],
+            },
+            {
+                "title": "Projects",
+                "separator": True,
+                "collapsible": True,
+                "items": [
+                    {
+                        "title": "All Projects",
+                        "icon": "folder",
+                        "link": "/admin/project/project/",
+                    },
+                ],
+            },
+            {
+                "title": "User Management",
+                "separator": True,
+                "collapsible": True,
+                "items": [
+                    {
+                        "title": "Users",
+                        "icon": "person",
+                        "link": "/admin/accounts/user/",
+                    },
+                    {
+                        "title": "Groups",
+                        "icon": "group",
+                        "link": "/admin/auth/group/",
+                    },
+                    {
+                        "title": "Permissions",
+                        "icon": "lock",
+                        "link": "/admin/auth/permission/",
+                    },
+                ],
+            },
+            {
+                "title": "System",
+                "separator": True,
+                "collapsible": True,
+                "items": [
+                    {
+                        "title": "Site Configuration",
+                        "icon": "settings",
+                        "link": "/admin/siteconfig/siteconfiguration/",
+                    },
+                    {
+                        "title": "Periodic Tasks",
+                        "icon": "schedule",
+                        "link": "/admin/django_celery_beat/periodictask/",
+                    },
+                    {
+                        "title": "Task Intervals",
+                        "icon": "timer",
+                        "link": "/admin/django_celery_beat/intervalschedule/",
+                    },
+                    {
+                        "title": "Crontabs",
+                        "icon": "access_time",
+                        "link": "/admin/django_celery_beat/crontabschedule/",
+                    },
+                ],
+            },
+        ],
+    },
+    "TABS": [
+        {
+            "models": ["keywords.Keyword"],
+            "items": [
+                {
+                    "title": "Active Keywords",
+                    "link": "/admin/keywords/keyword/?processing__exact=0&archive__exact=0",
+                },
+                {
+                    "title": "Processing",
+                    "link": "/admin/keywords/keyword/?processing__exact=1",
+                },
+                {
+                    "title": "Archived",
+                    "link": "/admin/keywords/keyword/?archive__exact=1",
+                },
+            ],
+        },
+    ],
 }
 
 CRISPY_ALLOWED_TEMPLATE_PACKS = "tailwind"
@@ -188,14 +342,20 @@ CELERY_TIMEZONE = TIME_ZONE
 CELERY_TASK_ROUTES = {
     'accounts.tasks.*': {'queue': 'accounts'},
     'limeclicks.tasks.*': {'queue': 'default'},
+    'keywords.tasks.fetch_keyword_serp_html': {'queue': 'serp_default'},
 }
 
 # Celery beat schedule (for periodic tasks)
 CELERY_BEAT_SCHEDULE = {
-    # Example: Clean expired verification tokens every hour
+    # Clean expired verification tokens every hour
     'cleanup-expired-tokens': {
         'task': 'accounts.tasks.cleanup_expired_tokens',
         'schedule': 3600.0,  # Every hour
+    },
+    # Enqueue keywords for SERP scraping every minute
+    'enqueue-keyword-scrapes': {
+        'task': 'keywords.tasks.enqueue_keyword_scrapes_batch',
+        'schedule': 60.0,  # Every minute (60 seconds)
     },
 }
 
@@ -211,3 +371,40 @@ LOGOUT_REDIRECT_URL = '/accounts/login/'
 
 # Scrape.do API Configuration
 SCRAPPER_API_KEY = os.getenv('SCRAPPER_API_KEY')
+
+# Cloudflare R2 Storage Configuration
+R2_ACCESS_KEY_ID = os.getenv('R2_ACCESS_KEY_ID')
+R2_SECRET_ACCESS_KEY = os.getenv('R2_SECRET_ACCESS_KEY')
+R2_BUCKET_NAME = os.getenv('R2_BUCKET_NAME')
+R2_ENDPOINT_URL = os.getenv('R2_ENDPOINT_URL')
+
+# AWS S3 Settings for django-storages (R2 is S3-compatible)
+AWS_ACCESS_KEY_ID = R2_ACCESS_KEY_ID
+AWS_SECRET_ACCESS_KEY = R2_SECRET_ACCESS_KEY
+AWS_STORAGE_BUCKET_NAME = R2_BUCKET_NAME
+AWS_S3_ENDPOINT_URL = R2_ENDPOINT_URL
+AWS_S3_REGION_NAME = 'auto'
+AWS_S3_SIGNATURE_VERSION = 's3v4'
+AWS_S3_FILE_OVERWRITE = False
+AWS_DEFAULT_ACL = None
+AWS_S3_VERIFY = True
+
+# Optional: Use R2 for media files
+# DEFAULT_FILE_STORAGE = 'services.storage_backends.R2MediaStorage'
+# MEDIA_URL = f'{R2_ENDPOINT_URL}/{R2_BUCKET_NAME}/media/'
+
+# Celery Configuration
+CELERY_BROKER_URL = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
+CELERY_RESULT_BACKEND = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = TIME_ZONE
+CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
+
+# SERP Scraping Configuration
+SCRAPE_DO_STORAGE_ROOT = os.getenv('SCRAPE_DO_STORAGE_ROOT', os.path.join(BASE_DIR, 'storage', 'scrape_do'))
+SCRAPE_DO_TIMEOUT = int(os.getenv('SCRAPE_DO_TIMEOUT', '60'))
+SCRAPE_DO_RETRIES = int(os.getenv('SCRAPE_DO_RETRIES', '3'))
+SERP_HISTORY_DAYS = int(os.getenv('SERP_HISTORY_DAYS', '7'))
+FETCH_MIN_INTERVAL_HOURS = int(os.getenv('FETCH_MIN_INTERVAL_HOURS', '24'))
