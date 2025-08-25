@@ -49,7 +49,8 @@ INSTALLED_APPS = [
     "django_recaptcha",
     "accounts",
     "project",
-    "siteconfig"
+    "siteconfig",
+    "keywords"
 ]
 
 MIDDLEWARE = [
