@@ -1,0 +1,470 @@
+<!-- Overview Tab - Clean Professional Design -->
+<div class="p-6 space-y-4">
+    <!-- Main Stats Grid - Smaller White Cards with Shadows -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <!-- Site Health Score -->
+        <div class="card bg-white shadow-md hover:shadow-lg transition-shadow compact">
+            <div class="card-body p-4">
+                <div class="flex items-center justify-between mb-2">
+                    <h3 class="text-xs font-semibold text-base-content/60 uppercase tracking-wide">Site Health Score</h3>
+                    <div class="w-8 h-8 rounded bg-primary/10 flex items-center justify-center">
+                        <i class="fas fa-heartbeat text-primary text-sm"></i>
+                    </div>
+                </div>
+                {% with health_score=audit.overall_site_health_score|default:0 %}
+                <div class="text-3xl font-bold mb-1">
+                    {{ health_score|floatformat:0 }}%
+                </div>
+                <div class="text-xs text-base-content/60">
+                    {% if health_score >= 80 %}
+                        <span class="text-success">● Excellent</span> Performance
+                    {% elif health_score >= 60 %}
+                        <span class="text-warning">● Good</span> Performance
+                    {% elif health_score >= 40 %}
+                        <span class="text-warning">● Needs Work</span>
+                    {% else %}
+                        <span class="text-error">● Poor</span> Performance
+                    {% endif %}
+                </div>
+                {% endwith %}
+            </div>
+        </div>
+
+        <!-- Pages Crawled -->
+        <div class="card bg-white shadow-md hover:shadow-lg transition-shadow compact">
+            <div class="card-body p-4">
+                <div class="flex items-center justify-between mb-2">
+                    <h3 class="text-xs font-semibold text-base-content/60 uppercase tracking-wide">Pages Crawled</h3>
+                    <div class="w-8 h-8 rounded bg-info/10 flex items-center justify-center">
+                        <i class="fas fa-sitemap text-info text-sm"></i>
+                    </div>
+                </div>
+                <div class="text-3xl font-bold mb-1">
+                    {{ audit.total_pages_crawled|default:0 }}
+                </div>
+                <div class="text-xs text-base-content/60">
+                    <span class="text-success">●</span> Successfully analyzed
+                </div>
+            </div>
+        </div>
+
+        <!-- Total Issues -->
+        <div class="card bg-white shadow-md hover:shadow-lg transition-shadow compact">
+            <div class="card-body p-4">
+                <div class="flex items-center justify-between mb-2">
+                    <h3 class="text-xs font-semibold text-base-content/60 uppercase tracking-wide">Total Issues</h3>
+                    <div class="w-8 h-8 rounded {% if audit.total_issues_count > 50 %}bg-error/10{% elif audit.total_issues_count > 20 %}bg-warning/10{% else %}bg-success/10{% endif %} flex items-center justify-center">
+                        <i class="fas fa-exclamation-triangle {% if audit.total_issues_count > 50 %}text-error{% elif audit.total_issues_count > 20 %}text-warning{% else %}text-success{% endif %} text-sm"></i>
+                    </div>
+                </div>
+                <div class="text-3xl font-bold mb-1 {% if audit.total_issues_count > 50 %}text-error{% elif audit.total_issues_count > 20 %}text-warning{% else %}text-base-content{% endif %}">
+                    {{ audit.total_issues_count|default:0 }}
+                </div>
+                <div class="text-xs text-base-content/60">
+                    {% if audit.total_issues_count > 50 %}
+                        <span class="text-error">● Action Required</span>
+                    {% elif audit.total_issues_count > 20 %}
+                        <span class="text-warning">● Review Needed</span>
+                    {% else %}
+                        <span class="text-success">● Looking Good</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Core Web Vitals Section -->
+    {% if performance_data.desktop_audit or performance_data.mobile_audit %}
+    <div class="card bg-white shadow-md">
+        <div class="card-body">
+            <div class="flex items-center justify-between mb-6">
+                <h3 class="text-lg font-bold">Core Web Vitals</h3>
+                <div class="badge badge-secondary badge-outline">Real-time Data</div>
+            </div>
+            
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Desktop Metrics -->
+                <div class="bg-base-100 rounded-xl p-4 border border-base-200">
+                    <h4 class="text-sm font-bold mb-4 flex items-center gap-2">
+                        <i class="fas fa-desktop text-info mr-2"></i>
+                        Desktop Performance
+                    </h4>
+                    
+                    <div class="space-y-4">
+                        <!-- LCP -->
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-2">
+                                <div class="tooltip" data-tip="Largest Contentful Paint">
+                                    <span class="text-xs font-semibold text-base-content/70">LCP</span>
+                                </div>
+                            </div>
+                            {% with lcp=performance_data.desktop_audit.largest_contentful_paint|default:0 %}
+                            {% if lcp %}
+                            <div class="flex items-center gap-2">
+                                <span class="text-lg font-bold {% if lcp <= 2.5 %}text-success{% elif lcp <= 4 %}text-warning{% else %}text-error{% endif %}">
+                                    {{ lcp|floatformat:1 }}s
+                                </span>
+                                {% if lcp <= 2.5 %}
+                                    <i class="fas fa-check-circle text-success text-xs"></i>
+                                {% elif lcp <= 4 %}
+                                    <i class="fas fa-exclamation-circle text-warning text-xs"></i>
+                                {% else %}
+                                    <i class="fas fa-times-circle text-error text-xs"></i>
+                                {% endif %}
+                            </div>
+                            {% else %}
+                            <span class="text-base-content/30">--</span>
+                            {% endif %}
+                            {% endwith %}
+                        </div>
+                        
+                        <!-- INP -->
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-2">
+                                <div class="tooltip" data-tip="Interaction to Next Paint">
+                                    <span class="text-xs font-semibold text-base-content/70">INP</span>
+                                </div>
+                            </div>
+                            {% with inp=performance_data.desktop_audit.interaction_to_next_paint|default:0 %}
+                            {% if inp %}
+                            <div class="flex items-center gap-2">
+                                <span class="text-lg font-bold {% if inp <= 200 %}text-success{% elif inp <= 500 %}text-warning{% else %}text-error{% endif %}">
+                                    {{ inp|floatformat:0 }}ms
+                                </span>
+                                {% if inp <= 200 %}
+                                    <i class="fas fa-check-circle text-success text-xs"></i>
+                                {% elif inp <= 500 %}
+                                    <i class="fas fa-exclamation-circle text-warning text-xs"></i>
+                                {% else %}
+                                    <i class="fas fa-times-circle text-error text-xs"></i>
+                                {% endif %}
+                            </div>
+                            {% else %}
+                            <span class="text-base-content/30">--</span>
+                            {% endif %}
+                            {% endwith %}
+                        </div>
+                        
+                        <!-- CLS -->
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-2">
+                                <div class="tooltip" data-tip="Cumulative Layout Shift">
+                                    <span class="text-xs font-semibold text-base-content/70">CLS</span>
+                                </div>
+                            </div>
+                            {% with cls=performance_data.desktop_audit.cumulative_layout_shift|default:0 %}
+                            {% if cls or cls == 0 %}
+                            <div class="flex items-center gap-2">
+                                <span class="text-lg font-bold {% if cls <= 0.1 %}text-success{% elif cls <= 0.25 %}text-warning{% else %}text-error{% endif %}">
+                                    {{ cls|floatformat:2 }}
+                                </span>
+                                {% if cls <= 0.1 %}
+                                    <i class="fas fa-check-circle text-success text-xs"></i>
+                                {% elif cls <= 0.25 %}
+                                    <i class="fas fa-exclamation-circle text-warning text-xs"></i>
+                                {% else %}
+                                    <i class="fas fa-times-circle text-error text-xs"></i>
+                                {% endif %}
+                            </div>
+                            {% else %}
+                            <span class="text-base-content/30">--</span>
+                            {% endif %}
+                            {% endwith %}
+                        </div>
+                        
+                        <!-- Performance Score -->
+                        {% if performance_data.desktop_audit.performance_score %}
+                        <div class="divider my-2"></div>
+                        <div>
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-xs font-semibold text-base-content/70">Overall Score</span>
+                                <span class="text-xl font-bold">{{ performance_data.desktop_audit.performance_score }}</span>
+                            </div>
+                            <progress class="progress progress-info h-2" value="{{ performance_data.desktop_audit.performance_score }}" max="100"></progress>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Mobile Metrics -->
+                <div class="bg-base-100 rounded-xl p-4 border border-base-200">
+                    <h4 class="text-sm font-bold mb-4 flex items-center gap-2">
+                        <i class="fas fa-mobile-alt text-primary mr-2"></i>
+                        Mobile Performance
+                    </h4>
+                    
+                    <div class="space-y-4">
+                        <!-- LCP -->
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-2">
+                                <div class="tooltip" data-tip="Largest Contentful Paint">
+                                    <span class="text-xs font-semibold text-base-content/70">LCP</span>
+                                </div>
+                            </div>
+                            {% with lcp=performance_data.mobile_audit.largest_contentful_paint|default:0 %}
+                            {% if lcp %}
+                            <div class="flex items-center gap-2">
+                                <span class="text-lg font-bold {% if lcp <= 2.5 %}text-success{% elif lcp <= 4 %}text-warning{% else %}text-error{% endif %}">
+                                    {{ lcp|floatformat:1 }}s
+                                </span>
+                                {% if lcp <= 2.5 %}
+                                    <i class="fas fa-check-circle text-success text-xs"></i>
+                                {% elif lcp <= 4 %}
+                                    <i class="fas fa-exclamation-circle text-warning text-xs"></i>
+                                {% else %}
+                                    <i class="fas fa-times-circle text-error text-xs"></i>
+                                {% endif %}
+                            </div>
+                            {% else %}
+                            <span class="text-base-content/30">--</span>
+                            {% endif %}
+                            {% endwith %}
+                        </div>
+                        
+                        <!-- INP -->
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-2">
+                                <div class="tooltip" data-tip="Interaction to Next Paint">
+                                    <span class="text-xs font-semibold text-base-content/70">INP</span>
+                                </div>
+                            </div>
+                            {% with inp=performance_data.mobile_audit.interaction_to_next_paint|default:0 %}
+                            {% if inp %}
+                            <div class="flex items-center gap-2">
+                                <span class="text-lg font-bold {% if inp <= 200 %}text-success{% elif inp <= 500 %}text-warning{% else %}text-error{% endif %}">
+                                    {{ inp|floatformat:0 }}ms
+                                </span>
+                                {% if inp <= 200 %}
+                                    <i class="fas fa-check-circle text-success text-xs"></i>
+                                {% elif inp <= 500 %}
+                                    <i class="fas fa-exclamation-circle text-warning text-xs"></i>
+                                {% else %}
+                                    <i class="fas fa-times-circle text-error text-xs"></i>
+                                {% endif %}
+                            </div>
+                            {% else %}
+                            <span class="text-base-content/30">--</span>
+                            {% endif %}
+                            {% endwith %}
+                        </div>
+                        
+                        <!-- CLS -->
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-2">
+                                <div class="tooltip" data-tip="Cumulative Layout Shift">
+                                    <span class="text-xs font-semibold text-base-content/70">CLS</span>
+                                </div>
+                            </div>
+                            {% with cls=performance_data.mobile_audit.cumulative_layout_shift|default:0 %}
+                            {% if cls or cls == 0 %}
+                            <div class="flex items-center gap-2">
+                                <span class="text-lg font-bold {% if cls <= 0.1 %}text-success{% elif cls <= 0.25 %}text-warning{% else %}text-error{% endif %}">
+                                    {{ cls|floatformat:2 }}
+                                </span>
+                                {% if cls <= 0.1 %}
+                                    <i class="fas fa-check-circle text-success text-xs"></i>
+                                {% elif cls <= 0.25 %}
+                                    <i class="fas fa-exclamation-circle text-warning text-xs"></i>
+                                {% else %}
+                                    <i class="fas fa-times-circle text-error text-xs"></i>
+                                {% endif %}
+                            </div>
+                            {% else %}
+                            <span class="text-base-content/30">--</span>
+                            {% endif %}
+                            {% endwith %}
+                        </div>
+                        
+                        <!-- Performance Score -->
+                        {% if performance_data.mobile_audit.performance_score %}
+                        <div class="divider my-2"></div>
+                        <div>
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-xs font-semibold text-base-content/70">Overall Score</span>
+                                <span class="text-xl font-bold">{{ performance_data.mobile_audit.performance_score }}</span>
+                            </div>
+                            <progress class="progress progress-primary h-2" value="{{ performance_data.mobile_audit.performance_score }}" max="100"></progress>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Issues Breakdown -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <!-- Issues by Severity -->
+        <div class="card bg-white shadow-md">
+            <div class="card-body">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-bold">Issues by Severity</h3>
+                    <span class="badge badge-lg">{{ audit.total_issues_count }} Total</span>
+                </div>
+                
+                <div class="space-y-3">
+                    <!-- Critical -->
+                    <div class="bg-base-100 rounded-lg p-3 border border-base-200 hover:shadow-md transition-all">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-3">
+                                <div class="w-2 h-8 rounded-full bg-error"></div>
+                                <div>
+                                    <span class="badge badge-error badge-sm">Critical</span>
+                                    <p class="text-xs text-base-content/60 mt-1">Must fix immediately</p>
+                                </div>
+                            </div>
+                            <div class="text-2xl font-bold text-error">{{ critical_count }}</div>
+                        </div>
+                    </div>
+
+                    <!-- High -->
+                    <div class="bg-base-100 rounded-lg p-3 border border-base-200 hover:shadow-md transition-all">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-3">
+                                <div class="w-2 h-8 rounded-full bg-warning"></div>
+                                <div>
+                                    <span class="badge badge-warning badge-sm">High</span>
+                                    <p class="text-xs text-base-content/60 mt-1">Should fix soon</p>
+                                </div>
+                            </div>
+                            <div class="text-2xl font-bold text-warning">{{ high_count }}</div>
+                        </div>
+                    </div>
+
+                    <!-- Medium -->
+                    <div class="bg-base-100 rounded-lg p-3 border border-base-200 hover:shadow-md transition-all">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-3">
+                                <div class="w-2 h-8 rounded-full bg-info"></div>
+                                <div>
+                                    <span class="badge badge-info badge-sm">Medium</span>
+                                    <p class="text-xs text-base-content/60 mt-1">Consider fixing</p>
+                                </div>
+                            </div>
+                            <div class="text-2xl font-bold text-info">{{ medium_count }}</div>
+                        </div>
+                    </div>
+
+                    <!-- Low -->
+                    <div class="bg-base-100 rounded-lg p-3 border border-base-200 hover:shadow-md transition-all">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-3">
+                                <div class="w-2 h-8 rounded-full bg-primary"></div>
+                                <div>
+                                    <span class="badge badge-primary badge-sm">Low</span>
+                                    <p class="text-xs text-base-content/60 mt-1">Minor improvements</p>
+                                </div>
+                            </div>
+                            <div class="text-2xl font-bold text-primary">{{ low_count }}</div>
+                        </div>
+                    </div>
+
+                    <!-- Info -->
+                    <div class="bg-base-100 rounded-lg p-3 border border-base-200 hover:shadow-md transition-all">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-3">
+                                <div class="w-2 h-8 rounded-full bg-base-content/20"></div>
+                                <div>
+                                    <span class="badge badge-ghost badge-sm">Info</span>
+                                    <p class="text-xs text-base-content/60 mt-1">FYI only</p>
+                                </div>
+                            </div>
+                            <div class="text-2xl font-bold text-base-content/60">{{ info_count }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Common Issues -->
+        <div class="card bg-white shadow-md">
+            <div class="card-body">
+                <h3 class="text-lg font-bold mb-4">Common Issues</h3>
+                
+                <div class="space-y-3">
+                    <div class="bg-base-100 rounded-lg p-3 border border-base-200 hover:shadow-md transition-all">
+                        <div class="flex justify-between items-center">
+                            <div class="flex items-center gap-2">
+                                <i class="fas fa-link-slash text-error text-sm"></i>
+                                <span class="text-sm font-medium">Broken Links</span>
+                            </div>
+                            <span class="badge badge-lg {% if audit.broken_links_count > 0 %}badge-error{% else %}badge-success{% endif %}">
+                                {{ audit.broken_links_count }}
+                            </span>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-base-100 rounded-lg p-3 border border-base-200 hover:shadow-md transition-all">
+                        <div class="flex justify-between items-center">
+                            <div class="flex items-center gap-2">
+                                <i class="fas fa-heading text-warning text-sm"></i>
+                                <span class="text-sm font-medium">Missing Titles</span>
+                            </div>
+                            <span class="badge badge-lg {% if audit.missing_titles_count > 0 %}badge-warning{% else %}badge-success{% endif %}">
+                                {{ audit.missing_titles_count }}
+                            </span>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-base-100 rounded-lg p-3 border border-base-200 hover:shadow-md transition-all">
+                        <div class="flex justify-between items-center">
+                            <div class="flex items-center gap-2">
+                                <i class="fas fa-copy text-warning text-sm"></i>
+                                <span class="text-sm font-medium">Duplicate Titles</span>
+                            </div>
+                            <span class="badge badge-lg {% if audit.duplicate_titles_count > 0 %}badge-warning{% else %}badge-success{% endif %}">
+                                {{ audit.duplicate_titles_count }}
+                            </span>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-base-100 rounded-lg p-3 border border-base-200 hover:shadow-md transition-all">
+                        <div class="flex justify-between items-center">
+                            <div class="flex items-center gap-2">
+                                <i class="fas fa-file-alt text-info text-sm"></i>
+                                <span class="text-sm font-medium">Missing Meta Descriptions</span>
+                            </div>
+                            <span class="badge badge-lg {% if audit.missing_meta_descriptions_count > 0 %}badge-info{% else %}badge-success{% endif %}">
+                                {{ audit.missing_meta_descriptions_count }}
+                            </span>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-base-100 rounded-lg p-3 border border-base-200 hover:shadow-md transition-all">
+                        <div class="flex justify-between items-center">
+                            <div class="flex items-center gap-2">
+                                <i class="fas fa-clone text-info text-sm"></i>
+                                <span class="text-sm font-medium">Duplicate Meta Descriptions</span>
+                            </div>
+                            <span class="badge badge-lg {% if audit.duplicate_meta_descriptions_count > 0 %}badge-info{% else %}badge-success{% endif %}">
+                                {{ audit.duplicate_meta_descriptions_count }}
+                            </span>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-base-100 rounded-lg p-3 border border-base-200 hover:shadow-md transition-all">
+                        <div class="flex justify-between items-center">
+                            <div class="flex items-center gap-2">
+                                <i class="fas fa-random text-primary text-sm"></i>
+                                <span class="text-sm font-medium">Redirect Chains</span>
+                            </div>
+                            <span class="badge badge-lg {% if audit.redirect_chains_count > 0 %}badge-primary{% else %}badge-success{% endif %}">
+                                {{ audit.redirect_chains_count }}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- View All Issues Button -->
+    <div class="text-center">
+        <button class="btn btn-primary btn-lg shadow-lg hover:shadow-xl" onclick="document.getElementById('issues-tab-btn').click()">
+            <i class="fas fa-search mr-2"></i>
+            View All Issues
+            <span class="badge badge-sm ml-2">{{ audit.total_issues_count }}</span>
+        </button>
+    </div>
+</div>

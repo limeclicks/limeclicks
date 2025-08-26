@@ -44,16 +44,57 @@ def site_audit_list(request):
     
     # Check for running audits
     from .models import OnPagePerformanceHistory
+    from performance_audit.models import PerformancePage, PerformanceHistory
+    
     running_audits = OnPagePerformanceHistory.objects.filter(
         audit__in=site_audits,
         status__in=['pending', 'running']
     ).values('audit_id').distinct()
     running_audit_ids = {item['audit_id'] for item in running_audits}
     
+    # Get performance scores for all projects
+    performance_scores = {}
+    for audit in site_audits:
+        try:
+            perf_page = PerformancePage.objects.filter(project=audit.project).first()
+            if perf_page:
+                latest_perf = PerformanceHistory.objects.filter(
+                    performance_page=perf_page,
+                    status='completed'
+                ).order_by('-created_at').first()
+                if latest_perf:
+                    performance_scores[audit.project_id] = {
+                        'mobile': latest_perf.mobile_performance_score,
+                        'desktop': latest_perf.desktop_performance_score
+                    }
+        except:
+            pass
+    
     # Calculate statistics for each audit
     for audit in site_audits:
         # Check if audit has running tasks
         audit.has_running_audit = audit.id in running_audit_ids
+        
+        # Add performance scores
+        if audit.project_id in performance_scores:
+            audit.performance_score_mobile = performance_scores[audit.project_id]['mobile']
+            audit.performance_score_desktop = performance_scores[audit.project_id]['desktop']
+        else:
+            audit.performance_score_mobile = None
+            audit.performance_score_desktop = None
+        
+        # Fix last audit date - use PerformancePage data if SiteAudit date is missing
+        if not audit.last_audit_date:
+            try:
+                perf_page = PerformancePage.objects.filter(project=audit.project).first()
+                if perf_page and perf_page.last_audit_date:
+                    audit.display_last_audit_date = perf_page.last_audit_date
+                else:
+                    audit.display_last_audit_date = None
+            except:
+                audit.display_last_audit_date = None
+        else:
+            audit.display_last_audit_date = audit.last_audit_date
         
         # Calculate technical SEO health (based on issues) - 100% weight
         if audit.total_pages_crawled and audit.total_pages_crawled > 0:
@@ -130,11 +171,11 @@ def site_audit_detail(request, audit_id):
     
     # Load JSON data from R2 if available
     audit_json_data = None
-    if latest_history and latest_history.json_report:
+    if latest_history and latest_history.full_report_json:
         try:
             import json
             # Read the JSON report from R2 storage
-            with latest_history.json_report.open('r') as f:
+            with latest_history.full_report_json.open('r') as f:
                 audit_json_data = json.load(f)
         except Exception as e:
             print(f"Error loading JSON report: {e}")
@@ -143,7 +184,8 @@ def site_audit_detail(request, audit_id):
     performance_data = {
         'mobile': None,
         'desktop': None,
-        'combined_audit': None
+        'combined_audit': None,
+        'performance_page': None
     }
     
     try:
@@ -151,6 +193,7 @@ def site_audit_detail(request, audit_id):
         performance_page = PerformancePage.objects.filter(project=audit.project).first()
         
         if performance_page:
+            performance_data['performance_page'] = performance_page
             # Get latest combined audit (contains both mobile and desktop)
             combined_audit = PerformanceHistory.objects.filter(
                 performance_page=performance_page,
@@ -194,12 +237,88 @@ def site_audit_detail(request, audit_id):
                             return getattr(self.audit, f'{self.device}_seo_score')
                         elif name == 'pwa_score':
                             return getattr(self.audit, f'{self.device}_pwa_score')
+                        # Core Web Vitals mapping
+                        elif name == 'largest_contentful_paint':
+                            return getattr(self.audit, f'{self.device}_largest_contentful_paint')
+                        elif name == 'interaction_to_next_paint':
+                            return getattr(self.audit, f'{self.device}_interaction_to_next_paint')
+                        elif name == 'cumulative_layout_shift':
+                            return getattr(self.audit, f'{self.device}_cumulative_layout_shift')
+                        elif name == 'first_contentful_paint':
+                            return getattr(self.audit, f'{self.device}_first_contentful_paint')
+                        elif name == 'speed_index':
+                            return getattr(self.audit, f'{self.device}_speed_index')
+                        elif name == 'time_to_interactive':
+                            return getattr(self.audit, f'{self.device}_time_to_interactive')
+                        elif name == 'total_blocking_time':
+                            return getattr(self.audit, f'{self.device}_total_blocking_time')
+                        elif name == 'first_input_delay':
+                            return getattr(self.audit, f'{self.device}_first_input_delay')
+                        elif name == 'time_to_first_byte':
+                            return getattr(self.audit, f'{self.device}_time_to_first_byte')
                         return getattr(self.audit, name)
                 
                 performance_data['mobile_audit'] = AuditProxy(combined_audit, 'mobile')
                 performance_data['desktop_audit'] = AuditProxy(combined_audit, 'desktop')
     except:
         pass
+    
+    # Prepare history data for History tab
+    history_data = []
+    all_history = OnPagePerformanceHistory.objects.filter(
+        audit=audit
+    ).order_by('-created_at')[:20]  # Get last 20 audits
+    
+    for history_item in all_history:
+        # Calculate audit duration
+        audit_duration = None
+        if history_item.completed_at and history_item.created_at:
+            audit_duration = int((history_item.completed_at - history_item.created_at).total_seconds())
+        
+        # Get issue breakdown by severity for this audit
+        issue_breakdown = {}
+        if history_item.status == 'completed':
+            severity_counts = SiteIssue.objects.filter(
+                performance_history=history_item
+            ).values('severity').annotate(count=Count('id'))
+            
+            for item in severity_counts:
+                issue_breakdown[item['severity']] = item['count']
+        
+        # Get performance scores if available (from related PerformanceHistory)
+        performance_scores = {}
+        try:
+            from performance_audit.models import PerformanceHistory as PerfHistory
+            # Check if there's a performance audit around the same time
+            perf_audit = PerfHistory.objects.filter(
+                performance_page__project=audit.project,
+                created_at__date=history_item.created_at.date(),
+                status='completed'
+            ).first()
+            
+            if perf_audit:
+                performance_scores = {
+                    'mobile': perf_audit.mobile_performance_score,
+                    'desktop': perf_audit.desktop_performance_score
+                }
+        except:
+            pass
+        
+        history_data.append({
+            'id': history_item.id,
+            'status': history_item.status,
+            'created_at': history_item.created_at,
+            'completed_at': history_item.completed_at,
+            'pages_crawled': history_item.pages_crawled,
+            'total_issues': history_item.total_issues,
+            'audit_duration': audit_duration,
+            'trigger_type': getattr(history_item, 'trigger_type', 'manual'),
+            'error_message': history_item.error_message,
+            'retry_count': history_item.retry_count,
+            'issue_breakdown': issue_breakdown,
+            'performance_scores': performance_scores,
+            'health_score': getattr(history_item, 'overall_score', audit.overall_site_health_score)
+        })
     
     # Get issues grouped by type and severity
     issues_by_type = SiteIssue.objects.filter(
@@ -208,10 +327,45 @@ def site_audit_detail(request, audit_id):
         count=Count('id')
     ).order_by('-severity', '-count') if latest_history else []
     
-    # Get all issues for detailed breakdown
-    all_issues = SiteIssue.objects.filter(
-        performance_history=latest_history
-    ).order_by('-severity', 'issue_type', 'page_url')[:50] if latest_history else []
+    # Get all issues for detailed breakdown with severity counts
+    all_issues = []
+    critical_count = high_count = medium_count = low_count = info_count = 0
+    
+    if latest_history:
+        # Create custom ordering for severity (critical -> info)
+        from django.db.models import Case, When, IntegerField
+        severity_order = Case(
+            When(severity='critical', then=1),
+            When(severity='high', then=2),
+            When(severity='medium', then=3),
+            When(severity='low', then=4),
+            When(severity='info', then=5),
+            default=6,
+            output_field=IntegerField()
+        )
+        
+        all_issues = SiteIssue.objects.filter(
+            performance_history=latest_history
+        ).annotate(
+            severity_order=severity_order
+        ).order_by('severity_order', 'issue_type', 'page_url')[:50]
+        
+        # Count by severity
+        severity_counts = SiteIssue.objects.filter(
+            performance_history=latest_history
+        ).values('severity').annotate(count=Count('id'))
+        
+        for item in severity_counts:
+            if item['severity'] == 'critical':
+                critical_count = item['count']
+            elif item['severity'] == 'high':
+                high_count = item['count']
+            elif item['severity'] == 'medium':
+                medium_count = item['count']
+            elif item['severity'] == 'low':
+                low_count = item['count']
+            elif item['severity'] == 'info':
+                info_count = item['count']
     
     # Calculate improvements if there's previous history
     previous_history = OnPagePerformanceHistory.objects.filter(
@@ -260,16 +414,56 @@ def site_audit_detail(request, audit_id):
         'redirect_chains': audit.redirect_chains_count,
     }
     
+    # Handle HTMX tab requests
+    tab = request.GET.get('tab', 'overview')
+    if request.headers.get('HX-Request'):
+        template_map = {
+            'overview': 'site_audit/partials/_overview_tab.html',
+            'issues': 'site_audit/partials/_issues_tab.html',
+            'performance': 'site_audit/partials/_performance_tab.html',
+            'history': 'site_audit/partials/_history_tab.html',
+        }
+        template = template_map.get(tab, 'site_audit/partials/_overview_tab.html')
+        return render(request, template, {
+            'audit': audit,
+            'recent_history': recent_history,
+            'latest_history': latest_history,
+            'history_data': history_data,
+            'issues_by_type': issues_by_type,
+            'all_issues': all_issues,
+            'improvements': improvements,
+            'metrics': metrics,
+            'performance_data': performance_data,
+            'audit_json_data': audit_json_data,
+            'critical_count': critical_count,
+            'high_count': high_count,
+            'medium_count': medium_count,
+            'low_count': low_count,
+            'info_count': info_count,
+            'has_more_issues': latest_history and SiteIssue.objects.filter(
+                performance_history=latest_history
+            ).count() > 50,
+        })
+    
     return render(request, 'site_audit/site_audit_detail.html', {
         'audit': audit,
         'recent_history': recent_history,
         'latest_history': latest_history,
+        'history_data': history_data,
         'issues_by_type': issues_by_type,
         'all_issues': all_issues,
         'improvements': improvements,
         'metrics': metrics,
         'performance_data': performance_data,
         'audit_json_data': audit_json_data,
+        'critical_count': critical_count,
+        'high_count': high_count,
+        'medium_count': medium_count,
+        'low_count': low_count,
+        'info_count': info_count,
+        'has_more_issues': latest_history and SiteIssue.objects.filter(
+            performance_history=latest_history
+        ).count() > 50,
     })
 
 
@@ -308,6 +502,91 @@ def run_manual_audit(request, audit_id):
         'task_id': str(task.id)
     })
 
+
+@login_required
+def load_more_issues(request, audit_id):
+    """Load issues with HTMX pagination"""
+    audit = get_object_or_404(
+        SiteAudit,
+        id=audit_id,
+        project__user=request.user
+    )
+    
+    # Get page number from request
+    page = int(request.GET.get('page', 1))
+    per_page = 50
+    
+    # Get filter parameters
+    severity_filter = request.GET.get('severity', '')
+    category_filter = request.GET.get('category', '')
+    search_query = request.GET.get('search', '')
+    
+    # Get latest history
+    latest_history = OnPagePerformanceHistory.objects.filter(
+        audit=audit,
+        status='completed'
+    ).order_by('-created_at').first()
+    
+    if not latest_history:
+        return render(request, 'site_audit/partials/_issues_content.html', {
+            'issues': [],
+            'has_next': False,
+            'has_prev': False,
+        })
+    
+    # Create custom ordering for severity
+    from django.db.models import Case, When, IntegerField, Q
+    severity_order = Case(
+        When(severity='critical', then=1),
+        When(severity='high', then=2),
+        When(severity='medium', then=3),
+        When(severity='low', then=4),
+        When(severity='info', then=5),
+        default=6,
+        output_field=IntegerField()
+    )
+    
+    # Build query
+    issues_query = SiteIssue.objects.filter(
+        performance_history=latest_history
+    )
+    
+    # Apply filters
+    if severity_filter:
+        issues_query = issues_query.filter(severity=severity_filter)
+    
+    if search_query:
+        issues_query = issues_query.filter(
+            Q(page_url__icontains=search_query) |
+            Q(description__icontains=search_query) |
+            Q(issue_type__icontains=search_query)
+        )
+    
+    # Get issues with proper ordering
+    issues_query = issues_query.annotate(
+        severity_order=severity_order
+    ).order_by('severity_order', 'issue_type', 'page_url')
+    
+    # Paginate
+    paginator = Paginator(issues_query, per_page)
+    page_obj = paginator.get_page(page)
+    
+    # For HTMX requests, return only the issues content
+    if request.headers.get('HX-Request'):
+        return render(request, 'site_audit/partials/_issues_content.html', {
+            'page_obj': page_obj,
+            'audit': audit,
+            'severity_filter': severity_filter,
+            'search_query': search_query,
+        })
+    
+    # For regular requests, return full response
+    return render(request, 'site_audit/partials/_issues_tab.html', {
+        'page_obj': page_obj,
+        'audit': audit,
+        'severity_filter': severity_filter,
+        'search_query': search_query,
+    })
 
 @login_required
 def site_audit_issues(request, audit_id):

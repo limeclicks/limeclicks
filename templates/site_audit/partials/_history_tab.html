@@ -1,0 +1,278 @@
+<!-- History Tab Content -->
+<div class="space-y-6">
+    {% if history_data %}
+    
+    <!-- History Timeline -->
+    <div class="card bg-base-100 shadow-lg border border-base-200">
+        <div class="card-body">
+            <h3 class="text-lg font-bold mb-4 flex items-center gap-2">
+                <i class="fas fa-history text-primary"></i>
+                Audit History
+                <span class="badge badge-ghost">{{ history_data|length }} audits</span>
+            </h3>
+            
+            <!-- Timeline -->
+            <div class="relative">
+                {% for history_item in history_data %}
+                <div class="flex gap-4 mb-6 {% if not forloop.last %}pb-6 border-l-2 border-base-200 ml-5{% endif %}">
+                    <!-- Timeline Node -->
+                    <div class="relative">
+                        <div class="absolute -left-[9px] w-4 h-4 rounded-full 
+                                    {% if history_item.status == 'completed' %}bg-success{% elif history_item.status == 'failed' %}bg-error{% else %}bg-warning{% endif %} 
+                                    border-2 border-base-100"></div>
+                    </div>
+                    
+                    <!-- History Item Content -->
+                    <div class="flex-1 ml-8">
+                        <div class="card bg-base-200/30 shadow-sm">
+                            <div class="card-body p-4">
+                                <!-- Header -->
+                                <div class="flex justify-between items-start mb-3">
+                                    <div>
+                                        <div class="flex items-center gap-2">
+                                            {% if history_item.status == 'completed' %}
+                                                <span class="badge badge-success badge-sm">Completed</span>
+                                            {% elif history_item.status == 'failed' %}
+                                                <span class="badge badge-error badge-sm">Failed</span>
+                                            {% elif history_item.status == 'running' %}
+                                                <span class="badge badge-warning badge-sm">Running</span>
+                                            {% else %}
+                                                <span class="badge badge-ghost badge-sm">{{ history_item.status|title }}</span>
+                                            {% endif %}
+                                            <span class="text-sm text-base-content/60">
+                                                {{ history_item.created_at|timesince }} ago
+                                            </span>
+                                        </div>
+                                        <div class="text-xs text-base-content/50 mt-1">
+                                            {{ history_item.created_at|date:"M d, Y g:i A" }}
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- View Details Button -->
+                                    {% if history_item.status == 'completed' %}
+                                    <button class="btn btn-ghost btn-xs"
+                                            onclick="toggleHistoryDetails('{{ history_item.id }}')">
+                                        <i class="fas fa-chevron-down"></i>
+                                    </button>
+                                    {% endif %}
+                                </div>
+                                
+                                <!-- Summary Stats (for completed audits) -->
+                                {% if history_item.status == 'completed' %}
+                                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+                                    {% if history_item.pages_crawled %}
+                                    <div class="p-2 bg-base-100 rounded-lg">
+                                        <div class="text-xl font-bold text-primary">{{ history_item.pages_crawled }}</div>
+                                        <div class="text-xs text-base-content/60">Pages Crawled</div>
+                                    </div>
+                                    {% endif %}
+                                    
+                                    {% if history_item.total_issues %}
+                                    <div class="p-2 bg-base-100 rounded-lg">
+                                        <div class="text-xl font-bold text-error">{{ history_item.total_issues }}</div>
+                                        <div class="text-xs text-base-content/60">Issues Found</div>
+                                    </div>
+                                    {% endif %}
+                                    
+                                    {% if history_item.audit_duration %}
+                                    <div class="p-2 bg-base-100 rounded-lg">
+                                        <div class="text-xl font-bold text-info">{{ history_item.audit_duration }}s</div>
+                                        <div class="text-xs text-base-content/60">Duration</div>
+                                    </div>
+                                    {% endif %}
+                                    
+                                    {% if history_item.trigger_type %}
+                                    <div class="p-2 bg-base-100 rounded-lg">
+                                        <div class="text-sm font-bold text-warning">{{ history_item.trigger_type|title }}</div>
+                                        <div class="text-xs text-base-content/60">Trigger</div>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                                
+                                <!-- Expandable Details -->
+                                <div id="history-details-{{ history_item.id }}" class="hidden mt-4 pt-4 border-t border-base-200">
+                                    <div class="space-y-3">
+                                        <!-- Issue Breakdown -->
+                                        {% if history_item.issue_breakdown %}
+                                        <div>
+                                            <h4 class="text-sm font-semibold mb-2">Issue Breakdown:</h4>
+                                            <div class="flex flex-wrap gap-2">
+                                                {% if history_item.issue_breakdown.critical > 0 %}
+                                                <span class="badge badge-error">Critical: {{ history_item.issue_breakdown.critical }}</span>
+                                                {% endif %}
+                                                {% if history_item.issue_breakdown.high > 0 %}
+                                                <span class="badge badge-warning">High: {{ history_item.issue_breakdown.high }}</span>
+                                                {% endif %}
+                                                {% if history_item.issue_breakdown.medium > 0 %}
+                                                <span class="badge badge-info">Medium: {{ history_item.issue_breakdown.medium }}</span>
+                                                {% endif %}
+                                                {% if history_item.issue_breakdown.low > 0 %}
+                                                <span class="badge badge-primary">Low: {{ history_item.issue_breakdown.low }}</span>
+                                                {% endif %}
+                                                {% if history_item.issue_breakdown.info > 0 %}
+                                                <span class="badge badge-ghost">Info: {{ history_item.issue_breakdown.info }}</span>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                        {% endif %}
+                                        
+                                        <!-- Performance Scores if available -->
+                                        {% if history_item.performance_scores %}
+                                        <div>
+                                            <h4 class="text-sm font-semibold mb-2">Performance Scores:</h4>
+                                            <div class="grid grid-cols-2 gap-2">
+                                                <div class="text-sm">
+                                                    <span class="text-base-content/60">Mobile:</span>
+                                                    <span class="font-bold">{{ history_item.performance_scores.mobile|default:"N/A" }}</span>
+                                                </div>
+                                                <div class="text-sm">
+                                                    <span class="text-base-content/60">Desktop:</span>
+                                                    <span class="font-bold">{{ history_item.performance_scores.desktop|default:"N/A" }}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        {% endif %}
+                                        
+                                        <!-- Actions -->
+                                        <div class="flex gap-2 pt-2">
+                                            <button class="btn btn-ghost btn-xs">
+                                                <i class="fas fa-download mr-1"></i>
+                                                Export Report
+                                            </button>
+                                            <button class="btn btn-ghost btn-xs">
+                                                <i class="fas fa-chart-line mr-1"></i>
+                                                Compare
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endif %}
+                                
+                                <!-- Error Message (for failed audits) -->
+                                {% if history_item.status == 'failed' and history_item.error_message %}
+                                <div class="mt-3 p-3 bg-error/10 rounded-lg">
+                                    <div class="text-sm text-error font-medium mb-1">Error Details:</div>
+                                    <div class="text-xs text-base-content/60">{{ history_item.error_message }}</div>
+                                    {% if history_item.retry_count > 0 %}
+                                    <div class="text-xs text-base-content/50 mt-1">Retried {{ history_item.retry_count }} time{{ history_item.retry_count|pluralize }}</div>
+                                    {% endif %}
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    
+    <!-- Audit Trends Chart (Optional) -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Issues Over Time -->
+        <div class="card bg-base-100 shadow-lg border border-base-200">
+            <div class="card-body">
+                <h3 class="text-lg font-bold mb-4">Issues Trend</h3>
+                <canvas id="issues-trend-chart" height="200"></canvas>
+            </div>
+        </div>
+        
+        <!-- Performance Over Time -->
+        <div class="card bg-base-100 shadow-lg border border-base-200">
+            <div class="card-body">
+                <h3 class="text-lg font-bold mb-4">Health Score Trend</h3>
+                <canvas id="health-trend-chart" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    {% else %}
+    <!-- No History -->
+    <div class="alert alert-info shadow-lg">
+        <div>
+            <i class="fas fa-info-circle"></i>
+            <span>No audit history available yet. Run your first audit to start tracking changes over time.</span>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+// Minimal JS for expanding history details
+function toggleHistoryDetails(historyId) {
+    const details = document.getElementById(`history-details-${historyId}`);
+    if (details) {
+        details.classList.toggle('hidden');
+    }
+}
+
+// Optional: Simple charts using Chart.js if available
+{% if history_data %}
+if (typeof Chart !== 'undefined') {
+    // Issues Trend Chart
+    const issuesCtx = document.getElementById('issues-trend-chart');
+    if (issuesCtx) {
+        new Chart(issuesCtx.getContext('2d'), {
+            type: 'line',
+            data: {
+                labels: [{% for item in history_data|slice:":10" %}'{{ item.created_at|date:"M d" }}'{% if not forloop.last %},{% endif %}{% endfor %}],
+                datasets: [{
+                    label: 'Total Issues',
+                    data: [{% for item in history_data|slice:":10" %}{{ item.total_issues|default:0 }}{% if not forloop.last %},{% endif %}{% endfor %}],
+                    borderColor: 'hsl(var(--er))',
+                    backgroundColor: 'hsla(var(--er), 0.1)',
+                    tension: 0.3
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+    }
+    
+    // Health Score Trend Chart
+    const healthCtx = document.getElementById('health-trend-chart');
+    if (healthCtx) {
+        new Chart(healthCtx.getContext('2d'), {
+            type: 'line',
+            data: {
+                labels: [{% for item in history_data|slice:":10" %}'{{ item.created_at|date:"M d" }}'{% if not forloop.last %},{% endif %}{% endfor %}],
+                datasets: [{
+                    label: 'Health Score',
+                    data: [{% for item in history_data|slice:":10" %}{{ item.health_score|default:0 }}{% if not forloop.last %},{% endif %}{% endfor %}],
+                    borderColor: 'hsl(var(--su))',
+                    backgroundColor: 'hsla(var(--su), 0.1)',
+                    tension: 0.3
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 100
+                    }
+                }
+            }
+        });
+    }
+}
+{% endif %}
+</script>

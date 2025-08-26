@@ -28,8 +28,10 @@ Performance Stats (GitHub favicon example):
 from django.http import HttpResponse
 from django.views.decorators.cache import cache_control
 from django.core.cache import cache
+from django.conf import settings
 import requests
 import hashlib
+import os
 
 
 @cache_control(max_age=86400)  # Cache for 24 hours in browser
@@ -84,12 +86,12 @@ def favicon_proxy(request, domain):
                 }
             )
         else:
-            # Return a default favicon or 404
-            return HttpResponse(status=404)
+            # Return default favicon on failure
+            return _serve_default_favicon()
             
     except (requests.RequestException, Exception):
-        # Return a default favicon or 404 on network error
-        return HttpResponse(status=404)
+        # Return default favicon on network error
+        return _serve_default_favicon()
 
 
 def get_cached_favicon_url(domain, size=64):
@@ -98,3 +100,48 @@ def get_cached_favicon_url(domain, size=64):
     """
     from django.urls import reverse
     return reverse('project:favicon_proxy', kwargs={'domain': domain}) + f'?size={size}'
+
+
+def _serve_default_favicon():
+    """
+    Serve the default favicon when domain favicon fails to load
+    """
+    try:
+        # Try to read the default favicon from static files
+        favicon_path = os.path.join(settings.STATIC_ROOT or 'static', 'img', 'favicon.png')
+        
+        # If STATIC_ROOT doesn't exist, try the local static directory
+        if not os.path.exists(favicon_path):
+            favicon_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'static', 'img', 'favicon.png')
+        
+        if os.path.exists(favicon_path):
+            with open(favicon_path, 'rb') as f:
+                content = f.read()
+            
+            return HttpResponse(
+                content,
+                content_type='image/png',
+                headers={
+                    'Cache-Control': 'public, max-age=86400',
+                    'X-Favicon-Cache': 'DEFAULT'
+                }
+            )
+    except (FileNotFoundError, IOError):
+        pass
+    
+    # If default favicon file doesn't exist, return a simple 1x1 transparent PNG
+    # This ensures there's always a valid response
+    transparent_png = (
+        b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01'
+        b'\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\rIDATx\xdac\xf8\x0f'
+        b'\x00\x00\x01\x00\x01\x00\x18\xdd\x8d\xb4\x00\x00\x00\x00IEND\xaeB`\x82'
+    )
+    
+    return HttpResponse(
+        transparent_png,
+        content_type='image/png',
+        headers={
+            'Cache-Control': 'public, max-age=86400',
+            'X-Favicon-Cache': 'FALLBACK'
+        }
+    )

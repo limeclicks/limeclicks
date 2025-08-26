@@ -1,0 +1,97 @@
+{% for issue in issues %}
+<div class="issue-card bg-base-100 rounded-lg shadow-sm border border-base-200 hover:shadow-md transition-all"
+     data-severity="{{ issue.severity }}"
+     data-category="{{ issue.get_category }}"
+     data-type="{{ issue.issue_type }}">
+    
+    <!-- Issue Header -->
+    <div class="p-4 border-b border-base-200">
+        <div class="flex items-start justify-between">
+            <div class="flex items-start gap-3 flex-1">
+                <!-- Severity Badge -->
+                <div class="mt-0.5">
+                    {% if issue.severity == 'critical' %}
+                        <span class="badge badge-error badge-sm">Critical</span>
+                    {% elif issue.severity == 'high' %}
+                        <span class="badge badge-warning badge-sm">High</span>
+                    {% elif issue.severity == 'medium' %}
+                        <span class="badge badge-info badge-sm">Medium</span>
+                    {% elif issue.severity == 'low' %}
+                        <span class="badge badge-primary badge-sm">Low</span>
+                    {% else %}
+                        <span class="badge badge-ghost badge-sm">Info</span>
+                    {% endif %}
+                </div>
+                
+                <!-- Issue Details -->
+                <div class="flex-1">
+                    <h3 class="font-semibold text-base-content mb-1">
+                        {{ issue.get_clean_display_name }}
+                    </h3>
+                    <p class="text-sm text-base-content/60 mb-2">
+                        <i class="fas fa-link mr-1"></i>
+                        <a href="{{ issue.page_url }}" target="_blank" class="link link-primary">
+                            {{ issue.page_url|truncatechars:80 }}
+                        </a>
+                    </p>
+                    {% if issue.description %}
+                    <p class="text-sm text-base-content/80">
+                        {{ issue.description }}
+                    </p>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- Actions -->
+            <div class="flex items-center gap-2">
+                <button onclick="showIssueDetails('{{ issue.id }}')" 
+                        class="btn btn-ghost btn-xs">
+                    <i class="fas fa-info-circle"></i>
+                </button>
+                <button onclick="toggleResolution('{{ issue.id }}')" 
+                        class="btn btn-ghost btn-xs">
+                    <i class="fas fa-wrench"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Resolution Section (Hidden by default) -->
+    <div id="resolution-{{ issue.id }}" class="hidden bg-base-200/30 p-4 border-t border-base-200">
+        <div class="flex items-start gap-3">
+            <div class="text-success mt-1">
+                <i class="fas fa-lightbulb"></i>
+            </div>
+            <div class="flex-1">
+                <h4 class="font-semibold text-sm mb-2">How to Fix:</h4>
+                <p class="text-sm text-base-content/80 whitespace-pre-line">
+                    {{ issue.recommendation }}
+                </p>
+                
+                {% if issue.duplicate_urls %}
+                <div class="mt-3">
+                    <p class="text-xs font-semibold mb-1">Affected URLs:</p>
+                    <ul class="text-xs space-y-1">
+                        {% for url in issue.duplicate_urls|slice:":3" %}
+                        <li class="text-base-content/60">• {{ url }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+                
+                <div class="flex items-center gap-3 mt-4">
+                    <button class="btn btn-success btn-xs">
+                        <i class="fas fa-check mr-1"></i>Mark Fixed
+                    </button>
+                    <button class="btn btn-ghost btn-xs">
+                        <i class="fas fa-clock mr-1"></i>Remind Later
+                    </button>
+                    <button class="btn btn-ghost btn-xs">
+                        <i class="fas fa-times mr-1"></i>Ignore
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endfor %}

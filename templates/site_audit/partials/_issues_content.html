@@ -1,0 +1,117 @@
+<!-- Issues List -->
+<div class="space-y-3">
+    {% for issue in page_obj %}
+    <div class="card bg-base-200">
+        <div class="card-body p-4">
+            <div class="flex items-start justify-between">
+                <div class="flex-1">
+                    <div class="flex items-center gap-3 mb-2">
+                        {% if issue.severity == 'critical' %}
+                            <span class="badge badge-error badge-sm">Critical</span>
+                        {% elif issue.severity == 'high' %}
+                            <span class="badge badge-warning badge-sm">High</span>
+                        {% elif issue.severity == 'medium' %}
+                            <span class="badge badge-info badge-sm">Medium</span>
+                        {% elif issue.severity == 'low' %}
+                            <span class="badge badge-primary badge-sm">Low</span>
+                        {% else %}
+                            <span class="badge badge-ghost badge-sm">Info</span>
+                        {% endif %}
+                        <h4 class="font-semibold">{{ issue.get_clean_display_name }}</h4>
+                    </div>
+                    <p class="text-sm text-base-content/70 mb-2">
+                        {{ issue.description }}
+                    </p>
+                    <div class="text-xs text-base-content/50">
+                        <i class="fas fa-link mr-1"></i>
+                        <a href="{{ issue.page_url }}" target="_blank" class="link link-primary">
+                            {{ issue.page_url|truncatechars:100 }}
+                        </a>
+                    </div>
+                    
+                    <!-- Resolution (Initially Hidden) -->
+                    <div id="resolution-{{ issue.id }}" class="hidden mt-4 p-3 bg-base-100 rounded-lg">
+                        <h5 class="font-semibold text-sm mb-2 text-success">How to Fix:</h5>
+                        <p class="text-sm text-base-content/80 whitespace-pre-line">{{ issue.recommendation }}</p>
+                    </div>
+                </div>
+                
+                <button onclick="toggleResolution('{{ issue.id }}')" 
+                        class="btn btn-ghost btn-sm">
+                    <i class="fas fa-wrench"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+    {% empty %}
+    <div class="card bg-base-200">
+        <div class="card-body text-center py-12">
+            <div class="w-20 h-20 mx-auto mb-4 rounded-full bg-success/10 flex items-center justify-center">
+                <i class="fas fa-check-circle text-3xl text-success"></i>
+            </div>
+            <h3 class="text-lg font-semibold mb-2">No Issues Found!</h3>
+            <p class="text-base-content/60">Your site is looking great with no SEO issues detected.</p>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Pagination Controls -->
+{% if page_obj.has_other_pages %}
+<div class="flex justify-center mt-8 mb-4">
+    <div class="join">
+        {% if page_obj.has_previous %}
+        <button class="join-item btn btn-sm"
+                hx-get="/site-audit/{{ audit.id }}/issues/load-more/?page={{ page_obj.previous_page_number }}&severity={{ severity_filter }}&search={{ search_query }}"
+                hx-target="#issues-container"
+                hx-swap="innerHTML"
+                hx-indicator="#loading-spinner">
+            «
+        </button>
+        {% else %}
+        <button class="join-item btn btn-sm btn-disabled">«</button>
+        {% endif %}
+        
+        <!-- Page Numbers -->
+        {% for num in page_obj.paginator.page_range %}
+            {% if page_obj.number == num %}
+            <button class="join-item btn btn-sm btn-active">{{ num }}</button>
+            {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+            <button class="join-item btn btn-sm"
+                    hx-get="/site-audit/{{ audit.id }}/issues/load-more/?page={{ num }}&severity={{ severity_filter }}&search={{ search_query }}"
+                    hx-target="#issues-container"
+                    hx-swap="innerHTML"
+                    hx-indicator="#loading-spinner">
+                {{ num }}
+            </button>
+            {% endif %}
+        {% endfor %}
+        
+        {% if page_obj.has_next %}
+        <button class="join-item btn btn-sm"
+                hx-get="/site-audit/{{ audit.id }}/issues/load-more/?page={{ page_obj.next_page_number }}&severity={{ severity_filter }}&search={{ search_query }}"
+                hx-target="#issues-container"
+                hx-swap="innerHTML"
+                hx-indicator="#loading-spinner">
+            »
+        </button>
+        {% else %}
+        <button class="join-item btn btn-sm btn-disabled">»</button>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Loading Spinner -->
+<div id="loading-spinner" class="htmx-indicator text-center py-4">
+    <span class="loading loading-spinner loading-md"></span>
+</div>
+{% endif %}
+
+<script>
+function toggleResolution(issueId) {
+    const resolution = document.getElementById(`resolution-${issueId}`);
+    if (resolution) {
+        resolution.classList.toggle('hidden');
+    }
+}
+</script>

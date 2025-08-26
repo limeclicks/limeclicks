@@ -4,20 +4,26 @@ from django.utils import timezone
 from django.db import transaction
 from datetime import timedelta
 from typing import Optional
+import time
+from django.core.cache import cache
 
 from .models import PerformancePage, PerformanceHistory, PerformanceSchedule
 from .lighthouse_runner import LighthouseRunner, LighthouseService
 
 logger = get_task_logger(__name__)
 
+# Global lighthouse execution lock
+LIGHTHOUSE_LOCK_KEY = 'lighthouse_audit_running'
+LIGHTHOUSE_LOCK_TIMEOUT = 900  # 15 minutes
+
 
 @shared_task(
     bind=True, 
-    max_retries=3, 
-    default_retry_delay=120,
-    rate_limit='1/m',  # Only 1 audit per minute globally (since we run both mobile & desktop)
-    time_limit=600,  # 10 minute timeout (increased for both audits)
-    soft_time_limit=540  # 9 minute soft timeout
+    max_retries=5,  # Increased to 5 retries
+    default_retry_delay=180,  # 3 minutes default delay
+    rate_limit='1/2m',  # Only 1 audit per 2 minutes globally for stability
+    time_limit=900,  # 15 minute timeout (increased)
+    soft_time_limit=780  # 13 minute soft timeout
 )
 def run_lighthouse_audit(self, performance_history_id: str):
     """
@@ -26,84 +32,112 @@ def run_lighthouse_audit(self, performance_history_id: str):
     Args:
         performance_history_id: UUID of the PerformanceHistory record
     """
+    # Acquire global lighthouse lock to ensure single process execution
     try:
-        performance_history = PerformanceHistory.objects.get(id=performance_history_id)
-        performance_page = performance_history.performance_page
+        # Try to acquire lock with unique task ID
+        lock_value = f"{self.request.id}_{time.time()}"
+        if not cache.add(LIGHTHOUSE_LOCK_KEY, lock_value, LIGHTHOUSE_LOCK_TIMEOUT):
+            # Lock is already held, check if it's expired
+            existing_lock = cache.get(LIGHTHOUSE_LOCK_KEY)
+            if existing_lock:
+                # Lock exists, retry later
+                logger.info("Another Lighthouse audit is already running, retrying in 3 minutes...")
+                raise self.retry(countdown=180, max_retries=5)
+            else:
+                # Try to acquire again 
+                if not cache.add(LIGHTHOUSE_LOCK_KEY, lock_value, LIGHTHOUSE_LOCK_TIMEOUT):
+                    raise self.retry(countdown=180, max_retries=5)
         
-        # Update status to running
-        performance_history.status = 'running'
-        performance_history.started_at = timezone.now()
-        performance_history.save(update_fields=['status', 'started_at'])
+        logger.info(f"Acquired Lighthouse lock: {lock_value}")
         
-        logger.info(f"Starting Lighthouse audits for {performance_page.page_url} (both mobile & desktop)")
-        
-        # Ensure Lighthouse is installed
-        if not LighthouseService.check_lighthouse_installed():
-            logger.info("Lighthouse not found, attempting to install...")
-            if not LighthouseService.install_lighthouse():
-                raise Exception("Failed to install Lighthouse")
-        
-        runner = LighthouseRunner()
-        audit_results = {'mobile': None, 'desktop': None}
-        errors = []
-        
-        # Run mobile audit first
-        logger.info(f"Running mobile audit for {performance_page.page_url}")
-        success, mobile_results, error = runner.run_audit(performance_page.page_url, 'mobile')
-        if success:
-            audit_results['mobile'] = mobile_results
-        else:
-            errors.append(f"Mobile audit failed: {error}")
-            logger.error(f"Mobile audit failed: {error}")
-        
-        # Run desktop audit
-        logger.info(f"Running desktop audit for {performance_page.page_url}")
-        success, desktop_results, error = runner.run_audit(performance_page.page_url, 'desktop')
-        if success:
-            audit_results['desktop'] = desktop_results
-        else:
-            errors.append(f"Desktop audit failed: {error}")
-            logger.error(f"Desktop audit failed: {error}")
-        
-        # Check if at least one audit succeeded
-        if not audit_results['mobile'] and not audit_results['desktop']:
-            raise Exception("; ".join(errors) if errors else "Both audits failed with unknown error")
-        
-        # Save combined results
-        runner.save_combined_audit_results(performance_history, audit_results)
-        
-        logger.info(f"Successfully completed audits for {performance_page.page_url}")
-        
-        # Schedule next audit if this was a scheduled audit
-        if performance_history.trigger_type == 'scheduled':
-            performance_page.schedule_next_audit()
-        
-        # Prepare response with both scores
-        response = {
-            'success': True,
-            'audit_id': str(performance_history.id),
-            'scores': {}
-        }
-        
-        if audit_results['mobile']:
-            response['scores']['mobile'] = {
-                'performance': audit_results['mobile'].get('performance_score'),
-                'accessibility': audit_results['mobile'].get('accessibility_score'),
-                'best_practices': audit_results['mobile'].get('best_practices_score'),
-                'seo': audit_results['mobile'].get('seo_score'),
-                'pwa': audit_results['mobile'].get('pwa_score')
+        try:
+            performance_history = PerformanceHistory.objects.get(id=performance_history_id)
+            performance_page = performance_history.performance_page
+            
+            # Update status to running
+            performance_history.status = 'running'
+            performance_history.started_at = timezone.now()
+            performance_history.save(update_fields=['status', 'started_at'])
+            
+            logger.info(f"Starting Lighthouse audits for {performance_page.page_url} (both mobile & desktop)")
+            
+            # Ensure Lighthouse is installed
+            if not LighthouseService.check_lighthouse_installed():
+                logger.info("Lighthouse not found, attempting to install...")
+                if not LighthouseService.install_lighthouse():
+                    raise Exception("Failed to install Lighthouse")
+            
+            runner = LighthouseRunner()
+            audit_results = {'mobile': None, 'desktop': None}
+            errors = []
+            
+            # Run mobile audit first
+            logger.info(f"Running mobile audit for {performance_page.page_url}")
+            success, mobile_results, error = runner.run_audit(performance_page.page_url, 'mobile')
+            if success:
+                audit_results['mobile'] = mobile_results
+            else:
+                errors.append(f"Mobile audit failed: {error}")
+                logger.error(f"Mobile audit failed: {error}")
+            
+            # Run desktop audit
+            logger.info(f"Running desktop audit for {performance_page.page_url}")
+            success, desktop_results, error = runner.run_audit(performance_page.page_url, 'desktop')
+            if success:
+                audit_results['desktop'] = desktop_results
+            else:
+                errors.append(f"Desktop audit failed: {error}")
+                logger.error(f"Desktop audit failed: {error}")
+            
+            # Check if at least one audit succeeded
+            if not audit_results['mobile'] and not audit_results['desktop']:
+                raise Exception("; ".join(errors) if errors else "Both audits failed with unknown error")
+            
+            # Save combined results
+            runner.save_combined_audit_results(performance_history, audit_results)
+            
+            logger.info(f"Successfully completed audits for {performance_page.page_url}")
+            
+            # Schedule next audit if this was a scheduled audit
+            if performance_history.trigger_type == 'scheduled':
+                performance_page.schedule_next_audit()
+            
+            # Prepare response with both scores
+            response = {
+                'success': True,
+                'audit_id': str(performance_history.id),
+                'scores': {}
             }
+            
+            if audit_results['mobile']:
+                response['scores']['mobile'] = {
+                    'performance': audit_results['mobile'].get('performance_score'),
+                    'accessibility': audit_results['mobile'].get('accessibility_score'),
+                    'best_practices': audit_results['mobile'].get('best_practices_score'),
+                    'seo': audit_results['mobile'].get('seo_score'),
+                    'pwa': audit_results['mobile'].get('pwa_score')
+                }
+            
+            if audit_results['desktop']:
+                response['scores']['desktop'] = {
+                    'performance': audit_results['desktop'].get('performance_score'),
+                    'accessibility': audit_results['desktop'].get('accessibility_score'),
+                    'best_practices': audit_results['desktop'].get('best_practices_score'),
+                    'seo': audit_results['desktop'].get('seo_score'),
+                    'pwa': audit_results['desktop'].get('pwa_score')
+                }
         
-        if audit_results['desktop']:
-            response['scores']['desktop'] = {
-                'performance': audit_results['desktop'].get('performance_score'),
-                'accessibility': audit_results['desktop'].get('accessibility_score'),
-                'best_practices': audit_results['desktop'].get('best_practices_score'),
-                'seo': audit_results['desktop'].get('seo_score'),
-                'pwa': audit_results['desktop'].get('pwa_score')
-            }
-        
-        return response
+            return response
+            
+        finally:
+            # Always release the lock
+            try:
+                current_lock = cache.get(LIGHTHOUSE_LOCK_KEY)
+                if current_lock == lock_value:
+                    cache.delete(LIGHTHOUSE_LOCK_KEY)
+                    logger.info(f"Released Lighthouse lock: {lock_value}")
+            except:
+                pass
         
     except PerformanceHistory.DoesNotExist:
         logger.error(f"PerformanceHistory {performance_history_id} not found")
@@ -111,6 +145,12 @@ def run_lighthouse_audit(self, performance_history_id: str):
         
     except Exception as e:
         logger.error(f"Error running audit: {str(e)}")
+        
+        # Always release the lock on error
+        try:
+            cache.delete(LIGHTHOUSE_LOCK_KEY)
+        except:
+            pass
         
         # Update audit history with error
         try:
@@ -125,8 +165,8 @@ def run_lighthouse_audit(self, performance_history_id: str):
         # Retry if we haven't exceeded max retries
         if self.request.retries < self.max_retries:
             logger.info(f"Retrying audit (attempt {self.request.retries + 1}/{self.max_retries})")
-            # Exponential backoff: 2 minutes, 4 minutes, 8 minutes
-            countdown = 120 * (2 ** self.request.retries)
+            # Progressive backoff: 3 minutes, 6 minutes, 12 minutes, 24 minutes, 48 minutes
+            countdown = 180 * (2 ** self.request.retries)
             raise self.retry(exc=e, countdown=countdown)
         
         return {'success': False, 'error': str(e)}

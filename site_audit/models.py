@@ -433,29 +433,79 @@ class SiteIssue(models.Model):
     """Individual issues found during on-page audit"""
     
     ISSUE_TYPE_CHOICES = [
-        ('broken_link', 'Broken Link (4xx/5xx)'),
-        ('redirect_chain', 'Redirect Chain'),
-        ('missing_title', 'Missing Title'),
-        ('duplicate_title', 'Duplicate Title'),
-        ('title_too_long', 'Title Too Long'),
-        ('title_too_short', 'Title Too Short'),
+        # Page Titles & Metadata
+        ('missing_title', 'Missing Page Title'),
+        ('duplicate_title', 'Duplicate Page Title'),
+        ('title_too_long', 'Page Title Too Long (>60 chars)'),
+        ('title_too_short', 'Page Title Too Short (<30 chars)'),
+        ('title_pixel_width', 'Title Pixel Width Too Long (>600px)'),
         ('missing_meta_description', 'Missing Meta Description'),
         ('duplicate_meta_description', 'Duplicate Meta Description'),
-        ('meta_description_too_long', 'Meta Description Too Long'),
-        ('meta_description_too_short', 'Meta Description Too Short'),
-        ('blocked_by_robots', 'Blocked by Robots'),
-        ('noindex_page', 'Noindex Page'),
-        ('missing_hreflang', 'Missing Hreflang'),
-        ('invalid_hreflang', 'Invalid Hreflang'),
-        ('duplicate_content', 'Duplicate Content'),
-        ('near_duplicate', 'Near Duplicate Content'),
-        ('spelling_error', 'Spelling/Grammar Error'),
-        ('missing_h1', 'Missing H1'),
+        ('meta_description_too_long', 'Meta Description Too Long (>160 chars)'),
+        ('meta_description_too_short', 'Meta Description Too Short (<70 chars)'),
+        ('meta_pixel_width', 'Meta Description Pixel Width Too Long'),
+        
+        # Headings
+        ('missing_h1', 'Missing H1 Tag'),
         ('multiple_h1', 'Multiple H1 Tags'),
-        ('missing_alt_text', 'Missing Alt Text'),
-        ('page_too_large', 'Page Too Large'),
-        ('slow_page', 'Slow Loading Page'),
-        ('orphan_page', 'Orphan Page'),
+        ('duplicate_h1', 'Duplicate H1 Tag'),
+        ('h1_too_long', 'H1 Too Long (>70 chars)'),
+        ('h1_too_short', 'H1 Too Short (<20 chars)'),
+        ('missing_h2', 'Missing H2 Tags'),
+        ('duplicate_h2', 'Duplicate H2 Tags'),
+        
+        # Content & Duplicate Issues
+        ('duplicate_content', 'Exact Duplicate Content'),
+        ('near_duplicate', 'Near Duplicate Content'),
+        ('thin_content', 'Low Word Count/Thin Content'),
+        ('canonical_issue', 'Canonicalization Issue'),
+        ('canonical_chain', 'Canonical Chain'),
+        ('canonical_loop', 'Canonical Loop'),
+        ('noindex_page', 'Noindex Page'),
+        ('orphan_page', 'Orphan Page (No Internal Links)'),
+        
+        # Images
+        ('missing_alt_text', 'Missing Alt Text on Images'),
+        ('missing_alt_linked', 'Missing Alt Text on Linked Images'),
+        ('image_too_large', 'Image Too Large (>100KB)'),
+        ('broken_image', 'Missing/Broken Image'),
+        
+        # Links & Redirects
+        ('broken_internal_link', 'Broken Internal Link (404/5xx)'),
+        ('broken_external_link', 'Broken External Link'),
+        ('redirect_chain', 'Redirect Chain'),
+        ('redirect_loop', 'Redirect Loop'),
+        ('temporary_redirect', 'Temporary Redirect (302)'),
+        ('permanent_redirect', 'Permanent Redirect (301)'),
+        ('blocked_by_robots', 'Link Blocked by Robots.txt'),
+        ('internal_nofollow', 'Internal Nofollow Link'),
+        ('external_nofollow', 'External Nofollow Link'),
+        
+        # Structured Data & Directives
+        ('missing_canonical', 'Missing Canonical Tag'),
+        ('conflicting_canonical', 'Conflicting Canonical Tags'),
+        ('multiple_canonical', 'Multiple Canonical Tags'),
+        ('hreflang_missing_return', 'Hreflang Missing Return Link'),
+        ('hreflang_invalid_code', 'Hreflang Invalid Language Code'),
+        ('hreflang_no_self', 'Hreflang No Self-Reference'),
+        ('meta_robots_issue', 'Meta Robots Tag Issue'),
+        ('x_robots_issue', 'X-Robots-Tag Issue'),
+        ('amp_error', 'AMP Error'),
+        
+        # Sitemaps & Crawling
+        ('sitemap_mismatch', 'URL in Sitemap Not on Site'),
+        ('sitemap_noindex', 'Sitemap Contains Noindex URLs'),
+        ('sitemap_missing', 'Page Missing from Sitemap'),
+        ('robots_blocked_resource', 'Robots.txt Blocked Resource'),
+        ('crawl_depth_issue', 'Excessive Crawl Depth'),
+        
+        # Performance & Other
+        ('slow_page', 'Slow Page Load (>3s)'),
+        ('mobile_usability', 'Mobile Usability Issue'),
+        ('mixed_content', 'Mixed Content (HTTP on HTTPS)'),
+        ('http_https_mismatch', 'HTTP/HTTPS Inconsistency'),
+        ('non_200_status', 'Non-200 Status Code'),
+        ('missing_structured_data', 'Missing Structured Data'),
     ]
     
     SEVERITY_CHOICES = [
@@ -509,3 +559,130 @@ class SiteIssue(models.Model):
     
     def __str__(self):
         return f"{self.get_issue_type_display()} - {self.page_url[:50]}"
+    
+    def get_clean_display_name(self):
+        """Get a clean display name for the issue type"""
+        display_name = self.get_issue_type_display()
+        if not display_name or display_name == self.issue_type:
+            # Fallback: convert issue_type to readable format
+            return self.issue_type.replace('_', ' ').title()
+        return display_name
+    
+    @classmethod
+    def get_issue_severity(cls, issue_type):
+        """Get severity level for an issue type"""
+        severity_map = {
+            # Critical issues
+            'broken_internal_link': 'critical',
+            'broken_external_link': 'critical',
+            'broken_image': 'critical',
+            'redirect_loop': 'critical',
+            'canonical_loop': 'critical',
+            'non_200_status': 'critical',
+            
+            # High priority issues
+            'missing_title': 'high',
+            'duplicate_title': 'high',
+            'missing_meta_description': 'high',
+            'duplicate_content': 'high',
+            'missing_h1': 'high',
+            'multiple_h1': 'high',
+            'noindex_page': 'high',
+            'blocked_by_robots': 'high',
+            
+            # Medium priority issues
+            'title_too_long': 'medium',
+            'title_too_short': 'medium',
+            'meta_description_too_long': 'medium',
+            'meta_description_too_short': 'medium',
+            'redirect_chain': 'medium',
+            'missing_canonical': 'medium',
+            'thin_content': 'medium',
+            'orphan_page': 'medium',
+            'slow_page': 'medium',
+            
+            # Low priority issues
+            'missing_alt_text': 'low',
+            'image_too_large': 'low',
+            'temporary_redirect': 'low',
+            'internal_nofollow': 'low',
+            'missing_h2': 'low',
+            'duplicate_h2': 'low',
+            
+            # Info level
+            'permanent_redirect': 'info',
+            'external_nofollow': 'info',
+            'missing_structured_data': 'info',
+        }
+        return severity_map.get(issue_type, 'medium')
+    
+    @classmethod
+    def get_resolution_suggestion(cls, issue_type):
+        """Get resolution suggestion for an issue type"""
+        resolutions = {
+            # Page Titles & Metadata
+            'missing_title': "Add a unique, descriptive title tag to the page. Aim for 50-60 characters that accurately describe the page content and include target keywords.",
+            'duplicate_title': "Make each page title unique. Differentiate pages by adding specific identifiers like location, product names, or categories.",
+            'title_too_long': "Shorten the title to under 60 characters to prevent truncation in search results. Focus on the most important keywords.",
+            'title_too_short': "Expand the title to at least 30 characters to better describe the page content and improve click-through rates.",
+            'title_pixel_width': "Reduce title length to fit within 600 pixels. Consider shorter words or removing less important terms.",
+            'missing_meta_description': "Add a compelling meta description of 150-160 characters that summarizes the page content and includes a call-to-action.",
+            'duplicate_meta_description': "Write unique meta descriptions for each page. Customize them to highlight what makes each page different.",
+            'meta_description_too_long': "Trim the meta description to under 160 characters to avoid truncation in search results.",
+            'meta_description_too_short': "Expand the meta description to at least 70 characters to provide more context about the page.",
+            
+            # Headings
+            'missing_h1': "Add a single H1 tag that clearly describes the main topic of the page. This helps both users and search engines understand the content.",
+            'multiple_h1': "Use only one H1 tag per page. Convert additional H1s to H2 or H3 tags to maintain proper heading hierarchy.",
+            'duplicate_h1': "Make H1 tags unique across pages. Each page should have its own distinctive main heading.",
+            'h1_too_long': "Shorten the H1 to under 70 characters for better readability and user experience.",
+            'h1_too_short': "Expand the H1 to at least 20 characters to better describe the page topic.",
+            'missing_h2': "Add H2 tags to break up content into logical sections. This improves readability and content structure.",
+            'duplicate_h2': "Vary your H2 tags to cover different aspects of the topic. Each should introduce a unique section.",
+            
+            # Content & Duplicate Issues
+            'duplicate_content': "Rewrite content to be unique, or use canonical tags to point to the original version. Consider consolidating duplicate pages.",
+            'near_duplicate': "Differentiate similar pages by adding unique content, or merge them if they serve the same purpose.",
+            'thin_content': "Expand content to at least 300 words. Add valuable information, examples, or related topics to provide more value.",
+            'canonical_issue': "Fix canonical tag implementation. Ensure it points to the correct preferred version of the page.",
+            'canonical_chain': "Point canonical tags directly to the final destination, not through intermediate pages.",
+            'canonical_loop': "Break the canonical loop by ensuring tags don't create circular references.",
+            'noindex_page': "Remove noindex if the page should be indexed, or ensure it's intentional for pages like admin or duplicate content.",
+            'orphan_page': "Add internal links to this page from related content to help users and search engines discover it.",
+            
+            # Images
+            'missing_alt_text': "Add descriptive alt text to images for accessibility and SEO. Describe what the image shows in context.",
+            'missing_alt_linked': "Add alt text to linked images to provide context about where the link leads.",
+            'image_too_large': "Compress images to under 100KB using tools like TinyPNG or WebP format. Consider lazy loading for better performance.",
+            'broken_image': "Fix the image URL or replace the missing image. Check file paths and ensure images are properly uploaded.",
+            
+            # Links & Redirects
+            'broken_internal_link': "Fix or remove broken internal links. Update URLs or redirect old pages to relevant alternatives.",
+            'broken_external_link': "Update or remove broken external links. Find alternative resources or archive links if content is important.",
+            'redirect_chain': "Simplify redirect chains by pointing directly to the final destination. Update internal links to avoid redirects.",
+            'redirect_loop': "Fix redirect configuration to prevent infinite loops. Ensure redirects have a clear final destination.",
+            'temporary_redirect': "Use 301 permanent redirects for pages that have permanently moved. Keep 302 only for truly temporary moves.",
+            'blocked_by_robots': "Review robots.txt to ensure important pages aren't blocked. Only block admin, duplicate, or low-value pages.",
+            'internal_nofollow': "Remove nofollow from internal links unless linking to login/admin pages. Internal PageRank flow is important.",
+            
+            # Structured Data & Directives
+            'missing_canonical': "Add a self-referencing canonical tag to establish the preferred version of this page.",
+            'conflicting_canonical': "Ensure all canonical signals (tags, redirects, sitemaps) point to the same URL version.",
+            'multiple_canonical': "Use only one canonical tag per page. Remove duplicate canonical declarations.",
+            'hreflang_missing_return': "Add reciprocal hreflang tags. Each language version should reference all other versions.",
+            'hreflang_invalid_code': "Use valid ISO 639-1 language codes and ISO 3166-1 Alpha 2 country codes in hreflang tags.",
+            'meta_robots_issue': "Review meta robots tags. Ensure they don't conflict with robots.txt or unintentionally block indexing.",
+            
+            # Sitemaps & Crawling
+            'sitemap_mismatch': "Remove deleted or redirected URLs from the sitemap. Keep it updated with only live, indexable pages.",
+            'sitemap_noindex': "Remove noindex pages from the sitemap. Only include pages you want search engines to index.",
+            'sitemap_missing': "Add important pages to the XML sitemap to help search engines discover and crawl them.",
+            'crawl_depth_issue': "Improve site architecture. Important pages should be accessible within 3 clicks from the homepage.",
+            
+            # Performance & Other
+            'slow_page': "Optimize page speed: compress images, minify CSS/JS, enable caching, use CDN, reduce server response time.",
+            'mobile_usability': "Fix mobile issues: ensure text is readable, buttons are tappable, content fits viewport without horizontal scrolling.",
+            'mixed_content': "Update all resources to use HTTPS. Replace http:// links with https:// or use protocol-relative URLs.",
+            'missing_structured_data': "Add relevant schema markup (JSON-LD preferred) to help search engines understand your content better.",
+        }
+        return resolutions.get(issue_type, "Review and fix this issue according to SEO best practices.")

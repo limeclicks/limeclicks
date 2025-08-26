@@ -16,6 +16,34 @@ class LighthouseRunner:
     def __init__(self):
         self.lighthouse_path = self._find_lighthouse()
     
+    def _preprocess_url(self, url: str) -> str:
+        """Preprocess URL to handle common issues"""
+        import urllib.parse
+        
+        # Ensure URL has protocol
+        if not url.startswith(('http://', 'https://')):
+            url = f'https://{url}'
+        
+        # Parse and validate URL
+        try:
+            parsed = urllib.parse.urlparse(url)
+            if not parsed.netloc:
+                raise ValueError(f"Invalid URL: {url}")
+            
+            # For known problematic domains, try HTTP instead of HTTPS first
+            problematic_domains = ['badexample.com', 'test.com', 'example.org']
+            if any(domain in parsed.netloc for domain in problematic_domains):
+                # Try HTTP version for known problematic domains
+                if parsed.scheme == 'https':
+                    url = url.replace('https://', 'http://')
+                    logger.info(f"Using HTTP instead of HTTPS for potentially problematic domain: {url}")
+            
+            return url
+            
+        except Exception as e:
+            logger.error(f"URL preprocessing failed: {e}")
+            return url
+    
     def _find_lighthouse(self) -> str:
         """Find the lighthouse executable"""
         # Try to find lighthouse in different locations
@@ -54,23 +82,32 @@ class LighthouseRunner:
             Tuple of (success, result_dict, error_message)
         """
         
+        # Preprocess URL to handle common issues
+        original_url = url
+        url = self._preprocess_url(url)
+        if url != original_url:
+            logger.info(f"URL preprocessed: {original_url} -> {url}")
+        
         # Create temporary directory for output
         with tempfile.TemporaryDirectory() as temp_dir:
             json_output = os.path.join(temp_dir, 'report.json')
             html_output = os.path.join(temp_dir, 'report.html')
             
-            # Build lighthouse command for headless server environment
+            # Build lighthouse command for headless server environment with enhanced stability
             cmd = [
                 self.lighthouse_path,
                 url,
                 '--output', 'json',  # JSON only
                 '--output-path', json_output,  # Full path with extension
-                # Chrome flags for true headless mode (no browser window)
-                '--chrome-flags=--headless=new --no-sandbox --disable-gpu --disable-dev-shm-usage --disable-web-security --disable-features=site-per-process --disable-setuid-sandbox --disable-accelerated-2d-canvas --no-first-run --no-zygote --disable-background-timer-throttling --disable-extensions --disable-default-apps --disable-translate --disable-sync --no-default-browser-check --disable-background-networking --disable-background-mode --disable-plugins --disable-plugins-discovery',
+                # Chrome flags for maximum compatibility and stability
+                '--chrome-flags=--headless=new --no-sandbox --disable-gpu --disable-dev-shm-usage --disable-web-security --disable-features=site-per-process --disable-setuid-sandbox --disable-accelerated-2d-canvas --no-first-run --no-zygote --disable-background-timer-throttling --disable-extensions --disable-default-apps --disable-translate --disable-sync --no-default-browser-check --disable-background-networking --disable-background-mode --disable-plugins --disable-plugins-discovery --ignore-certificate-errors --ignore-ssl-errors --ignore-certificate-errors-spki-list --allow-running-insecure-content --disable-certificate-transparency --reduce-security-for-testing',
                 '--quiet',
                 '--no-enable-error-reporting',
                 '--no-update-notifier',
-                '--skip-audits', 'bf-cache'  # Skip audits that require GUI
+                '--skip-audits', 'bf-cache',  # Skip audits that require GUI
+                '--max-wait-for-load', '45000',  # 45 second wait
+                '--blocked-url-patterns', '*.doubleclick.net,*.googletagmanager.com,*.google-analytics.com,*.facebook.com,*.twitter.com',  # Block tracking
+                '--disable-storage-reset'  # Don't reset storage between runs
             ]
             
             # Add device-specific flags
@@ -90,12 +127,12 @@ class LighthouseRunner:
             try:
                 logger.info(f"Running Lighthouse audit for {url} ({device_type})")
                 
-                # Run lighthouse
+                # Run lighthouse with extended timeout
                 result = subprocess.run(
                     cmd,
                     capture_output=True,
                     text=True,
-                    timeout=120  # 2 minute timeout
+                    timeout=300  # 5 minute timeout per audit
                 )
                 
                 if result.returncode != 0:
@@ -127,7 +164,7 @@ class LighthouseRunner:
                 return True, results, None
                 
             except subprocess.TimeoutExpired:
-                error_msg = "Lighthouse audit timed out after 120 seconds"
+                error_msg = "Lighthouse audit timed out after 300 seconds"
                 logger.error(error_msg)
                 return False, None, error_msg
             except Exception as e:
