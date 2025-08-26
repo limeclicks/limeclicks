@@ -421,7 +421,7 @@ class ScrapeDoService:
         Encode location string to Google's UULE format
         
         The UULE parameter is used by Google to specify exact location for search results.
-        Format: w+CAIQICI{encoded_location}
+        Format: w+CAIQICI{length_char}{base64_encoded_location}
         
         Args:
             location: Location string (e.g., "New York,New York,United States")
@@ -432,15 +432,18 @@ class ScrapeDoService:
         # Create the canonical location string
         canonical_name = location.strip()
         
-        # Encode the location
-        encoded = base64.b64encode(canonical_name.encode('utf-8')).decode('ascii')
+        # Create the location string with length prefix
+        # The length is encoded as a character (chr of the length)
+        location_with_length = chr(len(canonical_name)) + canonical_name
         
-        # Remove padding and make URL-safe
+        # Base64 encode the location with length prefix
+        encoded = base64.b64encode(location_with_length.encode('utf-8')).decode('ascii')
+        
+        # Remove padding and make URL-safe (Google's requirement)
         encoded = encoded.rstrip('=').replace('+', '-').replace('/', '_')
         
-        # Create UULE parameter
-        # The prefix "w+CAIQICI" is Google's standard for location targeting
-        uule = f"w+CAIQICI{chr(len(canonical_name))}{canonical_name}"
+        # Create UULE parameter with Google's standard prefix
+        uule = f"w+CAIQICI{encoded}"
         
         return uule
     

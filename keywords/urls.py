@@ -13,4 +13,9 @@ urlpatterns = [
     path('api/tags/create/', views.api_create_tag, name='api_create_tag'),
     path('api/tags/keyword/', views.api_tag_keyword, name='api_tag_keyword'),
     path('api/tags/keyword/<int:keyword_id>/<int:tag_id>/', views.api_untag_keyword, name='api_untag_keyword'),
+    
+    # Crawl management endpoints
+    path('api/keyword/<int:keyword_id>/force-crawl/', views.api_force_crawl, name='api_force_crawl'),
+    path('api/keyword/<int:keyword_id>/crawl-status/', views.api_crawl_status, name='api_crawl_status'),
+    path('api/crawl-queue/', views.api_crawl_queue, name='api_crawl_queue'),
 ]

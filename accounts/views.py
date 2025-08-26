@@ -425,9 +425,38 @@ def dashboard_view(request):
     """
     Dashboard view for authenticated users
     """
+    from project.models import Project
+    
+    # Get user's projects
+    projects = Project.objects.filter(user=request.user, active=True).order_by('domain')
+    
+    # Get selected project from query parameter or session
+    selected_project = None
+    project_id = request.GET.get('project')
+    
+    if project_id:
+        try:
+            selected_project = projects.get(id=project_id)
+            # Store in session for persistence
+            request.session['selected_project_id'] = project_id
+        except Project.DoesNotExist:
+            pass
+    elif 'selected_project_id' in request.session:
+        try:
+            selected_project = projects.get(id=request.session['selected_project_id'])
+        except Project.DoesNotExist:
+            pass
+    
+    # If no selected project and user has projects, select the first one
+    if not selected_project and projects.exists():
+        selected_project = projects.first()
+        request.session['selected_project_id'] = selected_project.id
+    
     context = {
         'user': request.user,
-        'welcome_message': f"Welcome back, {request.user.first_name or request.user.username}!"
+        'welcome_message': f"Welcome back, {request.user.first_name or request.user.username}!",
+        'projects': projects,
+        'selected_project': selected_project
     }
     return render(request, "accounts/dashboard.html", context)
 

@@ -44,6 +44,16 @@ app.conf.worker_prefetch_multiplier = 1
 app.conf.task_default_priority = 5
 app.conf.task_inherit_parent_priority = True
 
+# Concurrency limits for performance audits
+app.conf.worker_concurrency = 4  # Total worker concurrency
+app.conf.task_annotations = {
+    'performance_audit.tasks.run_lighthouse_audit': {
+        'rate_limit': '2/m',  # Max 2 audits per minute
+        'time_limit': 300,  # 5 minute timeout
+        'soft_time_limit': 240  # 4 minute soft timeout
+    }
+}
+
 # Auto-discover tasks from Django apps
 app.autodiscover_tasks()
 
@@ -51,15 +61,32 @@ app.autodiscover_tasks()
 from celery.schedules import crontab
 
 app.conf.beat_schedule = {
+    # Keyword crawl scheduling
+    'schedule-keyword-crawls': {
+        'task': 'keywords.schedule_keyword_crawls',
+        'schedule': crontab(minute='*/5'),  # Run every 5 minutes
+        'kwargs': {'batch_size': 50}
+    },
+    'update-keyword-priorities': {
+        'task': 'keywords.update_keyword_priorities',
+        'schedule': crontab(hour=1, minute=0),  # Run daily at 1 AM
+    },
+    'reset-stuck-keywords': {
+        'task': 'keywords.reset_stuck_keywords',
+        'schedule': crontab(minute='*/30'),  # Run every 30 minutes
+        'kwargs': {'stuck_hours': 2}
+    },
+    # Performance audit tasks
     'check-scheduled-audits': {
         'task': 'performance_audit.tasks.check_scheduled_audits',
-        'schedule': crontab(minute=0),  # Run every hour
+        'schedule': crontab(day_of_month=1, hour=0, minute=0),  # Run on 1st of every month at midnight
     },
     'cleanup-old-audits': {
         'task': 'performance_audit.tasks.cleanup_old_audits',
         'schedule': crontab(hour=2, minute=0),  # Run daily at 2 AM
         'kwargs': {'days_to_keep': 90}
     },
+    # Site audit tasks
     'check-scheduled-onpage-audits': {
         'task': 'site_audit.tasks.check_scheduled_site_audits',
         'schedule': crontab(hour='*/6'),  # Run every 6 hours

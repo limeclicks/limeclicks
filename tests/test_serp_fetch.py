@@ -14,7 +14,7 @@ from django.utils import timezone
 from django.core.cache import cache
 
 from keywords.models import Keyword
-from keywords.tasks import fetch_keyword_serp_html, enqueue_daily_keyword_scrapes
+from keywords.tasks import fetch_keyword_serp_html, enqueue_keyword_scrapes_batch
 from project.models import Project
 from accounts.models import User
 

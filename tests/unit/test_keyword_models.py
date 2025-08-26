@@ -139,13 +139,12 @@ class KeywordModelTest(TestCase):
     
     def test_json_fields(self):
         """Test JSON fields work correctly"""
-        self.keyword.tags = ['seo', 'important', 'homepage']
+        # Test scrape_do_files JSON field
         self.keyword.scrape_do_files = ['file1.json', 'file2.json']
         self.keyword.save()
         
         # Reload from database
         keyword = Keyword.objects.get(pk=self.keyword.pk)
-        self.assertEqual(keyword.tags, ['seo', 'important', 'homepage'])
         self.assertEqual(keyword.scrape_do_files, ['file1.json', 'file2.json'])
 
 
@@ -188,7 +187,6 @@ class RankModelTest(TestCase):
         self.assertFalse(rank.has_map_result)
         self.assertFalse(rank.has_video_result)
         self.assertFalse(rank.has_image_result)
-        self.assertEqual(rank.number_of_results, 0)
     
     def test_rank_str_representation(self):
         """Test rank string representation"""
@@ -266,14 +264,16 @@ class RankModelTest(TestCase):
             )
     
     def test_number_of_results(self):
-        """Test storing number of search results"""
+        """Test storing search results file reference"""
+        # Note: number_of_results field has been removed from the model
+        # This test now validates that ranks can be created without this field
         rank = Rank.objects.create(
             keyword=self.keyword,
-            rank=5,
-            number_of_results=1234567890
+            rank=5
         )
         
-        self.assertEqual(rank.number_of_results, 1234567890)
+        self.assertEqual(rank.rank, 5)
+        self.assertTrue(rank.is_organic)
     
     def test_search_results_file(self):
         """Test storing reference to search results file"""
@@ -321,8 +321,7 @@ class KeywordRankIntegrationTest(TestCase):
         rank1 = Rank.objects.create(
             keyword=keyword,
             rank=15,
-            is_organic=True,
-            number_of_results=5000000
+            is_organic=True
         )
         
         keyword.refresh_from_db()
@@ -335,8 +334,7 @@ class KeywordRankIntegrationTest(TestCase):
         rank2 = Rank.objects.create(
             keyword=keyword,
             rank=8,
-            is_organic=True,
-            number_of_results=5100000
+            is_organic=True
         )
         
         keyword.refresh_from_db()
@@ -349,8 +347,7 @@ class KeywordRankIntegrationTest(TestCase):
         rank3 = Rank.objects.create(
             keyword=keyword,
             rank=12,
-            is_organic=True,
-            number_of_results=5200000
+            is_organic=True
         )
         
         keyword.refresh_from_db()

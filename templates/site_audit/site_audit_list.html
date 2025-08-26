@@ -1,0 +1,720 @@
+{% extends 'dashboard_base.html' %}
+
+{% block page_title %}Site Audit{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto">
+    <!-- Header Card - 2 Column Layout -->
+    <div class="card bg-base-100 border border-base-200 shadow-sm mb-6">
+        <div class="card-body">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 items-center">
+                <!-- Left Column: Title -->
+                <div class="flex items-center gap-3">
+                    <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-primary/10 to-primary/20 flex items-center justify-center flex-shrink-0">
+                        <i class="fas fa-search-location text-primary text-xl"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-2xl font-bold text-base-content">Site Audit</h1>
+                        <p class="text-sm text-base-content/60">Monitor your website's technical SEO health and performance</p>
+                    </div>
+                </div>
+                
+                <!-- Right Column: Search and Filters -->
+                <div class="flex flex-col gap-3 lg:items-end">
+                    <!-- Search Box -->
+                    <form method="get" class="w-full">
+                        <div class="relative">
+                            <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-base-content/40"></i>
+                            <input type="text" name="q" id="search-input" value="{{ search_query }}" 
+                                   placeholder="Search projects..." 
+                                   class="input input-bordered input-sm pl-10 pr-10 w-full">
+                            {% if search_query %}
+                            <button type="button" onclick="clearSearch()" 
+                                    class="btn btn-ghost btn-xs btn-circle absolute right-2 top-1/2 -translate-y-1/2">
+                                <i class="fas fa-times text-xs"></i>
+                            </button>
+                            {% endif %}
+                        </div>
+                    </form>
+                    
+                    <!-- Filter Buttons - Right Aligned -->
+                    <div class="flex flex-wrap items-center gap-2 lg:justify-end">
+                        <span class="text-xs font-medium text-base-content/60">Filter by status:</span>
+                        <div class="flex flex-wrap gap-1">
+                            <!-- All -->
+                            <button onclick="filterByStatus('all')" 
+                                    class="filter-btn btn btn-xs gap-1 transition-all duration-200 active"
+                                    data-filter="all">
+                                <i class="fas fa-th text-xs"></i>
+                                <span>All</span>
+                                <span class="badge badge-ghost badge-xs">{{ total_audits }}</span>
+                            </button>
+                            
+                            <!-- Healthy -->
+                            <button onclick="filterByStatus('healthy')" 
+                                    class="filter-btn btn btn-xs btn-outline gap-1 transition-all duration-200 border-success/50 text-success hover:bg-success hover:border-success hover:text-white"
+                                    data-filter="healthy">
+                                <i class="fas fa-check-circle text-xs"></i>
+                                <span>Healthy</span>
+                                <span class="badge badge-success badge-xs">{{ healthy_sites }}</span>
+                            </button>
+                            
+                            <!-- Need Attention -->
+                            <button onclick="filterByStatus('warning')" 
+                                    class="filter-btn btn btn-xs btn-outline gap-1 transition-all duration-200 border-warning/50 text-warning hover:bg-warning hover:border-warning hover:text-white"
+                                    data-filter="warning">
+                                <i class="fas fa-exclamation-triangle text-xs"></i>
+                                <span>Need Attention</span>
+                                <span class="badge badge-warning badge-xs">{{ warning_sites }}</span>
+                            </button>
+                            
+                            <!-- Critical -->
+                            <button onclick="filterByStatus('critical')" 
+                                    class="filter-btn btn btn-xs btn-outline gap-1 transition-all duration-200 border-error/50 text-error hover:bg-error hover:border-error hover:text-white"
+                                    data-filter="critical">
+                                <i class="fas fa-times-circle text-xs"></i>
+                                <span>Critical</span>
+                                <span class="badge badge-error badge-xs">{{ critical_sites }}</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stats Cards - Individual Cards in Single Row -->
+    <div class="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-8">
+        <!-- Total Projects Card -->
+        <div class="bg-base-100 rounded-2xl border border-base-200 shadow-sm p-6 hover:shadow-md transition-all">
+            <div class="flex items-start justify-between mb-3">
+                <div class="flex-1">
+                    <p class="text-xs font-semibold text-base-content/60 uppercase tracking-wider">Total Projects</p>
+                    <h3 class="text-3xl font-bold text-primary mt-2">{{ total_audits }}</h3>
+                    <p class="text-sm text-base-content/60 mt-1">Projects being audited</p>
+                </div>
+                <div class="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                    <i class="fas fa-folder text-primary text-lg"></i>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Healthy Sites Card -->
+        <div class="bg-base-100 rounded-2xl border border-base-200 shadow-sm p-6 hover:shadow-md transition-all">
+            <div class="flex items-start justify-between mb-3">
+                <div class="flex-1">
+                    <p class="text-xs font-semibold text-base-content/60 uppercase tracking-wider">Healthy Sites</p>
+                    <h3 class="text-3xl font-bold text-success mt-2">{{ healthy_sites }}</h3>
+                    <p class="text-sm text-base-content/60 mt-1">Score above 80%</p>
+                </div>
+                <div class="w-12 h-12 rounded-full bg-success/10 flex items-center justify-center">
+                    <i class="fas fa-check-circle text-success text-lg"></i>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Need Attention Card -->
+        <div class="bg-base-100 rounded-2xl border border-base-200 shadow-sm p-6 hover:shadow-md transition-all">
+            <div class="flex items-start justify-between mb-3">
+                <div class="flex-1">
+                    <p class="text-xs font-semibold text-base-content/60 uppercase tracking-wider">Need Attention</p>
+                    <h3 class="text-3xl font-bold text-warning mt-2">{{ warning_sites }}</h3>
+                    <p class="text-sm text-base-content/60 mt-1">Score 60-80%</p>
+                </div>
+                <div class="w-12 h-12 rounded-full bg-warning/10 flex items-center justify-center">
+                    <i class="fas fa-exclamation-triangle text-warning text-lg"></i>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Critical Card -->
+        <div class="bg-base-100 rounded-2xl border border-base-200 shadow-sm p-6 hover:shadow-md transition-all">
+            <div class="flex items-start justify-between mb-3">
+                <div class="flex-1">
+                    <p class="text-xs font-semibold text-base-content/60 uppercase tracking-wider">Critical</p>
+                    <h3 class="text-3xl font-bold text-error mt-2">{{ critical_sites }}</h3>
+                    <p class="text-sm text-base-content/60 mt-1">Score below 60%</p>
+                </div>
+                <div class="w-12 h-12 rounded-full bg-error/10 flex items-center justify-center">
+                    <i class="fas fa-times-circle text-error text-lg"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Audits Table -->
+    <div class="bg-base-100 rounded-2xl border border-base-200 shadow-sm overflow-hidden">
+        {% if page_obj.object_list %}
+        <div class="overflow-x-auto">
+            <table class="table w-full">
+                <thead class="bg-base-200/50 border-b border-base-200">
+                    <tr>
+                        <th class="text-xs font-bold uppercase tracking-wider text-base-content/60 px-6 py-4">PROJECT</th>
+                        <th class="text-xs font-bold uppercase tracking-wider text-base-content/60 text-center px-4 py-4">PAGES CRAWLED</th>
+                        <th class="text-xs font-bold uppercase tracking-wider text-base-content/60 text-center px-4 py-4">SITE HEALTH</th>
+                        <th class="text-xs font-bold uppercase tracking-wider text-base-content/60 text-center px-4 py-4">ERRORS</th>
+                        <th class="text-xs font-bold uppercase tracking-wider text-base-content/60 text-center px-4 py-4">WARNINGS</th>
+                        <th class="text-xs font-bold uppercase tracking-wider text-base-content/60 text-center px-4 py-4">CRAWLABILITY</th>
+                        <th class="text-xs font-bold uppercase tracking-wider text-base-content/60 text-center px-4 py-4">HTTPS</th>
+                        <th class="text-xs font-bold uppercase tracking-wider text-base-content/60 text-center px-4 py-4">INT. SEO</th>
+                        <th class="text-xs font-bold uppercase tracking-wider text-base-content/60 text-center px-4 py-4">SITE PERFORMANCE</th>
+                        <th class="text-xs font-bold uppercase tracking-wider text-base-content/60 text-center px-4 py-4">INTERNAL LINKING</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-base-200">
+                    {% for audit in page_obj.object_list %}
+                    <tr class="hover:bg-base-200/20 transition-colors audit-row cursor-pointer" 
+                        data-status="{% if audit.site_health >= 80 %}healthy{% elif audit.site_health >= 60 %}warning{% else %}critical{% endif %}"
+                        onclick="window.location.href='{% url 'site_audit:detail' audit.id %}'"
+                        title="Click to view details">
+                        <!-- Project -->
+                        <td class="px-6 py-4">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 rounded-lg bg-base-200 flex items-center justify-center overflow-hidden relative">
+                                    {% if audit.has_running_audit %}
+                                    <div class="absolute inset-0 flex items-center justify-center bg-base-100/90 z-10">
+                                        <span class="loading loading-spinner loading-sm text-primary"></span>
+                                    </div>
+                                    {% endif %}
+                                    {% if audit.project.favicon %}
+                                    <img src="{{ audit.project.favicon.url }}" alt="{{ audit.project.domain }}" class="w-full h-full object-cover">
+                                    {% else %}
+                                    <i class="fas fa-globe text-base-content/40"></i>
+                                    {% endif %}
+                                </div>
+                                <div>
+                                    <div class="flex items-center gap-2">
+                                        <span class="font-semibold text-base-content">{{ audit.project.domain }}</span>
+                                        {% if audit.has_running_audit %}
+                                        <span class="badge badge-primary badge-xs animate-pulse">
+                                            <i class="fas fa-circle-notch fa-spin mr-1 text-[10px]"></i>
+                                            Scanning
+                                        </span>
+                                        {% elif audit.last_audit_date %}
+                                        <span class="badge badge-ghost badge-xs">
+                                            <i class="fas fa-check-circle mr-1 text-[10px]"></i>
+                                            Completed
+                                        </span>
+                                        {% else %}
+                                        <span class="badge badge-ghost badge-xs">
+                                            <i class="fas fa-clock mr-1 text-[10px]"></i>
+                                            Pending
+                                        </span>
+                                        {% endif %}
+                                    </div>
+                                    <div class="text-xs text-base-content/60">{{ audit.project.title|default:"" }}</div>
+                                </div>
+                            </div>
+                        </td>
+                        
+                        <!-- Pages Crawled -->
+                        <td class="text-center px-4 py-4">
+                            <span class="text-base-content font-medium">{{ audit.total_pages_crawled|default:0 }}</span>
+                        </td>
+                        
+                        <!-- Site Health -->
+                        <td class="text-center px-4 py-4">
+                            {% with health_score=audit.site_health|default:0 %}
+                            <div class="flex flex-col items-center gap-1">
+                                <span class="text-sm font-bold
+                                    {% if health_score >= 80 %}text-success
+                                    {% elif health_score >= 60 %}text-warning
+                                    {% else %}text-error{% endif %}">
+                                    {{ health_score|floatformat:0 }}%
+                                </span>
+                                <div class="w-16 bg-base-200 rounded-full h-1.5">
+                                    <div class="h-1.5 rounded-full transition-all
+                                        {% if health_score >= 80 %}bg-success
+                                        {% elif health_score >= 60 %}bg-warning
+                                        {% else %}bg-error{% endif %}"
+                                        style="width: {{ health_score }}%"></div>
+                                </div>
+                            </div>
+                            {% endwith %}
+                        </td>
+                        
+                        <!-- Errors -->
+                        <td class="text-center px-4 py-4">
+                            {% if audit.errors_count %}
+                            <span class="inline-flex items-center justify-center min-w-[2rem] px-2 py-1 text-xs font-bold rounded-full bg-error/10 text-error border border-error/20">
+                                {{ audit.errors_count }}
+                            </span>
+                            {% else %}
+                            <span class="inline-flex items-center justify-center min-w-[2rem] px-2 py-1 text-xs font-bold rounded-full bg-success/10 text-success border border-success/20">
+                                0
+                            </span>
+                            {% endif %}
+                        </td>
+                        
+                        <!-- Warnings -->
+                        <td class="text-center px-4 py-4">
+                            {% if audit.redirect_chains_count|default:0 > 0 %}
+                            <span class="inline-flex items-center justify-center min-w-[2rem] px-2 py-1 text-xs font-bold rounded-full bg-warning/10 text-warning border border-warning/20">
+                                {{ audit.redirect_chains_count }}
+                            </span>
+                            {% else %}
+                            <span class="inline-flex items-center justify-center min-w-[2rem] px-2 py-1 text-xs font-bold rounded-full bg-success/10 text-success border border-success/20">
+                                0
+                            </span>
+                            {% endif %}
+                        </td>
+                        
+                        <!-- Crawlability -->
+                        <td class="text-center px-4 py-4">
+                            {% with crawl_score=audit.crawlability|default:0 %}
+                            <div class="flex flex-col items-center gap-1">
+                                <span class="text-sm font-bold
+                                    {% if crawl_score >= 90 %}text-success
+                                    {% elif crawl_score >= 70 %}text-warning
+                                    {% else %}text-error{% endif %}">
+                                    {{ crawl_score|floatformat:0 }}%
+                                </span>
+                                <div class="w-16 bg-base-200 rounded-full h-1.5">
+                                    <div class="h-1.5 rounded-full transition-all
+                                        {% if crawl_score >= 90 %}bg-success
+                                        {% elif crawl_score >= 70 %}bg-warning
+                                        {% else %}bg-error{% endif %}"
+                                        style="width: {{ crawl_score }}%"></div>
+                                </div>
+                            </div>
+                            {% endwith %}
+                        </td>
+                        
+                        <!-- HTTPS -->
+                        <td class="text-center px-4 py-4">
+                            {% with https_score=audit.https_percentage|default:0 %}
+                            <div class="flex flex-col items-center gap-1">
+                                <span class="text-sm font-bold
+                                    {% if https_score >= 95 %}text-success
+                                    {% elif https_score >= 80 %}text-warning
+                                    {% else %}text-error{% endif %}">
+                                    {{ https_score }}%
+                                </span>
+                                <div class="w-16 bg-base-200 rounded-full h-1.5">
+                                    <div class="h-1.5 rounded-full transition-all
+                                        {% if https_score >= 95 %}bg-success
+                                        {% elif https_score >= 80 %}bg-warning
+                                        {% else %}bg-error{% endif %}"
+                                        style="width: {{ https_score }}%"></div>
+                                </div>
+                            </div>
+                            {% endwith %}
+                        </td>
+                        
+                        <!-- International SEO -->
+                        <td class="text-center px-4 py-4">
+                            {% if audit.missing_hreflang_count == 0 and audit.total_pages_crawled > 0 %}
+                            <div class="w-8 h-8 mx-auto rounded-full bg-success/10 flex items-center justify-center">
+                                <i class="fas fa-check text-success text-sm"></i>
+                            </div>
+                            {% else %}
+                            <div class="w-8 h-8 mx-auto rounded-full bg-base-200 flex items-center justify-center">
+                                <i class="fas fa-minus text-base-content/40 text-sm"></i>
+                            </div>
+                            {% endif %}
+                        </td>
+                        
+                        <!-- Site Performance -->
+                        <td class="text-center px-4 py-4">
+                            {% with perf_score=audit.site_performance|default:0 %}
+                            <div class="flex flex-col items-center gap-1">
+                                <span class="text-sm font-bold
+                                    {% if perf_score >= 80 %}text-success
+                                    {% elif perf_score >= 60 %}text-warning
+                                    {% else %}text-error{% endif %}">
+                                    {{ perf_score|floatformat:0 }}%
+                                </span>
+                                <div class="w-16 bg-base-200 rounded-full h-1.5">
+                                    <div class="h-1.5 rounded-full transition-all
+                                        {% if perf_score >= 80 %}bg-success
+                                        {% elif perf_score >= 60 %}bg-warning
+                                        {% else %}bg-error{% endif %}"
+                                        style="width: {{ perf_score }}%"></div>
+                                </div>
+                            </div>
+                            {% endwith %}
+                        </td>
+                        
+                        <!-- Internal Linking -->
+                        <td class="text-center px-4 py-4">
+                            {% with link_score=audit.internal_linking|default:0 %}
+                            <div class="flex flex-col items-center gap-1">
+                                <span class="text-sm font-bold
+                                    {% if link_score >= 85 %}text-success
+                                    {% elif link_score >= 60 %}text-warning
+                                    {% else %}text-error{% endif %}">
+                                    {{ link_score|floatformat:0 }}%
+                                </span>
+                                <div class="w-16 bg-base-200 rounded-full h-1.5">
+                                    <div class="h-1.5 rounded-full transition-all
+                                        {% if link_score >= 85 %}bg-success
+                                        {% elif link_score >= 60 %}bg-warning
+                                        {% else %}bg-error{% endif %}"
+                                        style="width: {{ link_score }}%"></div>
+                                </div>
+                            </div>
+                            {% endwith %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Pagination -->
+        {% if page_obj.has_other_pages %}
+        <div class="px-6 py-4 border-t border-base-200 bg-base-200/20">
+            <div class="flex justify-between items-center">
+                <div class="text-sm text-base-content/60">
+                    Showing {{ page_obj.start_index }} to {{ page_obj.end_index }} of {{ page_obj.paginator.count }} audits
+                </div>
+                <div class="join">
+                    {% if page_obj.has_previous %}
+                    <a href="?page={{ page_obj.previous_page_number }}{% if search_query %}&q={{ search_query }}{% endif %}" 
+                       class="join-item btn btn-sm">
+                        <i class="fas fa-chevron-left"></i>
+                    </a>
+                    {% endif %}
+                    
+                    {% for num in page_obj.paginator.page_range %}
+                        {% if page_obj.number == num %}
+                        <button class="join-item btn btn-sm btn-active">{{ num }}</button>
+                        {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                        <a href="?page={{ num }}{% if search_query %}&q={{ search_query }}{% endif %}" 
+                           class="join-item btn btn-sm">{{ num }}</a>
+                        {% endif %}
+                    {% endfor %}
+                    
+                    {% if page_obj.has_next %}
+                    <a href="?page={{ page_obj.next_page_number }}{% if search_query %}&q={{ search_query }}{% endif %}" 
+                       class="join-item btn btn-sm">
+                        <i class="fas fa-chevron-right"></i>
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        
+        {% else %}
+        <!-- Empty State -->
+        <div class="flex flex-col items-center justify-center py-12 px-4">
+            <!-- Icon -->
+            <div class="w-20 h-20 mb-4 rounded-2xl bg-gradient-to-br from-base-200 to-base-300 flex items-center justify-center">
+                <i class="fas fa-search text-3xl text-base-content/40"></i>
+            </div>
+            
+            <!-- Title -->
+            <h3 class="text-xl font-semibold text-base-content mb-2">No Site Audits Found</h3>
+            
+            <!-- Description -->
+            <p class="text-base-content/60 text-center max-w-sm text-sm mb-6">
+                {% if search_query %}
+                No audits match your search "<span class="font-medium text-base-content/80">{{ search_query }}</span>"
+                {% else %}
+                Site audits will be automatically created when you add projects. Start by creating your first project.
+                {% endif %}
+            </p>
+            
+            <!-- Action Button -->
+            {% if not search_query %}
+            <a href="{% url 'project:list' %}" class="btn btn-primary gap-2">
+                <i class="fas fa-plus"></i>
+                <span>Add Your First Project</span>
+            </a>
+            {% else %}
+            <a href="{% url 'site_audit:list' %}" class="btn btn-ghost">
+                <i class="fas fa-times mr-2"></i>
+                Clear Search
+            </a>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+// Filter functionality
+let currentFilter = 'all';
+
+function filterByStatus(status) {
+    currentFilter = status;
+    
+    // Update active button states with enhanced visual feedback
+    document.querySelectorAll('.filter-btn').forEach(btn => {
+        btn.classList.remove('btn-primary', 'btn-success', 'btn-warning', 'btn-error', 'active', 'ring-2', 'ring-offset-2', 'shadow-lg', 'scale-105', 'text-white');
+        btn.classList.remove('ring-success', 'ring-warning', 'ring-error');
+        
+        if (btn.dataset.filter === status) {
+            // Active button styling based on filter type
+            btn.classList.remove('btn-outline');
+            btn.classList.add('active', 'ring-2', 'ring-offset-2', 'shadow-lg', 'scale-105');
+            
+            if (status === 'all') {
+                btn.classList.add('btn-primary', 'ring-primary');
+            } else if (status === 'healthy') {
+                btn.classList.add('btn-success', 'ring-success', 'text-white');
+            } else if (status === 'warning') {
+                btn.classList.add('btn-warning', 'ring-warning', 'text-white');
+            } else if (status === 'critical') {
+                btn.classList.add('btn-error', 'ring-error', 'text-white');
+            }
+        } else {
+            // Inactive button styling
+            if (!btn.classList.contains('btn-outline')) {
+                btn.classList.add('btn-outline');
+            }
+        }
+    });
+    
+    // Filter table rows with smooth transitions
+    const rows = document.querySelectorAll('.audit-row');
+    let visibleCount = 0;
+    
+    rows.forEach((row, index) => {
+        if (status === 'all' || row.dataset.status === status) {
+            row.style.display = '';
+            // Add subtle animation
+            row.style.animation = 'fadeIn 0.3s ease-in-out';
+            visibleCount++;
+        } else {
+            row.style.display = 'none';
+        }
+    });
+    
+    // Show/hide empty state if no results
+    const tbody = document.querySelector('tbody');
+    const emptyState = document.querySelector('.empty-filtered-state');
+    
+    if (visibleCount === 0 && tbody && rows.length > 0) {
+        // Create or show empty state for filtered results
+        if (!emptyState) {
+            const emptyRow = document.createElement('tr');
+            emptyRow.className = 'empty-filtered-state';
+            emptyRow.innerHTML = `
+                <td colspan="10" class="text-center py-16">
+                    <div class="flex flex-col items-center gap-4">
+                        <div class="w-20 h-20 rounded-full bg-base-200 flex items-center justify-center">
+                            <i class="fas fa-filter text-3xl text-base-content/40"></i>
+                        </div>
+                        <div>
+                            <p class="text-lg font-semibold text-base-content/70">No ${status === 'healthy' ? 'healthy sites' : status === 'warning' ? 'sites needing attention' : 'critical sites'} found</p>
+                            <p class="text-sm text-base-content/50 mt-1">Try adjusting your filter or checking back later</p>
+                        </div>
+                        <button onclick="filterByStatus('all')" class="btn btn-sm btn-ghost">
+                            <i class="fas fa-times mr-2"></i>Clear Filter
+                        </button>
+                    </div>
+                </td>
+            `;
+            tbody.appendChild(emptyRow);
+        }
+    } else if (emptyState) {
+        emptyState.remove();
+    }
+    
+    // Update URL with filter parameter
+    const url = new URL(window.location);
+    if (status === 'all') {
+        url.searchParams.delete('filter');
+    } else {
+        url.searchParams.set('filter', status);
+    }
+    window.history.replaceState({}, '', url);
+}
+
+function clearSearch() {
+    document.getElementById('search-input').value = '';
+    window.location.href = '{% url "site_audit:list" %}';
+}
+
+function runManualAudit(auditId) {
+    if (!confirm('Are you sure you want to run a manual audit for this project?')) return;
+    
+    // Show loading state
+    const btn = event.currentTarget;
+    const originalHTML = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Running...';
+    btn.disabled = true;
+    
+    fetch(`/site-audit/${auditId}/run/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken'),
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Show success toast
+            showToast('success', data.message);
+            
+            // Reload page after a delay
+            setTimeout(() => location.reload(), 2000);
+        } else {
+            // Show error toast
+            showToast('error', data.error || 'Failed to start audit');
+            
+            // Restore button
+            btn.innerHTML = originalHTML;
+            btn.disabled = false;
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showToast('error', 'An error occurred while starting the audit');
+        
+        // Restore button
+        btn.innerHTML = originalHTML;
+        btn.disabled = false;
+    });
+}
+
+function showToast(type, message) {
+    const toast = document.createElement('div');
+    toast.className = 'toast toast-top toast-end z-50';
+    
+    const alertClass = type === 'success' ? 'alert-success' : 'alert-error';
+    const iconClass = type === 'success' ? 'fa-check-circle' : 'fa-times-circle';
+    
+    toast.innerHTML = `
+        <div class="alert ${alertClass} shadow-lg">
+            <i class="fas ${iconClass}"></i>
+            <span>${message}</span>
+        </div>
+    `;
+    
+    document.body.appendChild(toast);
+    
+    // Animate in
+    setTimeout(() => {
+        toast.querySelector('.alert').classList.add('animate-slide-in');
+    }, 10);
+    
+    // Remove after 5 seconds
+    setTimeout(() => {
+        toast.querySelector('.alert').classList.add('animate-slide-out');
+        setTimeout(() => toast.remove(), 300);
+    }, 5000);
+}
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+    // Check if there's a filter in URL params (for future enhancement)
+    const urlParams = new URLSearchParams(window.location.search);
+    const filterParam = urlParams.get('filter');
+    if (filterParam && ['all', 'healthy', 'warning', 'critical'].includes(filterParam)) {
+        filterByStatus(filterParam);
+    }
+});
+</script>
+
+<style>
+@keyframes slide-in {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.audit-row {
+    transition: all 0.2s ease;
+}
+
+.audit-row:hover {
+    transform: translateX(2px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+@keyframes slide-out {
+    from {
+        transform: translateX(0);
+        opacity: 1;
+    }
+    to {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+}
+
+.animate-slide-in {
+    animation: slide-in 0.3s ease-out forwards;
+}
+
+.animate-slide-out {
+    animation: slide-out 0.3s ease-out forwards;
+}
+
+/* Smooth hover effects */
+.table tbody tr {
+    transition: background-color 0.2s ease;
+}
+
+/* Progress bar animations */
+.h-1\.5 {
+    transition: width 0.5s ease-out;
+}
+
+/* Filter button styles */
+.filter-btn {
+    position: relative;
+    overflow: hidden;
+}
+
+.filter-btn::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.1);
+    transform: translate(-50%, -50%);
+    transition: width 0.3s, height 0.3s;
+}
+
+.filter-btn:hover::before {
+    width: 100px;
+    height: 100px;
+}
+
+.filter-btn.active {
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.filter-btn .badge {
+    transition: all 0.2s ease;
+}
+
+.filter-btn:hover .badge {
+    transform: scale(1.1);
+}
+
+/* Card hover effect */
+.card {
+    transition: all 0.2s ease;
+}
+
+.card:hover {
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+}
+</style>
+{% endblock %}

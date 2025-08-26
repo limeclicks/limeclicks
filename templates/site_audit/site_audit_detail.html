@@ -1,0 +1,789 @@
+{% extends "dashboard_base.html" %}
+{% load static %}
+
+{% block page_title %}{{ audit.project.domain }} - Site Audit Details{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto">
+    <!-- In-Progress Notification -->
+    {% if latest_history and latest_history.status in 'pending,running' %}
+    <div class="alert alert-info shadow-lg mb-6 animate-pulse">
+        <div class="flex items-center gap-3">
+            <span class="loading loading-spinner loading-sm"></span>
+            <div>
+                <h3 class="font-bold">Audit in Progress</h3>
+                <div class="text-sm">
+                    {% if latest_history.status == 'pending' %}
+                        Your audit is queued and will start shortly...
+                    {% else %}
+                        Scanning your website for technical SEO issues. This may take a few minutes.
+                    {% endif %}
+                </div>
+            </div>
+            <button class="btn btn-sm btn-ghost" onclick="location.reload()">
+                <i class="fas fa-sync-alt"></i>
+                Refresh
+            </button>
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- Performance Audit In Progress -->
+    {% if performance_data.combined_audit and performance_data.combined_audit.status in 'pending,running' %}
+    <div class="alert alert-warning shadow-lg mb-6">
+        <div class="flex items-center gap-3">
+            <span class="loading loading-spinner loading-sm"></span>
+            <div>
+                <h3 class="font-bold">Performance Audit Running</h3>
+                <div class="text-sm">
+                    Running Lighthouse audits for mobile and desktop. This typically takes 1-2 minutes.
+                </div>
+            </div>
+            <div class="text-sm opacity-75">
+                <i class="fas fa-mobile-alt mr-1"></i>Mobile
+                <i class="fas fa-desktop ml-3 mr-1"></i>Desktop
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- Header -->
+    <div class="mb-6">
+        <!-- Breadcrumb -->
+        <div class="text-sm breadcrumbs mb-4">
+            <ul>
+                <li><a href="{% url 'site_audit:list' %}" class="text-primary">Site Audits</a></li>
+                <li>{{ audit.project.domain }}</li>
+            </ul>
+        </div>
+        
+        <!-- Project Header -->
+        <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+            <div class="flex items-center gap-4">
+                <div class="w-16 h-16 rounded-xl bg-base-200 flex items-center justify-center overflow-hidden">
+                    {% if audit.project.favicon %}
+                    <img src="{{ audit.project.favicon.url }}" alt="{{ audit.project.domain }}" class="w-full h-full object-cover">
+                    {% else %}
+                    <i class="fas fa-globe text-2xl text-base-content/40"></i>
+                    {% endif %}
+                </div>
+                <div>
+                    <h1 class="text-3xl font-bold text-base-content">{{ audit.project.domain }}</h1>
+                    <p class="text-base-content/60 mt-1">{{ audit.project.title|default:"Website Audit" }}</p>
+                    <div class="flex items-center gap-4 mt-2 text-sm">
+                        <span class="text-base-content/50">
+                            <i class="fas fa-clock mr-1"></i>
+                            Last audit: 
+                            {% if audit.last_audit_date %}
+                                {{ audit.last_audit_date|timesince }} ago
+                            {% elif audit.created_at %}
+                                {{ audit.created_at|timesince }} ago
+                            {% else %}
+                                Pending
+                            {% endif %}
+                        </span>
+                        {% with health_score=audit.overall_site_health_score|default:0 %}
+                        <span class="badge {% if health_score >= 80 %}badge-success{% elif health_score >= 60 %}badge-warning{% else %}badge-error{% endif %}">
+                            Health: {{ health_score|floatformat:0 }}%
+                        </span>
+                        {% endwith %}
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Actions -->
+            <div class="flex gap-2">
+                <button onclick="runManualAudit({{ audit.id }})" class="btn btn-primary btn-sm">
+                    <i class="fas fa-sync-alt mr-2"></i>
+                    Run Manual Audit
+                </button>
+                <button class="btn btn-ghost btn-sm">
+                    <i class="fas fa-download mr-2"></i>
+                    Export Report
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Tabs Navigation -->
+    <div class="tabs tabs-boxed mb-6 bg-base-200 p-1">
+        <button class="tab tab-active" onclick="switchTab('overview', event)">
+            <i class="fas fa-chart-line mr-2"></i>Overview
+        </button>
+        <button class="tab" onclick="switchTab('technical', event)">
+            <i class="fas fa-code mr-2"></i>Technical SEO
+        </button>
+        <button class="tab" onclick="switchTab('performance', event)">
+            <i class="fas fa-tachometer-alt mr-2"></i>Performance
+        </button>
+        <button class="tab" onclick="switchTab('issues', event)">
+            <i class="fas fa-exclamation-triangle mr-2"></i>Issues
+        </button>
+        <button class="tab" onclick="switchTab('history', event)">
+            <i class="fas fa-history mr-2"></i>History
+        </button>
+    </div>
+    
+    <!-- Tab Content -->
+    <div id="tab-content">
+        <!-- Overview Tab -->
+        <div id="overview-tab" class="tab-content">
+            <!-- Key Metrics Grid -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                <!-- Technical Health -->
+                <div class="card bg-base-100 shadow-sm border border-base-200">
+                    <div class="card-body p-4">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <p class="text-xs font-semibold text-base-content/60 uppercase">Technical Health</p>
+                                {% with health_score=audit.overall_site_health_score|default:0 %}
+                                <h3 class="text-3xl font-bold mt-1 {% if health_score >= 80 %}text-success{% elif health_score >= 60 %}text-warning{% else %}text-error{% endif %}">
+                                    {{ health_score|floatformat:0 }}%
+                                </h3>
+                                {% endwith %}
+                                <p class="text-sm text-base-content/60 mt-1">Based on {{ metrics.total_issues }} issues</p>
+                            </div>
+                            <div class="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                                <i class="fas fa-heartbeat text-primary"></i>
+                            </div>
+                        </div>
+                        {% if improvements %}
+                        <div class="mt-3 pt-3 border-t border-base-200">
+                            <span class="text-xs {% if improvements.score_change >= 0 %}text-success{% else %}text-error{% endif %}">
+                                <i class="fas {% if improvements.score_change >= 0 %}fa-arrow-up{% else %}fa-arrow-down{% endif %}"></i>
+                                {{ improvements.score_change|floatformat:1 }}% from last audit
+                            </span>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <!-- Pages Crawled -->
+                <div class="card bg-base-100 shadow-sm border border-base-200">
+                    <div class="card-body p-4">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <p class="text-xs font-semibold text-base-content/60 uppercase">Pages Crawled</p>
+                                <h3 class="text-3xl font-bold text-primary mt-1">{{ metrics.total_pages }}</h3>
+                                <p class="text-sm text-base-content/60 mt-1">Total pages analyzed</p>
+                            </div>
+                            <div class="w-12 h-12 rounded-full bg-info/10 flex items-center justify-center">
+                                <i class="fas fa-file-alt text-info"></i>
+                            </div>
+                        </div>
+                        {% if improvements %}
+                        <div class="mt-3 pt-3 border-t border-base-200">
+                            <span class="text-xs {% if improvements.pages_change >= 0 %}text-success{% else %}text-warning{% endif %}">
+                                <i class="fas {% if improvements.pages_change >= 0 %}fa-plus{% else %}fa-minus{% endif %}"></i>
+                                {{ improvements.pages_change_abs }} pages change
+                            </span>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <!-- Total Issues -->
+                <div class="card bg-base-100 shadow-sm border border-base-200">
+                    <div class="card-body p-4">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <p class="text-xs font-semibold text-base-content/60 uppercase">Total Issues</p>
+                                <h3 class="text-3xl font-bold text-warning mt-1">{{ metrics.total_issues }}</h3>
+                                <div class="flex gap-3 mt-2">
+                                    <span class="text-xs text-error">{{ metrics.critical_issues }} critical</span>
+                                    <span class="text-xs text-warning">{{ metrics.warning_issues }} warning</span>
+                                </div>
+                            </div>
+                            <div class="w-12 h-12 rounded-full bg-warning/10 flex items-center justify-center">
+                                <i class="fas fa-exclamation-triangle text-warning"></i>
+                            </div>
+                        </div>
+                        {% if improvements %}
+                        <div class="mt-3 pt-3 border-t border-base-200">
+                            <span class="text-xs text-success">
+                                <i class="fas fa-check"></i>
+                                {{ improvements.issues_fixed }} fixed
+                            </span>
+                            {% if improvements.issues_new > 0 %}
+                            <span class="text-xs text-error ml-3">
+                                <i class="fas fa-plus"></i>
+                                {{ improvements.issues_new }} new
+                            </span>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <!-- Performance Score - Mobile & Desktop -->
+                <div class="card bg-base-100 shadow-sm border border-base-200">
+                    <div class="card-body p-4">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <p class="text-xs font-semibold text-base-content/60 uppercase">Performance Scores</p>
+                                <div class="flex items-center gap-4 mt-2">
+                                    <!-- Mobile Score -->
+                                    <div class="flex items-center gap-2">
+                                        <i class="fas fa-mobile-alt text-base-content/50"></i>
+                                        {% with mobile_score=audit.performance_score_mobile|default:0 %}
+                                        <span class="text-2xl font-bold {% if mobile_score >= 80 %}text-success{% elif mobile_score >= 60 %}text-warning{% else %}text-error{% endif %}">
+                                            {{ mobile_score }}
+                                        </span>
+                                        {% endwith %}
+                                        <span class="text-xs text-base-content/60">Mobile</span>
+                                    </div>
+                                    <div class="divider divider-horizontal mx-0"></div>
+                                    <!-- Desktop Score -->
+                                    <div class="flex items-center gap-2">
+                                        <i class="fas fa-desktop text-base-content/50"></i>
+                                        {% with desktop_score=audit.performance_score_desktop|default:0 %}
+                                        <span class="text-2xl font-bold {% if desktop_score >= 80 %}text-success{% elif desktop_score >= 60 %}text-warning{% else %}text-error{% endif %}">
+                                            {{ desktop_score }}
+                                        </span>
+                                        {% endwith %}
+                                        <span class="text-xs text-base-content/60">Desktop</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="w-12 h-12 rounded-full bg-accent/10 flex items-center justify-center">
+                                <i class="fas fa-tachometer-alt text-accent"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Core Web Vitals Section -->
+            <div class="card bg-base-100 shadow-sm border border-base-200 mb-6">
+                <div class="card-body">
+                    <h3 class="text-lg font-semibold mb-4 flex items-center">
+                        <i class="fas fa-chart-bar mr-2 text-primary"></i>
+                        Core Web Vitals
+                        {% if performance_data.desktop_audit or performance_data.mobile_audit %}
+                        <span class="ml-auto text-sm text-base-content/60 font-normal">
+                            {% if performance_data.desktop_audit %}Desktop{% else %}Mobile{% endif %} Results
+                        </span>
+                        {% endif %}
+                    </h3>
+                    
+                    {% if performance_data.desktop_audit or performance_data.mobile_audit %}
+                    {% with audit_data=performance_data.desktop_audit|default:performance_data.mobile_audit %}
+                    {% if audit_data %}
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <!-- LCP -->
+                        <div class="border border-base-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                            <div class="flex items-start justify-between mb-3">
+                                <div>
+                                    <p class="text-sm font-semibold text-base-content">Largest Contentful Paint</p>
+                                    <p class="text-xs text-base-content/60 mt-1">Loading performance</p>
+                                </div>
+                                <i class="fas fa-image text-2xl text-base-content/20"></i>
+                            </div>
+                            <div class="text-center py-2">
+                                {% with lcp=audit_data.largest_contentful_paint|default:0 %}
+                                <p class="text-3xl font-bold {% if lcp <= 2.5 %}text-success{% elif lcp <= 4 %}text-warning{% else %}text-error{% endif %}">
+                                    {{ lcp|floatformat:1 }}s
+                                </p>
+                                <p class="text-xs text-base-content/60 mt-1">
+                                    {% if lcp <= 2.5 %}Good{% elif lcp <= 4 %}Needs Improvement{% else %}Poor{% endif %}
+                                </p>
+                                {% endwith %}
+                            </div>
+                            <div class="mt-3 pt-3 border-t border-base-200">
+                                <div class="flex justify-between text-xs text-base-content/60">
+                                    <span>Good: ≤2.5s</span>
+                                    <span>Poor: >4s</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- INP -->
+                        <div class="border border-base-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                            <div class="flex items-start justify-between mb-3">
+                                <div>
+                                    <p class="text-sm font-semibold text-base-content">Interaction to Next Paint</p>
+                                    <p class="text-xs text-base-content/60 mt-1">Responsiveness</p>
+                                </div>
+                                <i class="fas fa-mouse-pointer text-2xl text-base-content/20"></i>
+                            </div>
+                            <div class="text-center py-2">
+                                {% with inp=audit_data.interaction_to_next_paint|default:0 %}
+                                <p class="text-3xl font-bold {% if inp <= 200 %}text-success{% elif inp <= 500 %}text-warning{% else %}text-error{% endif %}">
+                                    {{ inp|floatformat:0 }}ms
+                                </p>
+                                <p class="text-xs text-base-content/60 mt-1">
+                                    {% if inp <= 200 %}Good{% elif inp <= 500 %}Needs Improvement{% else %}Poor{% endif %}
+                                </p>
+                                {% endwith %}
+                            </div>
+                            <div class="mt-3 pt-3 border-t border-base-200">
+                                <div class="flex justify-between text-xs text-base-content/60">
+                                    <span>Good: ≤200ms</span>
+                                    <span>Poor: >500ms</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- CLS -->
+                        <div class="border border-base-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                            <div class="flex items-start justify-between mb-3">
+                                <div>
+                                    <p class="text-sm font-semibold text-base-content">Cumulative Layout Shift</p>
+                                    <p class="text-xs text-base-content/60 mt-1">Visual stability</p>
+                                </div>
+                                <i class="fas fa-arrows-alt text-2xl text-base-content/20"></i>
+                            </div>
+                            <div class="text-center py-2">
+                                {% with cls=audit_data.cumulative_layout_shift|default:0 %}
+                                <p class="text-3xl font-bold {% if cls <= 0.1 %}text-success{% elif cls <= 0.25 %}text-warning{% else %}text-error{% endif %}">
+                                    {{ cls|floatformat:2 }}
+                                </p>
+                                <p class="text-xs text-base-content/60 mt-1">
+                                    {% if cls <= 0.1 %}Good{% elif cls <= 0.25 %}Needs Improvement{% else %}Poor{% endif %}
+                                </p>
+                                {% endwith %}
+                            </div>
+                            <div class="mt-3 pt-3 border-t border-base-200">
+                                <div class="flex justify-between text-xs text-base-content/60">
+                                    <span>Good: ≤0.1</span>
+                                    <span>Poor: >0.25</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                    {% endwith %}
+                    {% else %}
+                    <!-- No Performance Data State -->
+                    <div class="text-center py-12">
+                        <div class="inline-flex flex-col items-center">
+                            <div class="w-20 h-20 rounded-full bg-base-200 flex items-center justify-center mb-4">
+                                <i class="fas fa-chart-bar text-3xl text-base-content/30"></i>
+                            </div>
+                            <p class="text-lg font-medium text-base-content/70 mb-2">No Core Web Vitals data</p>
+                            <p class="text-sm text-base-content/50 max-w-md">
+                                Run a performance audit to measure Core Web Vitals and get insights into your site's user experience.
+                            </p>
+                            <button onclick="runPerformanceAudit({{ audit.project.id }})" class="btn btn-primary btn-sm mt-4">
+                                <i class="fas fa-rocket mr-2"></i>
+                                Start Performance Audit
+                            </button>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- Two Column Layout -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- SEO Issues Breakdown -->
+                <div class="card bg-base-100 shadow-sm border border-base-200">
+                    <div class="card-body">
+                        <h3 class="text-lg font-semibold mb-4 flex items-center">
+                            <i class="fas fa-search mr-2 text-primary"></i>
+                            SEO Issues Breakdown
+                        </h3>
+                        
+                        <div class="space-y-3">
+                            <!-- Broken Links -->
+                            <div class="flex items-center justify-between p-3 rounded-lg hover:bg-base-200/50 transition-colors">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-8 h-8 rounded-full bg-error/10 flex items-center justify-center">
+                                        <i class="fas fa-link-slash text-error text-sm"></i>
+                                    </div>
+                                    <div>
+                                        <p class="font-medium">Broken Links</p>
+                                        <p class="text-xs text-base-content/60">404 and unreachable pages</p>
+                                    </div>
+                                </div>
+                                <span class="badge {% if metrics.broken_links > 0 %}badge-error{% else %}badge-success{% endif %}">
+                                    {{ metrics.broken_links }}
+                                </span>
+                            </div>
+                            
+                            <!-- Missing Titles -->
+                            <div class="flex items-center justify-between p-3 rounded-lg hover:bg-base-200/50 transition-colors">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-8 h-8 rounded-full bg-warning/10 flex items-center justify-center">
+                                        <i class="fas fa-heading text-warning text-sm"></i>
+                                    </div>
+                                    <div>
+                                        <p class="font-medium">Missing Titles</p>
+                                        <p class="text-xs text-base-content/60">Pages without title tags</p>
+                                    </div>
+                                </div>
+                                <span class="badge {% if metrics.missing_titles > 0 %}badge-warning{% else %}badge-success{% endif %}">
+                                    {{ metrics.missing_titles }}
+                                </span>
+                            </div>
+                            
+                            <!-- Duplicate Titles -->
+                            <div class="flex items-center justify-between p-3 rounded-lg hover:bg-base-200/50 transition-colors">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-8 h-8 rounded-full bg-warning/10 flex items-center justify-center">
+                                        <i class="fas fa-copy text-warning text-sm"></i>
+                                    </div>
+                                    <div>
+                                        <p class="font-medium">Duplicate Titles</p>
+                                        <p class="text-xs text-base-content/60">Pages with same title tags</p>
+                                    </div>
+                                </div>
+                                <span class="badge {% if metrics.duplicate_titles > 0 %}badge-warning{% else %}badge-success{% endif %}">
+                                    {{ metrics.duplicate_titles }}
+                                </span>
+                            </div>
+                            
+                            <!-- Missing Meta Descriptions -->
+                            <div class="flex items-center justify-between p-3 rounded-lg hover:bg-base-200/50 transition-colors">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-8 h-8 rounded-full bg-info/10 flex items-center justify-center">
+                                        <i class="fas fa-file-alt text-info text-sm"></i>
+                                    </div>
+                                    <div>
+                                        <p class="font-medium">Missing Meta Descriptions</p>
+                                        <p class="text-xs text-base-content/60">Pages without meta descriptions</p>
+                                    </div>
+                                </div>
+                                <span class="badge {% if metrics.missing_meta > 0 %}badge-info{% else %}badge-success{% endif %}">
+                                    {{ metrics.missing_meta }}
+                                </span>
+                            </div>
+                            
+                            <!-- Redirect Chains -->
+                            <div class="flex items-center justify-between p-3 rounded-lg hover:bg-base-200/50 transition-colors">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-8 h-8 rounded-full bg-warning/10 flex items-center justify-center">
+                                        <i class="fas fa-directions text-warning text-sm"></i>
+                                    </div>
+                                    <div>
+                                        <p class="font-medium">Redirect Chains</p>
+                                        <p class="text-xs text-base-content/60">Multiple redirects in sequence</p>
+                                    </div>
+                                </div>
+                                <span class="badge {% if metrics.redirect_chains > 0 %}badge-warning{% else %}badge-success{% endif %}">
+                                    {{ metrics.redirect_chains }}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Performance Metrics -->
+                <div class="card bg-base-100 shadow-sm border border-base-200">
+                    <div class="card-body">
+                        <h3 class="text-lg font-semibold mb-4 flex items-center">
+                            <i class="fas fa-tachometer-alt mr-2 text-primary"></i>
+                            Performance Metrics
+                        </h3>
+                        
+                        {% if performance_data.desktop_audit %}
+                        <div class="space-y-4">
+                            <!-- Core Web Vitals -->
+                            <div class="border-b border-base-200 pb-3">
+                                <p class="text-sm font-medium text-base-content/70 mb-3">Core Web Vitals</p>
+                                <div class="grid grid-cols-3 gap-3">
+                                    <!-- LCP -->
+                                    <div class="text-center">
+                                        <p class="text-xs text-base-content/60 mb-1">LCP</p>
+                                        <p class="text-lg font-bold {% if performance_data.desktop_audit.largest_contentful_paint <= 2.5 %}text-success{% elif performance_data.desktop_audit.largest_contentful_paint <= 4 %}text-warning{% else %}text-error{% endif %}">
+                                            {{ performance_data.desktop_audit.largest_contentful_paint|default:"--"|floatformat:1 }}s
+                                        </p>
+                                    </div>
+                                    
+                                    <!-- FID/INP -->
+                                    <div class="text-center">
+                                        <p class="text-xs text-base-content/60 mb-1">INP</p>
+                                        <p class="text-lg font-bold {% if performance_data.desktop_audit.interaction_to_next_paint <= 200 %}text-success{% elif performance_data.desktop_audit.interaction_to_next_paint <= 500 %}text-warning{% else %}text-error{% endif %}">
+                                            {{ performance_data.desktop_audit.interaction_to_next_paint|default:"--"|floatformat:0 }}ms
+                                        </p>
+                                    </div>
+                                    
+                                    <!-- CLS -->
+                                    <div class="text-center">
+                                        <p class="text-xs text-base-content/60 mb-1">CLS</p>
+                                        <p class="text-lg font-bold {% if performance_data.desktop_audit.cumulative_layout_shift <= 0.1 %}text-success{% elif performance_data.desktop_audit.cumulative_layout_shift <= 0.25 %}text-warning{% else %}text-error{% endif %}">
+                                            {{ performance_data.desktop_audit.cumulative_layout_shift|default:"--"|floatformat:2 }}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Other Metrics -->
+                            <div class="space-y-3">
+                                <!-- FCP -->
+                                <div class="flex justify-between items-center">
+                                    <div>
+                                        <p class="text-sm font-medium">First Contentful Paint</p>
+                                        <p class="text-xs text-base-content/60">When first content appears</p>
+                                    </div>
+                                    <span class="badge badge-ghost">
+                                        {{ performance_data.desktop_audit.first_contentful_paint|default:"--"|floatformat:1 }}s
+                                    </span>
+                                </div>
+                                
+                                <!-- Speed Index -->
+                                <div class="flex justify-between items-center">
+                                    <div>
+                                        <p class="text-sm font-medium">Speed Index</p>
+                                        <p class="text-xs text-base-content/60">Visual loading speed</p>
+                                    </div>
+                                    <span class="badge badge-ghost">
+                                        {{ performance_data.desktop_audit.speed_index|default:"--"|floatformat:1 }}s
+                                    </span>
+                                </div>
+                                
+                                <!-- TTI -->
+                                <div class="flex justify-between items-center">
+                                    <div>
+                                        <p class="text-sm font-medium">Time to Interactive</p>
+                                        <p class="text-xs text-base-content/60">When page is fully interactive</p>
+                                    </div>
+                                    <span class="badge badge-ghost">
+                                        {{ performance_data.desktop_audit.time_to_interactive|default:"--"|floatformat:1 }}s
+                                    </span>
+                                </div>
+                                
+                                <!-- TBT -->
+                                <div class="flex justify-between items-center">
+                                    <div>
+                                        <p class="text-sm font-medium">Total Blocking Time</p>
+                                        <p class="text-xs text-base-content/60">Main thread blocking</p>
+                                    </div>
+                                    <span class="badge badge-ghost">
+                                        {{ performance_data.desktop_audit.total_blocking_time|default:"--"|floatformat:0 }}ms
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                        {% else %}
+                        <div class="text-center py-8">
+                            <i class="fas fa-tachometer-alt text-4xl text-base-content/20 mb-3"></i>
+                            <p class="text-base-content/70 font-medium">No performance audit data available</p>
+                            <p class="text-sm text-base-content/50 mt-2">Performance audits haven't been run for this project yet</p>
+                            <button onclick="runPerformanceAudit({{ audit.project.id }})" class="btn btn-sm btn-primary mt-4">
+                                <i class="fas fa-rocket mr-2"></i>
+                                Run Performance Audit
+                            </button>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Recent Issues -->
+            {% if all_issues %}
+            <div class="card bg-base-100 shadow-sm border border-base-200 mt-6">
+                <div class="card-body">
+                    <h3 class="text-lg font-semibold mb-4 flex items-center justify-between">
+                        <span>
+                            <i class="fas fa-exclamation-circle mr-2 text-primary"></i>
+                            Recent Issues Found
+                        </span>
+                        <button onclick="switchTab('issues', event)" class="btn btn-ghost btn-sm">
+                            View All <i class="fas fa-arrow-right ml-2"></i>
+                        </button>
+                    </h3>
+                    
+                    <div class="overflow-x-auto">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr class="border-b border-base-200">
+                                    <th class="text-xs font-bold uppercase tracking-wider text-base-content/60">Severity</th>
+                                    <th class="text-xs font-bold uppercase tracking-wider text-base-content/60">Type</th>
+                                    <th class="text-xs font-bold uppercase tracking-wider text-base-content/60">Page</th>
+                                    <th class="text-xs font-bold uppercase tracking-wider text-base-content/60">Description</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for issue in all_issues|slice:":10" %}
+                                <tr class="hover:bg-base-200/30 transition-colors">
+                                    <td>
+                                        <span class="badge badge-sm {% if issue.severity == 'high' %}badge-error{% elif issue.severity == 'medium' %}badge-warning{% else %}badge-info{% endif %}">
+                                            {{ issue.severity }}
+                                        </span>
+                                    </td>
+                                    <td class="text-sm">{{ issue.issue_type|title }}</td>
+                                    <td class="text-sm text-base-content/70 max-w-xs truncate">{{ issue.page_url }}</td>
+                                    <td class="text-sm text-base-content/70 max-w-md truncate">{{ issue.description }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+        
+        <!-- Other tabs (hidden by default) -->
+        <div id="technical-tab" class="tab-content hidden">
+            <div class="card bg-base-100 shadow-sm border border-base-200">
+                <div class="card-body">
+                    <h3 class="text-lg font-semibold mb-4">Technical SEO Details</h3>
+                    <p class="text-base-content/60">Technical SEO analysis coming soon...</p>
+                </div>
+            </div>
+        </div>
+        
+        <div id="performance-tab" class="tab-content hidden">
+            <div class="card bg-base-100 shadow-sm border border-base-200">
+                <div class="card-body">
+                    <h3 class="text-lg font-semibold mb-4">Performance Analysis</h3>
+                    <p class="text-base-content/60">Detailed performance metrics coming soon...</p>
+                </div>
+            </div>
+        </div>
+        
+        <div id="issues-tab" class="tab-content hidden">
+            <div class="card bg-base-100 shadow-sm border border-base-200">
+                <div class="card-body">
+                    <h3 class="text-lg font-semibold mb-4">All Issues</h3>
+                    <p class="text-base-content/60">Complete issues list coming soon...</p>
+                </div>
+            </div>
+        </div>
+        
+        <div id="history-tab" class="tab-content hidden">
+            <div class="card bg-base-100 shadow-sm border border-base-200">
+                <div class="card-body">
+                    <h3 class="text-lg font-semibold mb-4">Audit History</h3>
+                    <p class="text-base-content/60">Historical audit data coming soon...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function switchTab(tabName, event) {
+    // Hide all tab contents
+    document.querySelectorAll('.tab-content').forEach(tab => {
+        tab.classList.add('hidden');
+    });
+    
+    // Show selected tab
+    document.getElementById(tabName + '-tab').classList.remove('hidden');
+    
+    // Update tab buttons
+    document.querySelectorAll('.tab').forEach(btn => {
+        btn.classList.remove('tab-active');
+    });
+    if (event && event.target) {
+        // Find the closest button element
+        const btn = event.target.closest('.tab');
+        if (btn) {
+            btn.classList.add('tab-active');
+        }
+    }
+}
+
+function runManualAudit(auditId) {
+    if (!confirm('Are you sure you want to run a manual site audit?')) return;
+    
+    fetch(`/site-audit/${auditId}/run-manual/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': '{{ csrf_token }}',
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showNotification('success', 'Site audit started successfully');
+            setTimeout(() => location.reload(), 2000);
+        } else {
+            showNotification('error', data.error || 'Failed to start audit');
+        }
+    })
+    .catch(error => {
+        showNotification('error', 'An error occurred');
+    });
+}
+
+function runPerformanceAudit(projectId) {
+    if (!confirm('Are you sure you want to run a performance audit? This will test both mobile and desktop performance.')) return;
+    
+    showNotification('info', 'Starting performance audit...');
+    
+    // You can create an endpoint for triggering performance audits
+    // For now, we'll show a message
+    showNotification('info', 'Performance audit feature will be available soon. Please use the Performance Audit section from the main menu.');
+    
+    // When the endpoint is ready, use:
+    /*
+    fetch(`/performance-audit/project/${projectId}/run/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': '{{ csrf_token }}',
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showNotification('success', 'Performance audit started successfully');
+            setTimeout(() => location.reload(), 3000);
+        } else {
+            showNotification('error', data.error || 'Failed to start performance audit');
+        }
+    })
+    .catch(error => {
+        showNotification('error', 'An error occurred');
+    });
+    */
+}
+
+function showNotification(type, message) {
+    const alertClass = type === 'success' ? 'alert-success' : type === 'info' ? 'alert-info' : 'alert-error';
+    const icon = type === 'success' ? 'fa-check-circle' : type === 'info' ? 'fa-info-circle' : 'fa-exclamation-circle';
+    
+    const notification = document.createElement('div');
+    notification.className = `alert ${alertClass} fixed top-4 right-4 z-50 max-w-sm shadow-lg`;
+    notification.innerHTML = `
+        <i class="fas ${icon}"></i>
+        <span>${message}</span>
+    `;
+    
+    document.body.appendChild(notification);
+    
+    setTimeout(() => {
+        notification.remove();
+    }, 5000);
+}
+
+// Auto-refresh when audits are running
+document.addEventListener('DOMContentLoaded', function() {
+    {% if latest_history and latest_history.status in 'pending,running' %}
+    // Auto refresh every 10 seconds when site audit is running
+    setTimeout(function() {
+        location.reload();
+    }, 10000);
+    {% endif %}
+    
+    {% if performance_data.combined_audit and performance_data.combined_audit.status in 'pending,running' %}
+    // Auto refresh every 10 seconds when performance audit is running
+    setTimeout(function() {
+        location.reload();
+    }, 10000);
+    {% endif %}
+});
+</script>
+
+<style>
+.tab-content {
+    animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+</style>
+{% endblock %}

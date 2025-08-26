@@ -1,6 +1,7 @@
 from django.db import models
 from django.utils import timezone
 from django.conf import settings
+from datetime import timedelta
 from project.models import Project
 
 
@@ -17,6 +18,13 @@ class Keyword(models.Model):
         ('low', 'Low'),
         ('medium', 'Medium'),
         ('high', 'High'),
+    ]
+    
+    PRIORITY_CHOICES = [
+        ('low', 'Low'),
+        ('normal', 'Normal'),
+        ('high', 'High'),
+        ('critical', 'Critical'),
     ]
     
     # Core fields
@@ -39,6 +47,11 @@ class Keyword(models.Model):
     
     # Scraping fields
     scraped_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    next_crawl_at = models.DateTimeField(null=True, blank=True, db_index=True, help_text='Next scheduled crawl time')
+    last_force_crawl_at = models.DateTimeField(null=True, blank=True, help_text='Last time force crawl was used')
+    crawl_priority = models.CharField(max_length=20, choices=PRIORITY_CHOICES, default='normal', db_index=True)
+    crawl_interval_hours = models.IntegerField(default=24, help_text='Hours between automatic crawls')
+    force_crawl_count = models.IntegerField(default=0, help_text='Number of times force crawl was used')
     scrape_do_file_path = models.CharField(max_length=500, blank=True, null=True, help_text='Latest HTML file path')
     scrape_do_files = models.JSONField(default=list, blank=True, help_text='Ordered list of HTML files, latest first')
     scrape_do_at = models.DateTimeField(null=True, blank=True)
@@ -46,6 +59,13 @@ class Keyword(models.Model):
     last_error_message = models.CharField(max_length=255, blank=True, null=True, help_text='Minimal error message')
     success_api_hit_count = models.IntegerField(default=0)
     failed_api_hit_count = models.IntegerField(default=0)
+    
+    # Top ranking pages (stored as JSON array)
+    ranking_pages = models.JSONField(
+        default=list, 
+        blank=True, 
+        help_text='Top 3 ranking pages with URL and position'
+    )
     
     # Management fields
     impact = models.CharField(max_length=20, choices=IMPACT_CHOICES, default='no')
@@ -64,6 +84,8 @@ class Keyword(models.Model):
             models.Index(fields=['project', 'archive']),
             models.Index(fields=['project', '-created_at']),
             models.Index(fields=['processing', 'archive']),
+            models.Index(fields=['crawl_priority', 'next_crawl_at']),
+            models.Index(fields=['next_crawl_at', 'processing']),
         ]
         ordering = ['-created_at']
     
@@ -110,9 +132,83 @@ class Keyword(models.Model):
         # Calculate impact based on rank change
         self.impact = self.calculate_impact(old_rank, new_rank)
         
-        # Update scraped timestamp
+        # Update scraped timestamp and schedule next crawl
         self.scraped_at = timezone.now()
+        self.next_crawl_at = self.scraped_at + timedelta(hours=self.crawl_interval_hours)
+        
+        # Reset priority to normal after successful crawl (unless it was forced)
+        if self.crawl_priority == 'high' and old_rank == 0:
+            # Keep high priority for new keywords for a bit
+            pass
+        elif self.crawl_priority == 'critical':
+            # Reset critical priority after force crawl
+            self.crawl_priority = 'normal'
+        
         self.save()
+    
+    def should_crawl(self):
+        """Check if keyword should be crawled based on schedule"""
+        now = timezone.now()
+        
+        # Never crawled - high priority
+        if not self.scraped_at:
+            return True
+        
+        # Check if next crawl time has passed
+        if self.next_crawl_at and now >= self.next_crawl_at:
+            return True
+        
+        # Check if 24 hours have passed (fallback)
+        hours_since_last = (now - self.scraped_at).total_seconds() / 3600
+        if hours_since_last >= self.crawl_interval_hours:
+            return True
+        
+        return False
+    
+    def can_force_crawl(self):
+        """Check if force crawl is allowed (once per hour limit)"""
+        if not self.last_force_crawl_at:
+            return True
+        
+        now = timezone.now()
+        hours_since_last = (now - self.last_force_crawl_at).total_seconds() / 3600
+        return hours_since_last >= 1.0
+    
+    def schedule_next_crawl(self):
+        """Schedule the next crawl based on priority and interval"""
+        if not self.scraped_at:
+            # First time crawl - set to now for immediate crawling
+            self.next_crawl_at = timezone.now()
+            self.crawl_priority = 'high'  # High priority for first-time keywords
+        else:
+            # Calculate next crawl time based on interval
+            self.next_crawl_at = self.scraped_at + timedelta(hours=self.crawl_interval_hours)
+        
+        self.save(update_fields=['next_crawl_at', 'crawl_priority'])
+    
+    def force_crawl(self):
+        """Force an immediate crawl if allowed"""
+        if not self.can_force_crawl():
+            raise ValueError("Force crawl not allowed yet. Please wait 1 hour between force crawls.")
+        
+        now = timezone.now()
+        self.last_force_crawl_at = now
+        self.force_crawl_count += 1
+        self.next_crawl_at = now  # Set to now for immediate crawling
+        self.crawl_priority = 'critical'  # Highest priority for forced crawls
+        self.save(update_fields=['last_force_crawl_at', 'force_crawl_count', 'next_crawl_at', 'crawl_priority'])
+        
+        return True
+    
+    def get_crawl_priority_value(self):
+        """Get numeric priority value for ordering (higher = more important)"""
+        priority_values = {
+            'critical': 4,
+            'high': 3,
+            'normal': 2,
+            'low': 1,
+        }
+        return priority_values.get(self.crawl_priority, 2)
     
     def calculate_impact(self, old_rank, new_rank):
         """Calculate impact based on rank change"""

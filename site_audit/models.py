@@ -129,6 +129,20 @@ class SiteAudit(models.Model):
     average_load_time_ms = models.FloatField(null=True, blank=True)
     total_pages_crawled = models.IntegerField(default=0)
     
+    # Combined scores
+    performance_score_mobile = models.IntegerField(
+        null=True, blank=True,
+        help_text="Latest mobile performance score from Lighthouse"
+    )
+    performance_score_desktop = models.IntegerField(
+        null=True, blank=True,
+        help_text="Latest desktop performance score from Lighthouse"
+    )
+    overall_site_health_score = models.FloatField(
+        null=True, blank=True,
+        help_text="Technical SEO health score based on issue density (100% technical)"
+    )
+    
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
@@ -189,7 +203,63 @@ class SiteAudit(models.Model):
                 self.average_load_time_ms = summary.get('average_load_time_ms')
                 self.total_pages_crawled = summary.get('total_pages_crawled', 0)
             
+            # Update overall score
+            self.calculate_overall_score()
             self.save()
+    
+    def update_performance_scores(self):
+        """Update performance scores from PerformanceHistory"""
+        try:
+            from performance_audit.models import PerformancePage, PerformanceHistory
+            
+            performance_page = PerformancePage.objects.filter(project=self.project).first()
+            if performance_page:
+                # Get latest mobile score
+                latest_mobile = PerformanceHistory.objects.filter(
+                    performance_page=performance_page,
+                    device_type='mobile',
+                    status='completed'
+                ).order_by('-created_at').first()
+                
+                if latest_mobile and latest_mobile.performance_score is not None:
+                    self.performance_score_mobile = latest_mobile.performance_score
+                
+                # Get latest desktop score
+                latest_desktop = PerformanceHistory.objects.filter(
+                    performance_page=performance_page,
+                    device_type='desktop',
+                    status='completed'
+                ).order_by('-created_at').first()
+                
+                if latest_desktop and latest_desktop.performance_score is not None:
+                    self.performance_score_desktop = latest_desktop.performance_score
+                
+                # Calculate overall score
+                self.calculate_overall_score()
+                self.save(update_fields=['performance_score_mobile', 'performance_score_desktop', 'overall_site_health_score'])
+        except:
+            pass
+    
+    def calculate_overall_score(self):
+        """Calculate overall site health score combining technical SEO and performance"""
+        # Calculate technical SEO health
+        if self.total_pages_crawled and self.total_pages_crawled > 0:
+            issues_per_page = self.total_issues_count / self.total_pages_crawled
+            technical_health = max(0, min(100, 100 - (issues_per_page * 100)))
+        else:
+            technical_health = 100 if self.total_issues_count == 0 else 0
+        
+        # Get average performance score
+        performance_scores = []
+        if self.performance_score_mobile is not None:
+            performance_scores.append(self.performance_score_mobile)
+        if self.performance_score_desktop is not None:
+            performance_scores.append(self.performance_score_desktop)
+        
+        avg_performance = sum(performance_scores) / len(performance_scores) if performance_scores else 50
+        
+        # Calculate combined score (60% technical SEO + 40% performance)
+        self.overall_site_health_score = (technical_health * 0.6) + (avg_performance * 0.4)
 
 
 class OnPagePerformanceHistory(models.Model):

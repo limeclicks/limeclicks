@@ -52,16 +52,17 @@ def fetch_keyword_serp_html(self, keyword_id: int) -> None:
             logger.error(f"Keyword with id={keyword_id} not found")
             return
         
-        # Check eligibility (defensive check)
-        if keyword.scraped_at:
-            time_since_last = timezone.now() - keyword.scraped_at
-            min_interval = timedelta(hours=settings.FETCH_MIN_INTERVAL_HOURS)
-            
-            if time_since_last < min_interval:
-                hours_left = (min_interval - time_since_last).total_seconds() / 3600
+        # Check if this is a force crawl or scheduled crawl
+        is_force_crawl = keyword.crawl_priority == 'critical'
+        
+        # Check eligibility (unless force crawled)
+        if not is_force_crawl and keyword.scraped_at:
+            # Use the model's should_crawl method for consistency
+            if not keyword.should_crawl():
+                time_since_last = (timezone.now() - keyword.scraped_at).total_seconds() / 3600
                 logger.info(
-                    f"Keyword {keyword_id} scraped too recently. "
-                    f"Last: {keyword.scraped_at}, Hours left: {hours_left:.1f}"
+                    f"Keyword {keyword_id} not ready for crawl. "
+                    f"Last: {keyword.scraped_at}, Hours since: {time_since_last:.1f}"
                 )
                 # Reset processing flag since we're not actually processing
                 keyword.processing = False
@@ -83,7 +84,7 @@ def fetch_keyword_serp_html(self, keyword_id: int) -> None:
                     country_code=keyword.country_code or keyword.country,
                     num_results=100,
                     location=keyword.location if keyword.location else None,
-                    use_exact_location=bool(keyword.uule)
+                    use_exact_location=bool(keyword.location)  # Use UULE if location is provided
                 )
                 
                 if result and result.get('status_code') == 200:
@@ -137,6 +138,39 @@ def fetch_keyword_serp_html(self, keyword_id: int) -> None:
         cache.delete(lock_key)
 
 
+def _extract_top_pages(html_content: str, limit: int = 3) -> list:
+    """
+    Extract top ranking pages from SERP HTML
+    
+    Args:
+        html_content: Raw HTML from Google search
+        limit: Number of top pages to extract (default 3)
+        
+    Returns:
+        List of dictionaries with position and url
+    """
+    from services.google_search_parser import GoogleSearchParser
+    
+    try:
+        parser = GoogleSearchParser()
+        parsed_results = parser.parse(html_content)
+        
+        organic_results = parsed_results.get('organic_results', [])
+        top_pages = []
+        
+        for i, result in enumerate(organic_results[:limit], 1):
+            if result.get('url'):
+                top_pages.append({
+                    'position': i,
+                    'url': result['url']
+                })
+        
+        return top_pages
+    except Exception as e:
+        logger.warning(f"Failed to extract top pages: {e}")
+        return []
+
+
 def _handle_successful_fetch(keyword: Keyword, html_content: str) -> None:
     """
     Handle successful SERP fetch - store file, extract rankings, and update database.
@@ -157,10 +191,14 @@ def _handle_successful_fetch(keyword: Keyword, html_content: str) -> None:
     if not is_new_file:
         logger.info(f"File already exists for today: {relative_path}")
         # Don't overwrite, but still count as success
+        # Extract top 3 ranking pages
+        top_pages = _extract_top_pages(html_content, limit=3)
+        
         # Update database to reflect the fetch attempt
         keyword.success_api_hit_count += 1
         keyword.last_error_message = None
         keyword.processing = False  # Reset processing flag
+        keyword.ranking_pages = top_pages  # Update top 3 pages
         # Only update scraped_at if it's the first success today
         if not keyword.scrape_do_file_path or keyword.scrape_do_file_path != relative_path:
             keyword.scraped_at = timezone.now()
@@ -211,6 +249,9 @@ def _handle_successful_fetch(keyword: Keyword, html_content: str) -> None:
         except Exception as e:
             logger.warning(f"Failed to delete old file {old_file}: {e}")
     
+    # Extract top 3 ranking pages before updating database
+    top_pages = _extract_top_pages(html_content, limit=3)
+    
     # Update database
     keyword.scrape_do_file_path = relative_path
     keyword.scrape_do_files = file_list
@@ -218,6 +259,7 @@ def _handle_successful_fetch(keyword: Keyword, html_content: str) -> None:
     keyword.success_api_hit_count += 1
     keyword.last_error_message = None
     keyword.processing = False  # Reset processing flag
+    keyword.ranking_pages = top_pages  # Store top 3 pages
     keyword.save()
     
     logger.info(

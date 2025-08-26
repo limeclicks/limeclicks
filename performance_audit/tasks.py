@@ -11,14 +11,20 @@ from .lighthouse_runner import LighthouseRunner, LighthouseService
 logger = get_task_logger(__name__)
 
 
-@shared_task(bind=True, max_retries=3, default_retry_delay=60)
-def run_lighthouse_audit(self, performance_history_id: str, device_type: str = 'desktop'):
+@shared_task(
+    bind=True, 
+    max_retries=3, 
+    default_retry_delay=120,
+    rate_limit='1/m',  # Only 1 audit per minute globally (since we run both mobile & desktop)
+    time_limit=600,  # 10 minute timeout (increased for both audits)
+    soft_time_limit=540  # 9 minute soft timeout
+)
+def run_lighthouse_audit(self, performance_history_id: str):
     """
-    Run a Lighthouse audit for a specific audit history entry
+    Run Lighthouse audits for both mobile and desktop in a single record
     
     Args:
         performance_history_id: UUID of the PerformanceHistory record
-        device_type: 'desktop' or 'mobile'
     """
     try:
         performance_history = PerformanceHistory.objects.get(id=performance_history_id)
@@ -29,7 +35,7 @@ def run_lighthouse_audit(self, performance_history_id: str, device_type: str = '
         performance_history.started_at = timezone.now()
         performance_history.save(update_fields=['status', 'started_at'])
         
-        logger.info(f"Starting Lighthouse audit for {performance_page.page_url} ({device_type})")
+        logger.info(f"Starting Lighthouse audits for {performance_page.page_url} (both mobile & desktop)")
         
         # Ensure Lighthouse is installed
         if not LighthouseService.check_lighthouse_installed():
@@ -37,33 +43,67 @@ def run_lighthouse_audit(self, performance_history_id: str, device_type: str = '
             if not LighthouseService.install_lighthouse():
                 raise Exception("Failed to install Lighthouse")
         
-        # Run the audit
         runner = LighthouseRunner()
-        success, results, error = runner.run_audit(performance_page.page_url, device_type)
+        audit_results = {'mobile': None, 'desktop': None}
+        errors = []
         
-        if not success:
-            raise Exception(error or "Audit failed with unknown error")
+        # Run mobile audit first
+        logger.info(f"Running mobile audit for {performance_page.page_url}")
+        success, mobile_results, error = runner.run_audit(performance_page.page_url, 'mobile')
+        if success:
+            audit_results['mobile'] = mobile_results
+        else:
+            errors.append(f"Mobile audit failed: {error}")
+            logger.error(f"Mobile audit failed: {error}")
         
-        # Save results
-        runner.save_audit_results(performance_history, results)
+        # Run desktop audit
+        logger.info(f"Running desktop audit for {performance_page.page_url}")
+        success, desktop_results, error = runner.run_audit(performance_page.page_url, 'desktop')
+        if success:
+            audit_results['desktop'] = desktop_results
+        else:
+            errors.append(f"Desktop audit failed: {error}")
+            logger.error(f"Desktop audit failed: {error}")
         
-        logger.info(f"Successfully completed audit for {performance_page.page_url}")
+        # Check if at least one audit succeeded
+        if not audit_results['mobile'] and not audit_results['desktop']:
+            raise Exception("; ".join(errors) if errors else "Both audits failed with unknown error")
+        
+        # Save combined results
+        runner.save_combined_audit_results(performance_history, audit_results)
+        
+        logger.info(f"Successfully completed audits for {performance_page.page_url}")
         
         # Schedule next audit if this was a scheduled audit
         if performance_history.trigger_type == 'scheduled':
             performance_page.schedule_next_audit()
         
-        return {
+        # Prepare response with both scores
+        response = {
             'success': True,
             'audit_id': str(performance_history.id),
-            'scores': {
-                'performance': results.get('performance_score'),
-                'accessibility': results.get('accessibility_score'),
-                'best_practices': results.get('best_practices_score'),
-                'seo': results.get('seo_score'),
-                'pwa': results.get('pwa_score')
-            }
+            'scores': {}
         }
+        
+        if audit_results['mobile']:
+            response['scores']['mobile'] = {
+                'performance': audit_results['mobile'].get('performance_score'),
+                'accessibility': audit_results['mobile'].get('accessibility_score'),
+                'best_practices': audit_results['mobile'].get('best_practices_score'),
+                'seo': audit_results['mobile'].get('seo_score'),
+                'pwa': audit_results['mobile'].get('pwa_score')
+            }
+        
+        if audit_results['desktop']:
+            response['scores']['desktop'] = {
+                'performance': audit_results['desktop'].get('performance_score'),
+                'accessibility': audit_results['desktop'].get('accessibility_score'),
+                'best_practices': audit_results['desktop'].get('best_practices_score'),
+                'seo': audit_results['desktop'].get('seo_score'),
+                'pwa': audit_results['desktop'].get('pwa_score')
+            }
+        
+        return response
         
     except PerformanceHistory.DoesNotExist:
         logger.error(f"PerformanceHistory {performance_history_id} not found")
@@ -85,7 +125,9 @@ def run_lighthouse_audit(self, performance_history_id: str, device_type: str = '
         # Retry if we haven't exceeded max retries
         if self.request.retries < self.max_retries:
             logger.info(f"Retrying audit (attempt {self.request.retries + 1}/{self.max_retries})")
-            raise self.retry(exc=e, countdown=60 * (self.request.retries + 1))
+            # Exponential backoff: 2 minutes, 4 minutes, 8 minutes
+            countdown = 120 * (2 ** self.request.retries)
+            raise self.retry(exc=e, countdown=countdown)
         
         return {'success': False, 'error': str(e)}
 
@@ -93,7 +135,7 @@ def run_lighthouse_audit(self, performance_history_id: str, device_type: str = '
 @shared_task
 def create_audit_for_project(project_id: int, trigger_type: str = 'project_created'):
     """
-    Create and run an audit when a new project is added
+    Create and run a combined audit (mobile & desktop) when a new project is added
     
     Args:
         project_id: ID of the project
@@ -115,21 +157,35 @@ def create_audit_for_project(project_id: int, trigger_type: str = 'project_creat
         if created:
             logger.info(f"Created new audit page for project {project.domain}")
         
-        # Create audit history entries for both desktop and mobile
-        for device_type in ['desktop', 'mobile']:
-            performance_history = PerformanceHistory.objects.create(
-                performance_page=performance_page,
-                trigger_type=trigger_type,
-                device_type=device_type,
-                status='pending'
-            )
-            
-            # Queue the audit
-            run_lighthouse_audit.delay(str(performance_history.id), device_type)
-            
-            logger.info(f"Queued {device_type} audit for project {project.domain}")
+        # Check for existing audits today to prevent duplicates
+        from datetime import datetime, timedelta
+        today_start = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        today_end = today_start + timedelta(days=1)
         
-        return {'success': True, 'project_id': project_id}
+        # Check if audit already exists for today (any status)
+        existing_audit = PerformanceHistory.objects.filter(
+            performance_page=performance_page,
+            created_at__gte=today_start,
+            created_at__lt=today_end
+        ).exclude(status='failed').exists()  # Allow retry if failed
+        
+        if existing_audit:
+            logger.info(f"Audit already exists today for {project.domain}, skipping")
+            return {'success': True, 'project_id': project_id, 'message': 'Audit already exists today'}
+        
+        # Create a single audit history record for both mobile and desktop
+        performance_history = PerformanceHistory.objects.create(
+            performance_page=performance_page,
+            trigger_type=trigger_type,
+            status='pending'
+        )
+        
+        # Queue the combined audit
+        run_lighthouse_audit.delay(str(performance_history.id))
+        
+        logger.info(f"Queued combined mobile & desktop audit for project {project.domain}")
+        
+        return {'success': True, 'project_id': project_id, 'audit_id': str(performance_history.id)}
         
     except Project.DoesNotExist:
         logger.error(f"Project {project_id} not found")
@@ -142,7 +198,7 @@ def create_audit_for_project(project_id: int, trigger_type: str = 'project_creat
 @shared_task
 def run_manual_audit(performance_page_id: int, user_id: Optional[int] = None):
     """
-    Run a manual audit with rate limiting
+    Run a manual combined audit with rate limiting
     
     Args:
         performance_page_id: ID of the audit page
@@ -160,30 +216,42 @@ def run_manual_audit(performance_page_id: int, user_id: Optional[int] = None):
                 'error': f'Rate limited. Please wait {hours_remaining} hours before running another manual audit.'
             }
         
+        # Check for existing audits today
+        today_start = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        today_end = today_start + timedelta(days=1)
+        
+        existing_audit = PerformanceHistory.objects.filter(
+            performance_page=performance_page,
+            created_at__gte=today_start,
+            created_at__lt=today_end
+        ).exclude(status='failed').exists()
+        
+        if existing_audit:
+            return {
+                'success': False,
+                'error': 'An audit already exists today. Only one combined audit per day is allowed.'
+            }
+        
         # Update last manual audit time
         performance_page.last_manual_audit = timezone.now()
         performance_page.save(update_fields=['last_manual_audit'])
         
-        # Create audit history entries for both desktop and mobile
-        audit_ids = []
-        for device_type in ['desktop', 'mobile']:
-            performance_history = PerformanceHistory.objects.create(
-                performance_page=performance_page,
-                trigger_type='manual',
-                device_type=device_type,
-                status='pending'
-            )
-            audit_ids.append(str(performance_history.id))
-            
-            # Queue the audit
-            run_lighthouse_audit.delay(str(performance_history.id), device_type)
+        # Create a single audit history record for both mobile and desktop
+        performance_history = PerformanceHistory.objects.create(
+            performance_page=performance_page,
+            trigger_type='manual',
+            status='pending'
+        )
         
-        logger.info(f"Manual audit triggered for {performance_page.page_url}")
+        # Queue the combined audit
+        run_lighthouse_audit.delay(str(performance_history.id))
+        
+        logger.info(f"Manual combined audit triggered for {performance_page.page_url}")
         
         return {
             'success': True,
-            'audit_ids': audit_ids,
-            'message': 'Manual audit started for both desktop and mobile'
+            'audit_id': str(performance_history.id),
+            'message': 'Manual audit started for both mobile and desktop'
         }
         
     except PerformancePage.DoesNotExist:
@@ -212,6 +280,22 @@ def check_scheduled_audits():
     for performance_page in performance_pages:
         try:
             with transaction.atomic():
+                # Check if we already have audits today
+                today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+                today_end = today_start + timedelta(days=1)
+                
+                existing_today = PerformanceHistory.objects.filter(
+                    performance_page=performance_page,
+                    created_at__gte=today_start,
+                    created_at__lt=today_end
+                ).exclude(status='failed').exists()
+                
+                if existing_today:
+                    # Already have audit for today, schedule for next period
+                    performance_page.schedule_next_audit()
+                    logger.info(f"Audit already exists for {performance_page.page_url} today, scheduling next period")
+                    continue
+                
                 # Check if we already have a schedule for this time
                 schedule, created = PerformanceSchedule.objects.get_or_create(
                     performance_page=performance_page,
@@ -220,20 +304,16 @@ def check_scheduled_audits():
                 )
                 
                 if created or not schedule.is_processed:
-                    # Create audit history entries for both desktop and mobile
-                    for device_type in ['desktop', 'mobile']:
-                        performance_history = PerformanceHistory.objects.create(
-                            performance_page=performance_page,
-                            trigger_type='scheduled',
-                            device_type=device_type,
-                            status='pending'
-                        )
-                        
-                        # Queue the audit
-                        task = run_lighthouse_audit.delay(str(performance_history.id), device_type)
-                        
-                        if device_type == 'desktop':
-                            schedule.task_id = task.id
+                    # Create a single combined audit history entry
+                    performance_history = PerformanceHistory.objects.create(
+                        performance_page=performance_page,
+                        trigger_type='scheduled',
+                        status='pending'
+                    )
+                    
+                    # Queue the combined audit
+                    task = run_lighthouse_audit.delay(str(performance_history.id))
+                    schedule.task_id = task.id
                     
                     # Mark schedule as processed
                     schedule.is_processed = True

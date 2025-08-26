@@ -1,3 +1,11 @@
+import os
+import django
+
+# Ensure Django is set up before importing Django modules
+if not os.environ.get('DJANGO_SETTINGS_MODULE'):
+    os.environ['DJANGO_SETTINGS_MODULE'] = 'limeclicks.settings'
+    django.setup()
+
 from django.test import TestCase, Client
 from django.contrib.auth import get_user_model
 from django.core.cache import cache

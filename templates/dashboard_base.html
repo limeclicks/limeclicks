@@ -214,9 +214,11 @@
                         <i class="fas fa-bars text-lg"></i>
                     </button>
                 </div>
+                
                 <div class="flex-1 px-2">
                     <span class="text-xl font-semibold">{% block page_title %}Dashboard{% endblock %}</span>
                 </div>
+                
                 <div class="flex-none gap-2 px-2">
                     <!-- Theme Toggle -->
                     <div class="dropdown dropdown-end">
@@ -467,6 +469,17 @@
                         </a>
                     </li>
                     
+                    <!-- On Page & Tech SEO -->
+                    <li class="menu-title pt-4">
+                        <span class="text-xs uppercase font-semibold text-base-content/60">On Page & Tech SEO</span>
+                    </li>
+                    <li>
+                        <a href="{% url 'site_audit:list' %}" class="flex items-center gap-3 {% if request.resolver_match.app_name == 'site_audit' %}active{% endif %}">
+                            <i class="fas fa-search-location w-4"></i>
+                            <span>Site Audit</span>
+                        </a>
+                    </li>
+                    
                     <!-- Collaboration -->
                     <li class="menu-title pt-4">
                         <span class="text-xs uppercase font-semibold text-base-content/60">Collaboration</span>
@@ -628,6 +641,8 @@
         // Sidebar functionality
         document.addEventListener('DOMContentLoaded', function() {
             const mainDrawer = document.getElementById('main-drawer');
+            
+            // Project search functionality is now handled in the component itself
             const sidebarToggle = document.getElementById('sidebar-toggle');
             const sidebarCollapseBtn = document.getElementById('sidebar-collapse-btn');
             const menuLinks = document.querySelectorAll('.drawer-side .menu a');

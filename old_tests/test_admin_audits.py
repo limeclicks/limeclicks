@@ -16,7 +16,16 @@ from site_audit.models import SiteAudit
 
 # Get admin user
 admin = User.objects.filter(is_superuser=True).first()
-print(f"Admin user: {admin.username} ({admin.email})")
+if admin:
+    print(f"Admin user: {admin.username} ({admin.email})")
+else:
+    print("No admin user found. Creating one...")
+    admin = User.objects.create_superuser(
+        username='admin',
+        email='admin@example.com',
+        password='admin123'
+    )
+    print(f"Created admin user: {admin.username} ({admin.email})")
 
 # Create a test project if it doesn't exist
 test_project, created = Project.objects.get_or_create(

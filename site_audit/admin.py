@@ -347,14 +347,14 @@ class SiteAuditAdmin(admin.ModelAdmin):
         # View History button
         buttons.append(format_html(
             '<a class="button" href="{}">View History</a>',
-            reverse('admin:site_audit_site_audithistory_changelist') + f'?audit__id__exact={obj.id}'
+            reverse('admin:site_audit_onpageperformancehistory_changelist') + f'?audit__id__exact={obj.id}'
         ))
         
         # Run Manual button (if allowed)
         if obj.can_run_manual_audit():
             buttons.append(format_html(
                 '<a class="button" href="{}">Run Manual</a>',
-                reverse('admin:site_audit_site_audit_run_manual', args=[obj.pk])
+                reverse('admin:site_audit_siteaudit_run_manual', args=[obj.pk])
             ))
         
         return format_html(' '.join(buttons))
@@ -367,7 +367,7 @@ class SiteAuditAdmin(admin.ModelAdmin):
             path(
                 '<int:pk>/run-manual/',
                 self.admin_site.admin_view(self.run_manual_audit_view),
-                name='site_audit_site_audit_run_manual'
+                name='site_audit_siteaudit_run_manual'
             ),
         ]
         return custom_urls + urls
@@ -383,7 +383,7 @@ class SiteAuditAdmin(admin.ModelAdmin):
             else:
                 messages.error(request, 'Failed to start manual audit')
         
-        return redirect('admin:site_audit_site_audit_changelist')
+        return redirect('admin:site_audit_siteaudit_changelist')
 
 
 @admin.register(OnPagePerformanceHistory)
@@ -553,7 +553,7 @@ class OnPagePerformanceHistoryAdmin(admin.ModelAdmin):
         # View issues link
         buttons.append(format_html(
             '<a class="button" href="{}">View Issues</a>',
-            reverse('admin:site_audit_onpageissue_changelist') + f'?performance_history__id__exact={obj.id}'
+            reverse('admin:site_audit_siteissue_changelist') + f'?performance_history__id__exact={obj.id}'
         ))
         
         return format_html(' '.join(buttons)) if buttons else '-'

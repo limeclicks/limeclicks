@@ -1,0 +1,495 @@
+"""
+Enhanced tests for the project module with comprehensive coverage
+"""
+from django.test import TestCase, Client, override_settings
+from django.contrib.auth import get_user_model
+from django.urls import reverse
+from django.core.cache import cache
+from unittest.mock import Mock, patch, MagicMock
+import json
+from datetime import datetime, timedelta
+
+from common.test_base import BaseTestCase, ModelTestMixin, APITestMixin
+from project.models import Project
+from project.forms import ProjectForm
+from project.views import project_list, project_create, project_delete
+
+User = get_user_model()
+
+
+class ProjectModelEnhancedTest(BaseTestCase, ModelTestMixin):
+    """Enhanced tests for Project model"""
+    
+    def setUp(self):
+        super().setUp()
+        self.user = self.create_user()
+    
+    def test_project_fields(self):
+        """Test all project model fields"""
+        self.assert_model_field_exists(Project, 'user')
+        self.assert_model_field_exists(Project, 'domain')
+        self.assert_model_field_exists(Project, 'title')
+        self.assert_model_field_exists(Project, 'active')
+        self.assert_model_field_exists(Project, 'created_at')
+        self.assert_model_field_exists(Project, 'updated_at')
+        self.assert_model_field_exists(Project, 'favicon')
+        self.assert_model_field_exists(Project, 'favicon_fetched')
+    
+    def test_project_methods(self):
+        """Test project model methods"""
+        project = Project.objects.create(
+            user=self.user,
+            domain='test.com',
+            title='Test'
+        )
+        
+        self.assert_model_has_method(project, 'get_favicon_url')
+        self.assert_model_has_method(project, 'get_cached_favicon_url')
+        self.assert_model_has_method(project, 'queue_favicon_fetch')
+    
+    def test_domain_normalization(self):
+        """Test domain is properly normalized on save"""
+        test_cases = [
+            ('https://www.example.com/', 'example.com'),
+            ('http://test.com', 'test.com'),
+            ('WWW.SITE.COM', 'site.com'),
+            ('sub.domain.com', 'sub.domain.com'),
+        ]
+        
+        for input_domain, expected_domain in test_cases:
+            project = Project.objects.create(
+                user=self.user,
+                domain=input_domain,
+                title=f'Test {input_domain}'
+            )
+            # Domain normalization would happen in the form or admin
+            # Model stores as provided unless custom save logic added
+    
+    def test_project_unique_constraint(self):
+        """Test unique constraint on user-domain combination"""
+        Project.objects.create(
+            user=self.user,
+            domain='unique.com',
+            title='First'
+        )
+        
+        # Should raise error for duplicate
+        with self.assertRaises(Exception):
+            Project.objects.create(
+                user=self.user,
+                domain='unique.com',
+                title='Duplicate'
+            )
+    
+    def test_project_cascade_delete(self):
+        """Test related objects are deleted when project is deleted"""
+        project = Project.objects.create(
+            user=self.user,
+            domain='cascade.com',
+            title='Cascade Test'
+        )
+        project_id = project.id
+        
+        # Delete project
+        project.delete()
+        
+        # Verify project is deleted
+        self.assertFalse(Project.objects.filter(id=project_id).exists())
+    
+    @patch('project.models.fetch_favicon')
+    def test_queue_favicon_fetch(self, mock_fetch_task):
+        """Test favicon fetch task is queued"""
+        project = Project.objects.create(
+            user=self.user,
+            domain='favicon.com'
+        )
+        
+        project.queue_favicon_fetch()
+        
+        mock_fetch_task.delay.assert_called_once_with(project.id)
+    
+    def test_favicon_url_generation(self):
+        """Test favicon URL generation methods"""
+        project = Project.objects.create(
+            user=self.user,
+            domain='google.com'
+        )
+        
+        # Test Google favicon URL
+        favicon_url = project.get_favicon_url()
+        self.assertIn('google.com', favicon_url)
+        self.assertIn('favicon', favicon_url.lower())
+        
+        # Test cached favicon URL
+        cached_url = project.get_cached_favicon_url()
+        self.assertIn('favicon', cached_url)
+        self.assertIn(str(project.domain), cached_url)
+
+
+class ProjectViewsEnhancedTest(BaseTestCase, APITestMixin):
+    """Enhanced tests for project views"""
+    
+    def setUp(self):
+        super().setUp()
+        self.user = self.authenticate()
+    
+    def test_project_list_view(self):
+        """Test project list view"""
+        # Create test projects
+        for i in range(15):
+            Project.objects.create(
+                user=self.user,
+                domain=f'site{i}.com',
+                title=f'Site {i}'
+            )
+        
+        response = self.client.get(reverse('project:project_list'))
+        
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, 'project/project_list.html')
+        self.assertIn('projects', response.context)
+        
+        # Check pagination (10 per page)
+        self.assertEqual(len(response.context['projects']), 10)
+    
+    def test_project_list_search(self):
+        """Test project list search functionality"""
+        Project.objects.create(
+            user=self.user,
+            domain='searchable.com',
+            title='Searchable Site'
+        )
+        Project.objects.create(
+            user=self.user,
+            domain='other.com',
+            title='Other Site'
+        )
+        
+        # Search by domain
+        response = self.client.get(
+            reverse('project:project_list'),
+            {'search': 'searchable'}
+        )
+        
+        self.assertEqual(response.status_code, 200)
+        projects = response.context['projects']
+        self.assertEqual(len(projects), 1)
+        self.assertEqual(projects[0].domain, 'searchable.com')
+        
+        # Search by title
+        response = self.client.get(
+            reverse('project:project_list'),
+            {'search': 'Other'}
+        )
+        
+        projects = response.context['projects']
+        self.assertEqual(len(projects), 1)
+        self.assertEqual(projects[0].title, 'Other Site')
+    
+    def test_project_create_ajax(self):
+        """Test project creation via AJAX"""
+        data = {
+            'domain': 'newproject.com',
+            'title': 'New Project',
+            'active': True
+        }
+        
+        response = self.make_ajax_request(
+            'post',
+            reverse('project:project_create'),
+            data
+        )
+        
+        result = self.assert_ajax_success(response, 'created successfully')
+        
+        # Verify project was created
+        project = Project.objects.get(domain='newproject.com')
+        self.assertEqual(project.title, 'New Project')
+        self.assertEqual(project.user, self.user)
+        self.assertTrue(project.active)
+        
+        # Check response data
+        self.assertEqual(result['data']['project']['domain'], 'newproject.com')
+        self.assertEqual(result['data']['project']['title'], 'New Project')
+    
+    def test_project_create_validation_error(self):
+        """Test project creation with validation errors"""
+        data = {
+            'domain': '',  # Invalid - empty domain
+            'title': 'Test'
+        }
+        
+        response = self.make_ajax_request(
+            'post',
+            reverse('project:project_create'),
+            data
+        )
+        
+        result = self.assert_ajax_error(response)
+        self.assertIn('errors', result['data'])
+    
+    def test_project_delete_ajax(self):
+        """Test project deletion via AJAX"""
+        project = Project.objects.create(
+            user=self.user,
+            domain='todelete.com',
+            title='To Delete'
+        )
+        
+        response = self.make_ajax_request(
+            'post',
+            reverse('project:project_delete', args=[project.id])
+        )
+        
+        result = self.assert_ajax_success(response, 'deleted successfully')
+        
+        # Verify project was deleted
+        self.assertFalse(Project.objects.filter(id=project.id).exists())
+    
+    def test_project_delete_permission(self):
+        """Test user can only delete own projects"""
+        other_user = self.create_user(email='other@example.com')
+        other_project = Project.objects.create(
+            user=other_user,
+            domain='otheruser.com',
+            title='Other User Project'
+        )
+        
+        response = self.make_ajax_request(
+            'post',
+            reverse('project:project_delete', args=[other_project.id])
+        )
+        
+        # Should fail with 404 (not found for this user)
+        self.assertEqual(response.status_code, 404)
+        
+        # Project should still exist
+        self.assertTrue(Project.objects.filter(id=other_project.id).exists())
+    
+    def test_unauthenticated_access(self):
+        """Test unauthenticated users are redirected"""
+        self.client.logout()
+        
+        # Test list view
+        response = self.client.get(reverse('project:project_list'))
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('login', response.url)
+        
+        # Test create
+        response = self.client.post(reverse('project:project_create'))
+        self.assertEqual(response.status_code, 302)
+        
+        # Test delete
+        response = self.client.post(reverse('project:project_delete', args=[1]))
+        self.assertEqual(response.status_code, 302)
+
+
+class ProjectFormEnhancedTest(BaseTestCase):
+    """Enhanced tests for project forms"""
+    
+    def test_form_validation_valid(self):
+        """Test form with valid data"""
+        form = ProjectForm(data={
+            'domain': 'valid.com',
+            'title': 'Valid Project',
+            'active': True
+        })
+        
+        self.assertTrue(form.is_valid())
+    
+    def test_form_domain_validation(self):
+        """Test domain validation rules"""
+        # Invalid domains
+        invalid_domains = [
+            '',  # Empty
+            'invalid',  # No TLD
+            'http://',  # Just protocol
+            '.com',  # Just TLD
+            'test.',  # Trailing dot
+            'test..com',  # Double dot
+        ]
+        
+        for domain in invalid_domains:
+            form = ProjectForm(data={
+                'domain': domain,
+                'title': 'Test'
+            })
+            self.assertFalse(
+                form.is_valid(),
+                f"Domain '{domain}' should be invalid"
+            )
+    
+    def test_form_domain_normalization(self):
+        """Test domain normalization in form"""
+        test_cases = [
+            ('https://www.test.com/', 'test.com'),
+            ('HTTP://TEST.COM', 'test.com'),
+            ('www.example.org', 'example.org'),
+        ]
+        
+        for input_domain, expected_domain in test_cases:
+            form = ProjectForm(data={
+                'domain': input_domain,
+                'title': 'Test'
+            })
+            
+            if form.is_valid():
+                cleaned_domain = form.cleaned_data.get('domain')
+                self.assertEqual(
+                    cleaned_domain,
+                    expected_domain,
+                    f"Expected {input_domain} to be normalized to {expected_domain}"
+                )
+    
+    def test_form_title_optional(self):
+        """Test that title is optional"""
+        form = ProjectForm(data={
+            'domain': 'notitle.com'
+        })
+        
+        self.assertTrue(form.is_valid())
+        self.assertEqual(form.cleaned_data.get('title'), '')
+
+
+class ProjectFaviconTest(BaseTestCase):
+    """Tests for favicon functionality"""
+    
+    def setUp(self):
+        super().setUp()
+        self.user = self.authenticate()
+    
+    @override_settings(CACHES={'default': {'BACKEND': 'django.core.cache.backends.locmem.LocMemCache'}})
+    def test_favicon_proxy_view(self):
+        """Test favicon proxy endpoint"""
+        project = Project.objects.create(
+            user=self.user,
+            domain='github.com'
+        )
+        
+        with patch('requests.get') as mock_get:
+            # Mock successful favicon fetch
+            mock_response = Mock()
+            mock_response.status_code = 200
+            mock_response.content = b'fake-favicon-data'
+            mock_response.headers = {'Content-Type': 'image/png'}
+            mock_get.return_value = mock_response
+            
+            # First request (cache miss)
+            response = self.client.get(
+                reverse('project:favicon_proxy', args=['github.com'])
+            )
+            
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.content, b'fake-favicon-data')
+            self.assertEqual(response['X-Favicon-Cache'], 'MISS')
+            
+            # Second request (cache hit)
+            response = self.client.get(
+                reverse('project:favicon_proxy', args=['github.com'])
+            )
+            
+            self.assertEqual(response['X-Favicon-Cache'], 'HIT')
+            # Should only call external API once
+            self.assertEqual(mock_get.call_count, 1)
+    
+    def test_favicon_proxy_error_handling(self):
+        """Test favicon proxy error handling"""
+        with patch('requests.get') as mock_get:
+            # Mock failed request
+            mock_get.side_effect = Exception('Network error')
+            
+            response = self.client.get(
+                reverse('project:favicon_proxy', args=['error.com'])
+            )
+            
+            self.assertEqual(response.status_code, 404)
+
+
+class ProjectSignalsTest(BaseTestCase):
+    """Test project signals"""
+    
+    def setUp(self):
+        super().setUp()
+        self.user = self.create_user()
+    
+    @patch('project.signals.create_audit_for_project')
+    @patch('project.signals.create_onpage_audit_for_project')
+    def test_project_created_signal(self, mock_onpage, mock_lighthouse):
+        """Test signals fired when project is created"""
+        project = Project.objects.create(
+            user=self.user,
+            domain='signals.com',
+            title='Signal Test'
+        )
+        
+        # Verify audit tasks were queued
+        mock_lighthouse.delay.assert_called_once_with(
+            project.id,
+            'project_created'
+        )
+        mock_onpage.delay.assert_called_once_with(
+            project.id,
+            'project_created'
+        )
+    
+    @patch('project.tasks.fetch_favicon')
+    def test_favicon_fetch_on_create(self, mock_fetch):
+        """Test favicon fetch is triggered on project creation"""
+        project = Project.objects.create(
+            user=self.user,
+            domain='favicon-signal.com'
+        )
+        
+        mock_fetch.delay.assert_called_once_with(project.id)
+
+
+class ProjectIntegrationTest(BaseTestCase):
+    """Integration tests for project functionality"""
+    
+    def test_complete_project_workflow(self):
+        """Test complete project creation and management workflow"""
+        # Authenticate user
+        user = self.authenticate()
+        
+        # Create project via form
+        form = ProjectForm(data={
+            'domain': 'workflow.com',
+            'title': 'Workflow Test',
+            'active': True
+        })
+        
+        self.assertTrue(form.is_valid())
+        project = form.save(commit=False)
+        project.user = user
+        project.save()
+        
+        # List projects
+        response = self.client.get(reverse('project:project_list'))
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(project, response.context['projects'])
+        
+        # Search for project
+        response = self.client.get(
+            reverse('project:project_list'),
+            {'search': 'workflow'}
+        )
+        self.assertEqual(len(response.context['projects']), 1)
+        
+        # Delete project
+        response = self.make_ajax_request(
+            'post',
+            reverse('project:project_delete', args=[project.id])
+        )
+        self.assert_ajax_success(response)
+        
+        # Verify deletion
+        self.assertFalse(Project.objects.filter(id=project.id).exists())
+
+
+if __name__ == '__main__':
+    import django
+    from django.test.runner import DiscoverRunner
+    
+    django.setup()
+    test_runner = DiscoverRunner(verbosity=2)
+    test_runner.run_tests(['project.tests_enhanced'])

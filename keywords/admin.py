@@ -42,6 +42,7 @@ class RankInline(TabularInline):
     verbose_name_plural = 'Rank History (Last 10)'
 
 
+
 @admin.register(Keyword)
 class KeywordAdmin(ModelAdmin):
     # Warn unfold config

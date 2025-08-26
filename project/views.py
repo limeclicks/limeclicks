@@ -12,6 +12,9 @@ import requests
 import hashlib
 from .models import Project
 from .forms import ProjectForm
+from common.utils import create_ajax_response, get_logger
+
+logger = get_logger(__name__)
 
 
 @login_required
@@ -51,33 +54,38 @@ def project_create(request):
             project.user = request.user
             project.save()  # This will trigger the signal to auto-queue audits
             
-            return JsonResponse({
-                'success': True,
-                'message': 'Project created successfully!',
-                'project': {
-                    'id': project.id,
-                    'domain': project.domain,
-                    'title': project.title or 'Untitled',
-                    'active': project.active,
-                    'created_at': project.created_at.strftime('%Y-%m-%d %H:%M:%S')
+            return create_ajax_response(
+                success=True,
+                message='Project created successfully!',
+                data={
+                    'project': {
+                        'id': project.id,
+                        'domain': project.domain,
+                        'title': project.title or 'Untitled',
+                        'active': project.active,
+                        'created_at': project.created_at.strftime('%Y-%m-%d %H:%M:%S')
+                    }
                 }
-            })
+            )
         else:
-            return JsonResponse({
-                'success': False,
-                'errors': form.errors
-            })
+            return create_ajax_response(
+                success=False,
+                message='Validation failed',
+                data={'errors': form.errors}
+            )
     
     except json.JSONDecodeError:
-        return JsonResponse({
-            'success': False,
-            'errors': {'__all__': ['Invalid JSON data']}
-        })
+        logger.error("Invalid JSON data in project_create")
+        return create_ajax_response(
+            success=False,
+            message='Invalid JSON data'
+        )
     except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'errors': {'__all__': [str(e)]}
-        })
+        logger.error(f"Error creating project: {str(e)}")
+        return create_ajax_response(
+            success=False,
+            message=str(e)
+        )
 
 
 @login_required
@@ -89,20 +97,20 @@ def project_delete(request, project_id):
         domain = project.domain
         project.delete()
         
-        return JsonResponse({
-            'success': True,
-            'message': f'Project {domain} deleted successfully!'
-        })
+        return create_ajax_response(
+            success=True,
+            message=f'Project {domain} deleted successfully!'
+        )
     except Project.DoesNotExist:
-        return JsonResponse({
-            'success': False,
-            'message': 'Project not found or you do not have permission to delete it.'
-        })
+        return create_ajax_response(
+            success=False,
+            message='Project not found or you do not have permission to delete it.'
+        )
     except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'message': str(e)
-        })
+        return create_ajax_response(
+            success=False,
+            message=str(e)
+        )
 
 
 
@@ -127,9 +135,9 @@ def project_toggle_active(request, project_id):
             'message': 'Project not found or you do not have permission to modify it.'
         })
     except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'message': str(e)
-        })
+        return create_ajax_response(
+            success=False,
+            message=str(e)
+        )
 
 

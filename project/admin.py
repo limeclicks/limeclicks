@@ -103,7 +103,7 @@ class PerformancePageInline(TabularInline):
         return format_html(
             '<a class="button" href="{}" style="padding:5px 10px;background:#007bff;color:white;'
             'text-decoration:none;border-radius:3px;">View History</a>',
-            reverse('admin:performance_audit_audithistory_changelist') + f'?performance_page__id__exact={obj.id}'
+            reverse('admin:performance_audit_performancehistory_changelist') + f'?performance_page__id__exact={obj.id}'
         )
     audit_actions.short_description = 'Actions'
     
@@ -153,7 +153,7 @@ class SiteAuditInline(TabularInline):
         return format_html(
             '<a class="button" href="{}" style="padding:5px 10px;background:#28a745;color:white;'
             'text-decoration:none;border-radius:3px;">View History</a>',
-            reverse('admin:site_audit_site_audithistory_changelist') + f'?audit__id__exact={obj.id}'
+            reverse('admin:site_audit_onpageperformancehistory_changelist') + f'?audit__id__exact={obj.id}'
         )
     audit_actions.short_description = 'Actions'
     
@@ -298,7 +298,7 @@ class ProjectAdmin(ModelAdmin):
                     summary.append(f'Accessibility: <strong>{latest.accessibility_score}</strong>')
                 summary.append('</p>')
             
-            summary.append(f'<a href="{reverse("admin:performance_audit_audithistory_changelist")}?performance_page__id__exact={performance_page.id}" '
+            summary.append(f'<a href="{reverse("admin:performance_audit_performancehistory_changelist")}?performance_page__id__exact={performance_page.id}" '
                           f'class="button" style="padding:5px 10px;background:#007bff;color:white;'
                           f'text-decoration:none;border-radius:3px;">View Lighthouse History</a>')
             summary.append('</div>')
@@ -327,7 +327,7 @@ class ProjectAdmin(ModelAdmin):
                 summary.append(f'<p>Pages crawled: <strong>{latest.pages_crawled}</strong></p>')
                 summary.append(f'<p>Total issues found: <strong>{latest.total_issues or 0}</strong></p>')
             
-            summary.append(f'<a href="{reverse("admin:site_audit_site_audithistory_changelist")}?audit__id__exact={site_audit.id}" '
+            summary.append(f'<a href="{reverse("admin:site_audit_onpageperformancehistory_changelist")}?audit__id__exact={site_audit.id}" '
                           f'class="button" style="padding:5px 10px;background:#28a745;color:white;'
                           f'text-decoration:none;border-radius:3px;">View OnPage History</a>')
             summary.append('</div>')

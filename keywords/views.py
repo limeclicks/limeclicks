@@ -2,8 +2,13 @@ from django.shortcuts import render, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
-from django.db.models import Count
+from django.db.models import Count, Q
+from django.utils import timezone
 from .models import Tag, Keyword, KeywordTag
+from .crawl_scheduler import CrawlScheduler
+from common.utils import create_ajax_response, get_logger
+
+logger = get_logger(__name__)
 
 
 @login_required
@@ -168,3 +173,153 @@ def api_untag_keyword(request, keyword_id, tag_id):
         'deleted': deleted_count > 0,
         'message': 'Tag removed successfully' if deleted_count > 0 else 'Tag was not associated with this keyword'
     })
+
+
+@login_required
+@require_http_methods(["POST"])
+def api_force_crawl(request, keyword_id):
+    """
+    Force crawl a keyword immediately (with rate limiting)
+    
+    User can only force crawl once per hour per keyword
+    """
+    try:
+        # Get keyword and ensure user owns it
+        keyword = Keyword.objects.get(
+            id=keyword_id,
+            project__user=request.user
+        )
+        
+        # Check if force crawl is allowed
+        if not keyword.can_force_crawl():
+            time_until_allowed = 60 - ((timezone.now() - keyword.last_force_crawl_at).total_seconds() / 60)
+            return create_ajax_response(
+                success=False,
+                message=f"Please wait {int(time_until_allowed)} minutes before force crawling again",
+                data={'minutes_remaining': int(time_until_allowed)}
+            )
+        
+        # Perform force crawl
+        scheduler = CrawlScheduler()
+        if scheduler.force_crawl_keyword(keyword):
+            return create_ajax_response(
+                success=True,
+                message="Force crawl initiated successfully",
+                data={
+                    'keyword_id': keyword.id,
+                    'keyword': keyword.keyword,
+                    'crawl_priority': keyword.crawl_priority,
+                    'force_crawl_count': keyword.force_crawl_count + 1
+                }
+            )
+        else:
+            return create_ajax_response(
+                success=False,
+                message="Unable to initiate force crawl. Please try again later."
+            )
+            
+    except Keyword.DoesNotExist:
+        return create_ajax_response(
+            success=False,
+            message="Keyword not found or you don't have permission"
+        )
+    except Exception as e:
+        logger.error(f"Error force crawling keyword {keyword_id}: {e}")
+        return create_ajax_response(
+            success=False,
+            message=str(e)
+        )
+
+
+@login_required
+@require_http_methods(["GET"])
+def api_crawl_status(request, keyword_id):
+    """Get the crawl status and schedule for a keyword"""
+    try:
+        keyword = Keyword.objects.get(
+            id=keyword_id,
+            project__user=request.user
+        )
+        
+        now = timezone.now()
+        
+        # Calculate time until next crawl
+        time_until_crawl = None
+        if keyword.next_crawl_at:
+            delta = keyword.next_crawl_at - now
+            time_until_crawl = max(0, delta.total_seconds())
+        
+        # Calculate time until force crawl allowed
+        time_until_force = 0
+        if keyword.last_force_crawl_at:
+            delta = (keyword.last_force_crawl_at + timezone.timedelta(hours=1)) - now
+            time_until_force = max(0, delta.total_seconds())
+        
+        return create_ajax_response(
+            success=True,
+            message="",
+            data={
+                'keyword_id': keyword.id,
+                'keyword': keyword.keyword,
+                'crawl_priority': keyword.crawl_priority,
+                'processing': keyword.processing,
+                'scraped_at': keyword.scraped_at.isoformat() if keyword.scraped_at else None,
+                'next_crawl_at': keyword.next_crawl_at.isoformat() if keyword.next_crawl_at else None,
+                'can_force_crawl': keyword.can_force_crawl(),
+                'force_crawl_count': keyword.force_crawl_count,
+                'time_until_crawl': time_until_crawl,
+                'time_until_force': time_until_force,
+                'crawl_interval_hours': keyword.crawl_interval_hours,
+                'should_crawl': keyword.should_crawl()
+            }
+        )
+        
+    except Keyword.DoesNotExist:
+        return create_ajax_response(
+            success=False,
+            message="Keyword not found or you don't have permission"
+        )
+
+
+@login_required  
+@require_http_methods(["GET"])
+def api_crawl_queue(request):
+    """Get the current crawl queue for user's keywords"""
+    try:
+        # Get user's keywords that are queued or processing
+        keywords = Keyword.objects.filter(
+            project__user=request.user
+        ).filter(
+            Q(processing=True) | Q(next_crawl_at__lte=timezone.now())
+        ).order_by(
+            '-crawl_priority',
+            'next_crawl_at'
+        )[:20]  # Limit to 20 for performance
+        
+        queue_data = []
+        for kw in keywords:
+            queue_data.append({
+                'id': kw.id,
+                'keyword': kw.keyword,
+                'project': kw.project.domain,
+                'priority': kw.crawl_priority,
+                'processing': kw.processing,
+                'next_crawl_at': kw.next_crawl_at.isoformat() if kw.next_crawl_at else None,
+                'scraped_at': kw.scraped_at.isoformat() if kw.scraped_at else None,
+            })
+        
+        return create_ajax_response(
+            success=True,
+            message="",
+            data={
+                'queue': queue_data,
+                'total': len(queue_data)
+            }
+        )
+        
+    except Exception as e:
+        logger.error(f"Error fetching crawl queue: {e}")
+        return create_ajax_response(
+            success=False,
+            message="Error fetching crawl queue"
+        )
