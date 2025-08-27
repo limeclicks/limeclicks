@@ -330,6 +330,7 @@ def site_audit_detail(request, audit_id):
     # Get all issues for detailed breakdown with severity counts
     all_issues = []
     critical_count = high_count = medium_count = low_count = info_count = 0
+    issue_types_with_counts = []
     
     if latest_history:
         # Create custom ordering for severity (critical -> info)
@@ -366,6 +367,35 @@ def site_audit_detail(request, audit_id):
                 low_count = item['count']
             elif item['severity'] == 'info':
                 info_count = item['count']
+        
+        # Get issue types with counts and descriptions
+        from site_audit.issue_templates import ISSUE_TEMPLATES
+        issue_type_counts = SiteIssue.objects.filter(
+            performance_history=latest_history
+        ).values('issue_type').annotate(count=Count('id')).order_by('-count')
+        
+        for item in issue_type_counts:
+            issue_type = item['issue_type']
+            template = ISSUE_TEMPLATES.get(issue_type, {})
+            
+            # Get the actual severity from the template or from actual issues
+            severity = template.get('severity', None)
+            if not severity:
+                # Fallback: get the most common severity for this issue type from actual issues
+                severity_item = SiteIssue.objects.filter(
+                    performance_history=latest_history,
+                    issue_type=issue_type
+                ).values('severity').annotate(count=Count('id')).order_by('-count').first()
+                severity = severity_item['severity'] if severity_item else 'info'
+            
+            issue_types_with_counts.append({
+                'issue_type': issue_type,
+                'count': item['count'],
+                'display_name': issue_type.replace('_', ' ').title(),
+                'description': template.get('description', f'Issues related to {issue_type.replace("_", " ")}'),
+                'impact': template.get('impact', ''),
+                'severity': severity,  # Add severity for coloring
+            })
     
     # Calculate improvements if there's previous history
     previous_history = OnPagePerformanceHistory.objects.filter(
@@ -414,6 +444,11 @@ def site_audit_detail(request, audit_id):
         'redirect_chains': audit.redirect_chains_count,
     }
     
+    # Get filter parameters to preserve them
+    severity_filter = request.GET.get('severity', '')
+    issue_type_filter = request.GET.get('issue_type', '')
+    search_query = request.GET.get('search', '')
+    
     # Handle HTMX tab requests
     tab = request.GET.get('tab', 'overview')
     if request.headers.get('HX-Request'):
@@ -440,9 +475,13 @@ def site_audit_detail(request, audit_id):
             'medium_count': medium_count,
             'low_count': low_count,
             'info_count': info_count,
+            'issue_types_with_counts': issue_types_with_counts,
             'has_more_issues': latest_history and SiteIssue.objects.filter(
                 performance_history=latest_history
             ).count() > 50,
+            'severity_filter': severity_filter,
+            'issue_type_filter': issue_type_filter,
+            'search_query': search_query,
         })
     
     return render(request, 'site_audit/site_audit_detail.html', {
@@ -461,9 +500,13 @@ def site_audit_detail(request, audit_id):
         'medium_count': medium_count,
         'low_count': low_count,
         'info_count': info_count,
+        'issue_types_with_counts': issue_types_with_counts,
         'has_more_issues': latest_history and SiteIssue.objects.filter(
             performance_history=latest_history
         ).count() > 50,
+        'severity_filter': severity_filter,
+        'issue_type_filter': issue_type_filter,
+        'search_query': search_query,
     })
 
 
@@ -514,11 +557,18 @@ def load_more_issues(request, audit_id):
     
     # Get page number from request
     page = int(request.GET.get('page', 1))
-    per_page = 50
+    
+    # Get per_page parameter with validation
+    try:
+        per_page = int(request.GET.get('per_page', 25))
+        if per_page not in [25, 50, 100]:
+            per_page = 25
+    except (ValueError, TypeError):
+        per_page = 25
     
     # Get filter parameters
     severity_filter = request.GET.get('severity', '')
-    category_filter = request.GET.get('category', '')
+    issue_type_filter = request.GET.get('issue_type', '')
     search_query = request.GET.get('search', '')
     
     # Get latest history
@@ -529,9 +579,10 @@ def load_more_issues(request, audit_id):
     
     if not latest_history:
         return render(request, 'site_audit/partials/_issues_content.html', {
-            'issues': [],
-            'has_next': False,
-            'has_prev': False,
+            'page_obj': None,
+            'audit': audit,
+            'per_page': per_page,
+            'total_issues': 0,
         })
     
     # Create custom ordering for severity
@@ -555,6 +606,9 @@ def load_more_issues(request, audit_id):
     if severity_filter:
         issues_query = issues_query.filter(severity=severity_filter)
     
+    if issue_type_filter:
+        issues_query = issues_query.filter(issue_type=issue_type_filter)
+    
     if search_query:
         issues_query = issues_query.filter(
             Q(page_url__icontains=search_query) |
@@ -567,6 +621,9 @@ def load_more_issues(request, audit_id):
         severity_order=severity_order
     ).order_by('severity_order', 'issue_type', 'page_url')
     
+    # Get total count for display
+    total_issues = issues_query.count()
+    
     # Paginate
     paginator = Paginator(issues_query, per_page)
     page_obj = paginator.get_page(page)
@@ -577,7 +634,10 @@ def load_more_issues(request, audit_id):
             'page_obj': page_obj,
             'audit': audit,
             'severity_filter': severity_filter,
+            'issue_type_filter': issue_type_filter,
             'search_query': search_query,
+            'per_page': per_page,
+            'total_issues': total_issues,
         })
     
     # For regular requests, return full response
@@ -585,7 +645,10 @@ def load_more_issues(request, audit_id):
         'page_obj': page_obj,
         'audit': audit,
         'severity_filter': severity_filter,
+        'issue_type_filter': issue_type_filter,
         'search_query': search_query,
+        'per_page': per_page,
+        'total_issues': total_issues,
     })
 
 @login_required

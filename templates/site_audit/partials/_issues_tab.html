@@ -88,17 +88,19 @@
                         <span class="label-text text-xs font-semibold">Severity Level</span>
                     </label>
                     <select name="severity" 
+                            id="severity-filter"
                             class="select select-bordered bg-base-100 shadow-sm hover:shadow-md transition-all"
                             hx-get="/site-audit/{{ audit.id }}/issues/load-more/"
                             hx-target="#issues-container"
                             hx-trigger="change"
-                            hx-indicator="#loading-spinner">
-                        <option value="">🔍 All Severities</option>
-                        <option value="critical">🔴 Critical Only</option>
-                        <option value="high">🟠 High Priority</option>
-                        <option value="medium">🟡 Medium Priority</option>
-                        <option value="low">🔵 Low Priority</option>
-                        <option value="info">ℹ️ Informational</option>
+                            hx-indicator="#loading-spinner"
+                            hx-include="[name='issue_type'], [name='search']">
+                        <option value="" {% if not severity_filter %}selected{% endif %}>All Severities</option>
+                        <option value="critical" {% if severity_filter == 'critical' %}selected{% endif %}>Critical Only</option>
+                        <option value="high" {% if severity_filter == 'high' %}selected{% endif %}>High Priority</option>
+                        <option value="medium" {% if severity_filter == 'medium' %}selected{% endif %}>Medium Priority</option>
+                        <option value="low" {% if severity_filter == 'low' %}selected{% endif %}>Low Priority</option>
+                        <option value="info" {% if severity_filter == 'info' %}selected{% endif %}>Informational</option>
                     </select>
                 </div>
                 
@@ -113,15 +115,84 @@
                         </span>
                         <input type="text" 
                                name="search"
+                               value="{{ search_query }}"
                                placeholder="Type to search issues, URLs, or descriptions..." 
                                class="input input-bordered bg-base-100 flex-1 shadow-sm hover:shadow-md transition-all"
                                hx-get="/site-audit/{{ audit.id }}/issues/load-more/"
                                hx-target="#issues-container"
                                hx-trigger="keyup changed delay:500ms"
                                hx-indicator="#loading-spinner"
-                               hx-include="[name='severity']">
+                               hx-include="[name='severity'], [name='issue_type']">
                     </div>
                 </div>
+            </div>
+            
+            <!-- Issue Type Tags -->
+            <div class="mt-6">
+                <label class="label">
+                    <span class="label-text text-xs font-semibold">Issue Types</span>
+                    <span class="label-text-alt text-xs">Click to filter by type</span>
+                </label>
+                <div class="flex flex-wrap gap-2" id="issue-type-tags">
+                    <!-- All Issues Tag -->
+                    <div class="tooltip" data-tip="Show all issue types">
+                        <button class="btn btn-sm btn-outline {% if not issue_type_filter %}btn-primary{% endif %}"
+                                data-issue-type=""
+                                data-severity=""
+                                {% if not issue_type_filter %}data-active="true"{% endif %}
+                                hx-get="/site-audit/{{ audit.id }}/issues/load-more/"
+                                hx-target="#issues-container"
+                                hx-trigger="click"
+                                hx-indicator="#loading-spinner"
+                                hx-include="[name='severity'], [name='search']"
+                                hx-vals='{"issue_type": ""}'>
+                            <i class="fas fa-list-alt mr-1"></i>
+                            All Issues
+                            <span class="badge {% if not issue_type_filter %}badge-primary{% else %}badge-ghost{% endif %} badge-sm ml-2">{{ audit.total_issues_count }}</span>
+                        </button>
+                    </div>
+                    
+                    {% for issue_type_data in issue_types_with_counts %}
+                    <div class="tooltip" data-tip="{{ issue_type_data.description }}">
+                        <button class="btn btn-sm btn-outline severity-{{ issue_type_data.severity }}{% if issue_type_filter == issue_type_data.issue_type %} active{% endif %}"
+                                data-issue-type="{{ issue_type_data.issue_type }}"
+                                data-severity="{{ issue_type_data.severity }}"
+                                {% if issue_type_filter == issue_type_data.issue_type %}data-active="true"{% endif %}
+                                hx-get="/site-audit/{{ audit.id }}/issues/load-more/"
+                                hx-target="#issues-container"
+                                hx-trigger="click"
+                                hx-indicator="#loading-spinner"
+                                hx-include="[name='severity'], [name='search']"
+                                hx-vals='{"issue_type": "{% if issue_type_filter == issue_type_data.issue_type %}{% else %}{{ issue_type_data.issue_type }}{% endif %}"}'>
+                            {% if 'title' in issue_type_data.issue_type %}
+                                <i class="fas fa-heading mr-1"></i>
+                            {% elif 'meta' in issue_type_data.issue_type %}
+                                <i class="fas fa-tags mr-1"></i>
+                            {% elif 'h1' in issue_type_data.issue_type %}
+                                <i class="fas fa-header mr-1"></i>
+                            {% elif 'content' in issue_type_data.issue_type %}
+                                <i class="fas fa-file-alt mr-1"></i>
+                            {% elif 'alt' in issue_type_data.issue_type or 'image' in issue_type_data.issue_type %}
+                                <i class="fas fa-image mr-1"></i>
+                            {% elif 'link' in issue_type_data.issue_type or '404' in issue_type_data.issue_type %}
+                                <i class="fas fa-link mr-1"></i>
+                            {% elif 'canonical' in issue_type_data.issue_type %}
+                                <i class="fas fa-code mr-1"></i>
+                            {% elif 'redirect' in issue_type_data.issue_type %}
+                                <i class="fas fa-directions mr-1"></i>
+                            {% elif 'structured' in issue_type_data.issue_type %}
+                                <i class="fas fa-database mr-1"></i>
+                            {% else %}
+                                <i class="fas fa-exclamation-circle mr-1"></i>
+                            {% endif %}
+                            {{ issue_type_data.display_name }}
+                            <span class="badge badge-ghost badge-sm ml-2">{{ issue_type_data.count }}</span>
+                        </button>
+                    </div>
+                    {% endfor %}
+                </div>
+                <!-- Hidden input to store current issue type filter -->
+                <input type="hidden" name="issue_type" id="issue-type-filter" value="{{ issue_type_filter }}">
             </div>
         </div>
     </div>
@@ -155,15 +226,15 @@
                                 <div class="flex-1">
                                     <div class="flex items-center gap-3 mb-2">
                                         {% if issue.severity == 'critical' %}
-                                            <span class="badge badge-error">🔴 Critical</span>
+                                            <span class="badge badge-error">Critical</span>
                                         {% elif issue.severity == 'high' %}
-                                            <span class="badge badge-warning">🟠 High</span>
+                                            <span class="badge badge-warning">High</span>
                                         {% elif issue.severity == 'medium' %}
-                                            <span class="badge badge-info">🟡 Medium</span>
+                                            <span class="badge badge-info">Medium</span>
                                         {% elif issue.severity == 'low' %}
-                                            <span class="badge badge-primary">🔵 Low</span>
+                                            <span class="badge badge-primary">Low</span>
                                         {% else %}
-                                            <span class="badge badge-ghost">ℹ️ Info</span>
+                                            <span class="badge badge-ghost">Info</span>
                                         {% endif %}
                                         <h4 class="text-lg font-bold">{{ issue.get_clean_display_name }}</h4>
                                     </div>
@@ -208,15 +279,73 @@
             {% endfor %}
         </div>
         
-        {% if has_more_issues %}
-        <div class="text-center mt-6">
-            <button class="btn btn-primary btn-sm"
-                    hx-get="/site-audit/{{ audit.id }}/issues/load-more/?page=2"
-                    hx-target="#issues-container"
-                    hx-swap="innerHTML"
-                    hx-indicator="#loading-spinner">
-                Load More Issues
-            </button>
+        <!-- Initial Pagination Controls -->
+        {% if all_issues|length >= 25 or audit.total_issues_count > 25 %}
+        <div class="card bg-white shadow-md mt-6">
+            <div class="card-body p-4">
+                <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                    <!-- Results Per Page Selector -->
+                    <div class="flex items-center gap-2">
+                        <span class="text-sm font-semibold">Show:</span>
+                        <select class="select select-bordered select-sm bg-white"
+                                hx-get="/site-audit/{{ audit.id }}/issues/load-more/"
+                                hx-target="#issues-container"
+                                hx-swap="innerHTML"
+                                hx-trigger="change"
+                                hx-include="[name='severity'], [name='search']"
+                                hx-indicator="#loading-spinner"
+                                name="per_page">
+                            <option value="25" selected>25 per page</option>
+                            <option value="50">50 per page</option>
+                            <option value="100">100 per page</option>
+                        </select>
+                        <span class="text-xs text-base-content/60">
+                            Showing 1-{{ all_issues|length|default:0 }} of {{ audit.total_issues_count }} issues
+                        </span>
+                    </div>
+                    
+                    <!-- Initial Page Navigation -->
+                    {% if audit.total_issues_count > 50 %}
+                    <div class="join">
+                        <button class="join-item btn btn-sm btn-disabled">
+                            <i class="fas fa-chevron-left"></i>
+                        </button>
+                        <button class="join-item btn btn-sm btn-primary">1</button>
+                        {% if audit.total_issues_count > 50 %}
+                        <button class="join-item btn btn-sm"
+                                hx-get="/site-audit/{{ audit.id }}/issues/load-more/?page=2"
+                                hx-target="#issues-container"
+                                hx-swap="innerHTML"
+                                hx-indicator="#loading-spinner">
+                            2
+                        </button>
+                        {% endif %}
+                        {% if audit.total_issues_count > 100 %}
+                        <button class="join-item btn btn-sm"
+                                hx-get="/site-audit/{{ audit.id }}/issues/load-more/?page=3"
+                                hx-target="#issues-container"
+                                hx-swap="innerHTML"
+                                hx-indicator="#loading-spinner">
+                            3
+                        </button>
+                        {% endif %}
+                        {% if audit.total_issues_count > 50 %}
+                        <button class="join-item btn btn-sm"
+                                hx-get="/site-audit/{{ audit.id }}/issues/load-more/?page=2"
+                                hx-target="#issues-container"
+                                hx-swap="innerHTML"
+                                hx-indicator="#loading-spinner">
+                            <i class="fas fa-chevron-right"></i>
+                        </button>
+                        {% else %}
+                        <button class="join-item btn btn-sm btn-disabled">
+                            <i class="fas fa-chevron-right"></i>
+                        </button>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
         </div>
         {% endif %}
         
@@ -244,11 +373,6 @@
     </div>
 </div>
 
-<script>
-function toggleResolution(issueId) {
-    const resolution = document.getElementById(`resolution-${issueId}`);
-    if (resolution) {
-        resolution.classList.toggle('hidden');
-    }
-}
-</script>
+<!-- JavaScript functions are defined in the main site_audit_detail.html page -->
+
+<!-- Styles are defined in the main site_audit_detail.html page -->

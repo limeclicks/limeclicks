@@ -3,6 +3,147 @@
 
 {% block page_title %}{{ audit.project.domain }} - Site Audit Details{% endblock %}
 
+{% block extra_css %}
+<style>
+/* HTMX Loading Indicator Styles */
+.htmx-indicator {
+    display: none;
+}
+
+.htmx-request .htmx-indicator,
+.htmx-request.htmx-indicator {
+    display: block;
+}
+
+/* Ensure proper animation for the loading indicator */
+#tab-loading {
+    transition: opacity 200ms ease-in-out;
+}
+
+#tab-loading.hidden {
+    display: none !important;
+}
+
+/* Modern Header Styling */
+.card {
+    transition: all 0.3s ease;
+}
+
+.card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+}
+
+/* Stats card hover effects */
+.stats:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+    transition: all 0.2s ease;
+}
+
+/* Animations */
+.animate-fadeIn {
+    animation: fadeIn 0.5s ease-in;
+}
+
+.animate-slideIn {
+    animation: slideInLeft 0.4s ease-out;
+}
+
+.animate-fadeInUp {
+    animation: fadeInUp 0.4s ease-out backwards;
+}
+
+/* Radial progress animation */
+.radial-progress {
+    animation: fadeIn 0.5s ease-in;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: scale(0.8);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* Improved button styling */
+.btn {
+    transition: all 0.2s ease;
+}
+
+.btn:active {
+    transform: scale(0.95);
+}
+
+/* Breadcrumb improvements */
+.breadcrumbs a {
+    position: relative;
+    transition: all 0.2s ease;
+}
+
+.breadcrumbs a:hover {
+    transform: translateX(2px);
+}
+
+/* Favicon container styling */
+.w-20.h-20 {
+    animation: slideInLeft 0.4s ease-out;
+}
+
+@keyframes slideInLeft {
+    from {
+        opacity: 0;
+        transform: translateX(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+/* Project title animation */
+h1 {
+    animation: slideInUp 0.4s ease-out;
+}
+
+@keyframes slideInUp {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Stats grid animation */
+.stats {
+    animation: fadeInUp 0.4s ease-out backwards;
+}
+
+.stats:nth-child(1) { animation-delay: 0.1s; }
+.stats:nth-child(2) { animation-delay: 0.2s; }
+.stats:nth-child(3) { animation-delay: 0.3s; }
+.stats:nth-child(4) { animation-delay: 0.4s; }
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="container mx-auto px-4 max-w-full 2xl:max-w-screen-2xl">
     <!-- In-Progress Notification -->
@@ -28,63 +169,145 @@
     </div>
     {% endif %}
     
-    <!-- Header -->
-    <div class="mb-6">
-        <!-- Breadcrumb -->
-        <div class="text-sm breadcrumbs mb-4">
+    <!-- Modern Header Section -->
+    <div class="mb-8">
+        <!-- Breadcrumb with improved styling -->
+        <div class="text-sm breadcrumbs mb-6">
             <ul>
-                <li><a href="{% url 'site_audit:list' %}" class="text-primary">Site Audits</a></li>
-                <li>{{ audit.project.domain }}</li>
+                <li>
+                    <a href="{% url 'site_audit:list' %}" class="text-primary hover:text-primary-focus transition-colors">
+                        <i class="fas fa-chart-line mr-1"></i>
+                        Site Audits
+                    </a>
+                </li>
+                <li class="font-medium">{{ audit.project.domain }}</li>
             </ul>
         </div>
         
-        <!-- Project Header -->
-        <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
-            <div class="flex items-center gap-4">
-                <div class="w-16 h-16 rounded-xl bg-base-200 flex items-center justify-center overflow-hidden">
-                    <img src="{{ audit.project.get_cached_favicon_url }}" alt="{{ audit.project.domain }}" class="w-full h-full object-cover" onerror="this.style.display='none'; this.parentElement.innerHTML='<i class=\'fas fa-globe text-2xl text-base-content/40\'></i>';">
-                </div>
-                <div>
-                    <h1 class="text-3xl font-bold text-base-content">{{ audit.project.domain }}</h1>
-                    <p class="text-base-content/60 mt-1">{{ audit.project.title|default:"Website Audit" }}</p>
-                    <div class="flex items-center gap-4 mt-2 text-sm">
-                        <span class="text-base-content/50">
-                            <i class="fas fa-clock mr-1"></i>
-                            Last audit: 
-                            {% if performance_data.performance_page.last_audit_date %}
-                                {{ performance_data.performance_page.last_audit_date|timesince }} ago
-                            {% elif audit.created_at %}
-                                {{ audit.created_at|timesince }} ago
-                            {% else %}
-                                Never
-                            {% endif %}
-                        </span>
-                        {% with health_score=audit.overall_site_health_score|default:0 %}
-                        <span class="badge {% if health_score >= 80 %}badge-success{% elif health_score >= 60 %}badge-warning{% else %}badge-error{% endif %} badge-lg">
-                            Health: {{ health_score|floatformat:0 }}%
-                        </span>
-                        {% endwith %}
+        <!-- Modern Project Header Card -->
+        <div class="card bg-gradient-to-r from-base-100 to-base-100/90 shadow-xl border border-base-300">
+            <div class="card-body p-6 lg:p-8">
+                <div class="flex flex-col lg:flex-row justify-between items-start gap-6">
+                    <!-- Left Section: Project Info -->
+                    <div class="flex items-start gap-5 flex-1">
+                        <!-- Favicon with modern styling -->
+                        <div class="relative animate-fadeIn">
+                            <div class="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary/10 to-primary/5 p-1 shadow-lg">
+                                <div class="w-full h-full rounded-xl bg-base-100 flex items-center justify-center overflow-hidden">
+                                    <img src="{{ audit.project.get_cached_favicon_url }}" 
+                                         alt="{{ audit.project.domain }}" 
+                                         class="w-full h-full object-cover" 
+                                         onerror="this.style.display='none'; this.parentElement.innerHTML='<i class=\'fas fa-globe text-3xl text-primary/60\'></i>';">
+                                </div>
+                            </div>
+                            <!-- Health Score Badge -->
+                            {% with health_score=audit.overall_site_health_score|default:0 %}
+                            <div class="absolute -bottom-2 -right-2">
+                                <div class="radial-progress {% if health_score >= 80 %}text-success{% elif health_score >= 60 %}text-warning{% else %}text-error{% endif %} bg-base-100 border-2 border-base-100 shadow-lg" 
+                                     style="--value:{{ health_score }}; --size:3rem; --thickness: 4px;">
+                                    <span class="text-xs font-bold">{{ health_score|floatformat:0 }}%</span>
+                                </div>
+                            </div>
+                            {% endwith %}
+                        </div>
+                        
+                        <!-- Project Details -->
+                        <div class="flex-1">
+                            <div class="flex items-start justify-between mb-2">
+                                <div>
+                                    <h1 class="text-2xl lg:text-3xl font-bold text-base-content mb-1">
+                                        {{ audit.project.domain }}
+                                    </h1>
+                                    <p class="text-base-content/70 text-sm lg:text-base">
+                                        {{ audit.project.title|default:"Website SEO Audit" }}
+                                    </p>
+                                </div>
+                            </div>
+                            
+                            <!-- Stats Grid -->
+                            <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-4">
+                                <!-- Last Audit -->
+                                <div class="stats shadow-sm bg-base-100 border border-base-200 animate-fadeInUp">
+                                    <div class="stat p-3">
+                                        <div class="stat-title text-xs flex items-center gap-1">
+                                            <i class="fas fa-clock text-primary"></i>
+                                            Last Audit
+                                        </div>
+                                        <div class="stat-value text-sm">
+                                            {% if performance_data.performance_page.last_audit_date %}
+                                                {{ performance_data.performance_page.last_audit_date|timesince|truncatewords:1 }}
+                                            {% elif audit.created_at %}
+                                                {{ audit.created_at|timesince|truncatewords:1 }}
+                                            {% else %}
+                                                Never
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Health Score -->
+                                <div class="stats shadow-sm bg-base-100 border border-base-200 animate-fadeInUp" style="animation-delay: 0.1s;">
+                                    <div class="stat p-3">
+                                        <div class="stat-title text-xs flex items-center gap-1">
+                                            <i class="fas fa-heartbeat text-error"></i>
+                                            Health Score
+                                        </div>
+                                        {% with health_score=audit.overall_site_health_score|default:0 %}
+                                        <div class="stat-value text-sm {% if health_score >= 80 %}text-success{% elif health_score >= 60 %}text-warning{% else %}text-error{% endif %}">
+                                            {{ health_score|floatformat:0 }}%
+                                        </div>
+                                        {% endwith %}
+                                    </div>
+                                </div>
+                                
+                                <!-- Total Issues -->
+                                <div class="stats shadow-sm bg-base-100 border border-base-200 animate-fadeInUp" style="animation-delay: 0.2s;">
+                                    <div class="stat p-3">
+                                        <div class="stat-title text-xs flex items-center gap-1">
+                                            <i class="fas fa-exclamation-triangle text-warning"></i>
+                                            Total Issues
+                                        </div>
+                                        <div class="stat-value text-sm {% if audit.total_issues_count == 0 %}text-success{% elif audit.total_issues_count < 10 %}text-warning{% else %}text-error{% endif %}">
+                                            {{ audit.total_issues_count|default:0 }}
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Pages Crawled -->
+                                <div class="stats shadow-sm bg-base-100 border border-base-200 animate-fadeInUp" style="animation-delay: 0.3s;">
+                                    <div class="stat p-3">
+                                        <div class="stat-title text-xs flex items-center gap-1">
+                                            <i class="fas fa-file-alt text-info"></i>
+                                            Pages Crawled
+                                        </div>
+                                        <div class="stat-value text-sm text-info">
+                                            {{ audit.total_pages_crawled|default:0 }}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Right Section: Actions -->
+                    <div class="flex flex-col gap-2 lg:ml-auto">
+                        <button class="btn btn-primary btn-sm gap-2"
+                                hx-post="{% url 'site_audit:run_manual' audit.id %}"
+                                hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+                                hx-confirm="Run a new audit for {{ audit.project.domain }}?"
+                                hx-indicator="#audit-spinner">
+                            <i class="fas fa-sync-alt"></i>
+                            <span>Run Manual Audit</span>
+                            <span class="htmx-indicator" id="audit-spinner">
+                                <span class="loading loading-spinner loading-xs"></span>
+                            </span>
+                        </button>
+                        <button class="btn btn-outline btn-sm gap-2">
+                            <i class="fas fa-download"></i>
+                            <span>Export Report</span>
+                        </button>
                     </div>
                 </div>
-            </div>
-            
-            <!-- Actions -->
-            <div class="flex gap-2">
-                <button class="btn btn-primary btn-sm"
-                        hx-post="{% url 'site_audit:run_manual' audit.id %}"
-                        hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
-                        hx-confirm="Run a new audit for {{ audit.project.domain }}?"
-                        hx-indicator="#audit-spinner">
-                    <i class="fas fa-sync-alt mr-2"></i>
-                    <span class="htmx-indicator" id="audit-spinner">
-                        <span class="loading loading-spinner loading-xs"></span>
-                    </span>
-                    Run Manual Audit
-                </button>
-                <button class="btn btn-ghost btn-sm">
-                    <i class="fas fa-download mr-2"></i>
-                    Export Report
-                </button>
             </div>
         </div>
     </div>
@@ -93,7 +316,7 @@
     <div class="tabs tabs-bordered tabs-lg">
         <button class="tab tab-active" 
                 id="overview-tab-btn"
-                hx-get="{% url 'site_audit:detail' audit.id %}?tab=overview"
+                hx-get="{% url 'site_audit:detail' audit.id %}?tab=overview&severity={{ severity_filter }}&issue_type={{ issue_type_filter }}&search={{ search_query|urlencode }}"
                 hx-target="#tab-content"
                 hx-push-url="false"
                 hx-indicator="#tab-loading">
@@ -102,7 +325,7 @@
         </button>
         <button class="tab" 
                 id="issues-tab-btn"
-                hx-get="{% url 'site_audit:detail' audit.id %}?tab=issues"
+                hx-get="{% url 'site_audit:detail' audit.id %}?tab=issues&severity={{ severity_filter }}&issue_type={{ issue_type_filter }}&search={{ search_query|urlencode }}"
                 hx-target="#tab-content"
                 hx-push-url="false"
                 hx-indicator="#tab-loading">
@@ -114,7 +337,7 @@
         </button>
         <button class="tab" 
                 id="performance-tab-btn"
-                hx-get="{% url 'site_audit:detail' audit.id %}?tab=performance"
+                hx-get="{% url 'site_audit:detail' audit.id %}?tab=performance&severity={{ severity_filter }}&issue_type={{ issue_type_filter }}&search={{ search_query|urlencode }}"
                 hx-target="#tab-content"
                 hx-push-url="false"
                 hx-indicator="#tab-loading">
@@ -123,17 +346,27 @@
         </button>
     </div>
     
-    <!-- Tab Content Container with no gap -->
-    <div class="bg-base-200/50" id="tab-content">
-        <div id="tab-loading" class="htmx-indicator text-center py-4">
-            <span class="loading loading-spinner loading-sm"></span>
+    <!-- Tab Content Container -->
+    <div class="bg-base-200/50 relative min-h-[400px]">
+        <!-- Tab Content -->
+        <div id="tab-content" class="relative">
+            <!-- Loading Indicator - Inline, not blocking -->
+            <div id="tab-loading" class="htmx-indicator hidden">
+                <div class="absolute top-4 right-4 z-20">
+                    <div class="bg-white shadow-lg rounded-lg p-3 flex items-center gap-2">
+                        <span class="loading loading-spinner loading-sm text-primary"></span>
+                        <span class="text-sm">Loading...</span>
+                    </div>
+                </div>
+            </div>
+            
+            {% include 'site_audit/partials/_overview_tab.html' %}
         </div>
-        {% include 'site_audit/partials/_overview_tab.html' %}
     </div>
 </div>
 
 <script>
-// Minimal JS - Only for tab active state management with HTMX
+// Tab active state management with HTMX
 document.body.addEventListener('htmx:afterRequest', function(event) {
     if (event.detail.target.id === 'tab-content') {
         // Update active tab styling
@@ -148,12 +381,23 @@ document.body.addEventListener('htmx:afterRequest', function(event) {
     }
 });
 
+// HTMX handles the indicator automatically with htmx-indicator class
+// No need for manual show/hide logic
+
 // Auto-refresh if audit is running
 {% if latest_history and latest_history.status in 'pending,running' %}
 setTimeout(function() {
     location.reload();
 }, 10000);
 {% endif %}
+
+// Global function for Issues tab resolution toggle
+window.toggleResolution = function(issueId) {
+    const resolution = document.getElementById(`resolution-${issueId}`);
+    if (resolution) {
+        resolution.classList.toggle('hidden');
+    }
+}
 </script>
 
 <style>
@@ -180,6 +424,77 @@ setTimeout(function() {
 .htmx-settling #tab-content {
     opacity: 0.6;
     transition: opacity 0.2s ease;
+}
+
+/* Severity-based button styles for issue type tags */
+.severity-critical {
+    border-color: hsl(var(--er)) !important;
+    color: hsl(var(--er)) !important;
+}
+.severity-critical:hover, .severity-critical.active {
+    background-color: hsl(var(--er)) !important;
+    border-color: hsl(var(--er)) !important;
+    color: hsl(var(--erc)) !important;
+}
+.severity-critical.active .badge {
+    background-color: hsl(var(--erc)) !important;
+    color: hsl(var(--er)) !important;
+}
+
+.severity-high {
+    border-color: hsl(var(--wa)) !important;
+    color: hsl(var(--wa)) !important;
+}
+.severity-high:hover, .severity-high.active {
+    background-color: hsl(var(--wa)) !important;
+    border-color: hsl(var(--wa)) !important;
+    color: hsl(var(--wac)) !important;
+}
+.severity-high.active .badge {
+    background-color: hsl(var(--wac)) !important;
+    color: hsl(var(--wa)) !important;
+}
+
+.severity-medium {
+    border-color: hsl(var(--in)) !important;
+    color: hsl(var(--in)) !important;
+}
+.severity-medium:hover, .severity-medium.active {
+    background-color: hsl(var(--in)) !important;
+    border-color: hsl(var(--in)) !important;
+    color: hsl(var(--inc)) !important;
+}
+.severity-medium.active .badge {
+    background-color: hsl(var(--inc)) !important;
+    color: hsl(var(--in)) !important;
+}
+
+.severity-low {
+    border-color: hsl(var(--p)) !important;
+    color: hsl(var(--p)) !important;
+}
+.severity-low:hover, .severity-low.active {
+    background-color: hsl(var(--p)) !important;
+    border-color: hsl(var(--p)) !important;
+    color: hsl(var(--pc)) !important;
+}
+.severity-low.active .badge {
+    background-color: hsl(var(--pc)) !important;
+    color: hsl(var(--p)) !important;
+}
+
+.severity-info {
+    border-color: hsl(var(--bc) / 0.3) !important;
+    color: hsl(var(--bc) / 0.7) !important;
+}
+.severity-info:hover, .severity-info.active {
+    background-color: hsl(var(--bc) / 0.2) !important;
+    border-color: hsl(var(--bc) / 0.5) !important;
+    color: hsl(var(--bc)) !important;
+}
+.severity-info.active .badge {
+    background-color: hsl(var(--bc)) !important;
+    color: hsl(var(--b1)) !important;
 }
 </style>
 {% endblock %}

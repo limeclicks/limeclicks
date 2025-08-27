@@ -29,88 +29,108 @@
                 {% endif %}
                 
                 <!-- Core Web Vitals -->
-                <div class="space-y-3">
-                    <div class="p-4 bg-base-100 rounded-lg border border-base-200 hover:shadow-sm transition-all">
-                        <div class="flex justify-between items-center">
-                            <div>
-                                <div class="text-sm font-medium flex items-center gap-1">
-                                    <i class="fas fa-image text-xs text-base-content/50"></i>
-                                    LCP
+                <div class="mb-4">
+                    <h4 class="text-sm font-semibold mb-3 text-base-content/80 uppercase tracking-wide">Core Web Vitals</h4>
+                    <div class="grid grid-cols-3 gap-3">
+                        <!-- LCP -->
+                        <div class="tooltip tooltip-top" data-tip="Largest Contentful Paint - Measures loading performance. Good: ≤2.5s, Needs Improvement: ≤4s, Poor: >4s">
+                            <div class="p-3 bg-base-100 rounded-lg border border-base-200 hover:shadow-sm transition-all cursor-help">
+                                <div class="text-center">
+                                    <i class="fas fa-image text-xs text-base-content/50 mb-1"></i>
+                                    {% with lcp=performance_data.mobile_audit.largest_contentful_paint %}
+                                    <div class="text-xl font-bold {% if lcp %}{% if lcp <= 2.5 %}text-success{% elif lcp <= 4 %}text-warning{% else %}text-error{% endif %}{% else %}text-base-content/30{% endif %}">
+                                        {% if lcp %}{{ lcp|floatformat:1 }}s{% else %}--{% endif %}
+                                    </div>
+                                    {% endwith %}
+                                    <div class="text-xs text-base-content/60">LCP</div>
                                 </div>
-                                <div class="text-xs text-base-content/60">Largest Contentful Paint</div>
                             </div>
-                            {% with lcp=performance_data.mobile_audit.largest_contentful_paint|default:0 %}
-                            {% if lcp %}
-                            <div class="text-lg font-bold {% if lcp <= 2.5 %}text-success{% elif lcp <= 4 %}text-warning{% else %}text-error{% endif %}">
-                                {{ lcp|floatformat:1 }}s
-                            </div>
-                            {% else %}
-                            <div class="text-lg font-bold text-base-content/30">--</div>
-                            {% endif %}
-                            {% endwith %}
                         </div>
-                    </div>
-                    
-                    <div class="p-4 bg-base-100 rounded-lg border border-base-200 hover:shadow-sm transition-all">
-                        <div class="flex justify-between items-center">
-                            <div>
-                                <div class="text-sm font-medium flex items-center gap-1">
-                                    <i class="fas fa-hand-pointer text-xs text-base-content/50"></i>
-                                    INP
+                        
+                        <!-- INP -->
+                        <div class="tooltip tooltip-top" data-tip="Interaction to Next Paint - Measures responsiveness. Good: ≤200ms, Needs Improvement: ≤500ms, Poor: >500ms">
+                            <div class="p-3 bg-base-100 rounded-lg border border-base-200 hover:shadow-sm transition-all cursor-help">
+                                <div class="text-center">
+                                    <i class="fas fa-hand-pointer text-xs text-base-content/50 mb-1"></i>
+                                    {% with inp=performance_data.mobile_audit.interaction_to_next_paint %}
+                                    <div class="text-xl font-bold {% if inp %}{% if inp <= 200 %}text-success{% elif inp <= 500 %}text-warning{% else %}text-error{% endif %}{% else %}text-base-content/30{% endif %}">
+                                        {% if inp %}{{ inp|floatformat:0 }}ms{% else %}--{% endif %}
+                                    </div>
+                                    {% endwith %}
+                                    <div class="text-xs text-base-content/60">INP</div>
                                 </div>
-                                <div class="text-xs text-base-content/60">Interaction to Next Paint</div>
                             </div>
-                            {% with inp=performance_data.mobile_audit.interaction_to_next_paint|default:0 %}
-                            {% if inp %}
-                            <div class="text-lg font-bold {% if inp <= 200 %}text-success{% elif inp <= 500 %}text-warning{% else %}text-error{% endif %}">
-                                {{ inp|floatformat:0 }}ms
-                            </div>
-                            {% else %}
-                            <div class="text-lg font-bold text-base-content/30">--</div>
-                            {% endif %}
-                            {% endwith %}
                         </div>
-                    </div>
-                    
-                    <div class="p-4 bg-base-100 rounded-lg border border-base-200 hover:shadow-sm transition-all">
-                        <div class="flex justify-between items-center">
-                            <div>
-                                <div class="text-sm font-medium flex items-center gap-1">
-                                    <i class="fas fa-arrows-alt text-xs text-base-content/50"></i>
-                                    CLS
+                        
+                        <!-- CLS -->
+                        <div class="tooltip tooltip-top" data-tip="Cumulative Layout Shift - Measures visual stability. Good: ≤0.1, Needs Improvement: ≤0.25, Poor: >0.25">
+                            <div class="p-3 bg-base-100 rounded-lg border border-base-200 hover:shadow-sm transition-all cursor-help">
+                                <div class="text-center">
+                                    <i class="fas fa-arrows-alt text-xs text-base-content/50 mb-1"></i>
+                                    {% with cls=performance_data.mobile_audit.cumulative_layout_shift %}
+                                    <div class="text-xl font-bold {% if cls is not None %}{% if cls == 0 or cls %}{% if cls <= 0.1 %}text-success{% elif cls <= 0.25 %}text-warning{% else %}text-error{% endif %}{% else %}text-base-content/30{% endif %}{% else %}text-base-content/30{% endif %}">
+                                        {% if cls is not None %}{% if cls == 0 or cls %}{{ cls|floatformat:2 }}{% else %}--{% endif %}{% else %}--{% endif %}
+                                    </div>
+                                    {% endwith %}
+                                    <div class="text-xs text-base-content/60">CLS</div>
                                 </div>
-                                <div class="text-xs text-base-content/60">Cumulative Layout Shift</div>
                             </div>
-                            {% with cls=performance_data.mobile_audit.cumulative_layout_shift|default:0 %}
-                            {% if cls or cls == 0 %}
-                            <div class="text-lg font-bold {% if cls <= 0.1 %}text-success{% elif cls <= 0.25 %}text-warning{% else %}text-error{% endif %}">
-                                {{ cls|floatformat:2 }}
-                            </div>
-                            {% else %}
-                            <div class="text-lg font-bold text-base-content/30">--</div>
-                            {% endif %}
-                            {% endwith %}
                         </div>
                     </div>
                 </div>
                 
                 <!-- Other Metrics -->
-                <div class="grid grid-cols-2 gap-3 mt-4">
-                    <div class="text-center p-2 bg-base-100 rounded-lg">
-                        <div class="text-lg font-bold">{{ performance_data.mobile_audit.first_contentful_paint|floatformat:1|default:"--" }}s</div>
-                        <div class="text-xs text-base-content/60">FCP</div>
-                    </div>
-                    <div class="text-center p-2 bg-base-100 rounded-lg">
-                        <div class="text-lg font-bold">{{ performance_data.mobile_audit.speed_index|floatformat:1|default:"--" }}s</div>
-                        <div class="text-xs text-base-content/60">Speed Index</div>
-                    </div>
-                    <div class="text-center p-2 bg-base-100 rounded-lg">
-                        <div class="text-lg font-bold">{{ performance_data.mobile_audit.time_to_interactive|floatformat:1|default:"--" }}s</div>
-                        <div class="text-xs text-base-content/60">TTI</div>
-                    </div>
-                    <div class="text-center p-2 bg-base-100 rounded-lg">
-                        <div class="text-lg font-bold">{{ performance_data.mobile_audit.total_blocking_time|floatformat:0|default:"--" }}ms</div>
-                        <div class="text-xs text-base-content/60">TBT</div>
+                <div class="mb-4">
+                    <h4 class="text-sm font-semibold mb-3 text-base-content/80 uppercase tracking-wide">Other Metrics</h4>
+                    <div class="grid grid-cols-4 gap-3">
+                        <div class="tooltip tooltip-top" data-tip="First Contentful Paint - When the first text or image is painted">
+                            <div class="p-3 bg-base-100 rounded-lg border border-base-200 hover:shadow-sm transition-all cursor-help">
+                                <div class="text-center">
+                                    {% with fcp=performance_data.mobile_audit.first_contentful_paint %}
+                                    <div class="text-lg font-bold {% if fcp %}{% if fcp <= 1.8 %}text-success{% elif fcp <= 3 %}text-warning{% else %}text-error{% endif %}{% else %}text-base-content/30{% endif %}">
+                                        {% if fcp %}{{ fcp|floatformat:1 }}s{% else %}--{% endif %}
+                                    </div>
+                                    {% endwith %}
+                                    <div class="text-xs text-base-content/60">FCP</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="tooltip tooltip-top" data-tip="Speed Index - How quickly content is visually displayed">
+                            <div class="p-3 bg-base-100 rounded-lg border border-base-200 hover:shadow-sm transition-all cursor-help">
+                                <div class="text-center">
+                                    {% with si=performance_data.mobile_audit.speed_index %}
+                                    <div class="text-lg font-bold {% if si %}{% if si <= 3.4 %}text-success{% elif si <= 5.8 %}text-warning{% else %}text-error{% endif %}{% else %}text-base-content/30{% endif %}">
+                                        {% if si %}{{ si|floatformat:1 }}s{% else %}--{% endif %}
+                                    </div>
+                                    {% endwith %}
+                                    <div class="text-xs text-base-content/60">SI</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="tooltip tooltip-top" data-tip="Time to Interactive - When the page becomes fully interactive">
+                            <div class="p-3 bg-base-100 rounded-lg border border-base-200 hover:shadow-sm transition-all cursor-help">
+                                <div class="text-center">
+                                    {% with tti=performance_data.mobile_audit.time_to_interactive %}
+                                    <div class="text-lg font-bold {% if tti %}{% if tti <= 3.8 %}text-success{% elif tti <= 7.3 %}text-warning{% else %}text-error{% endif %}{% else %}text-base-content/30{% endif %}">
+                                        {% if tti %}{{ tti|floatformat:1 }}s{% else %}--{% endif %}
+                                    </div>
+                                    {% endwith %}
+                                    <div class="text-xs text-base-content/60">TTI</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="tooltip tooltip-top" data-tip="Total Blocking Time - Time blocked by long tasks">
+                            <div class="p-3 bg-base-100 rounded-lg border border-base-200 hover:shadow-sm transition-all cursor-help">
+                                <div class="text-center">
+                                    {% with tbt=performance_data.mobile_audit.total_blocking_time %}
+                                    <div class="text-lg font-bold {% if tbt is not None and tbt != "" %}{% if tbt <= 200 %}text-success{% elif tbt <= 600 %}text-warning{% else %}text-error{% endif %}{% else %}text-base-content/30{% endif %}">
+                                        {% if tbt is not None and tbt != "" %}{{ tbt|floatformat:0 }}ms{% else %}--{% endif %}
+                                    </div>
+                                    {% endwith %}
+                                    <div class="text-xs text-base-content/60">TBT</div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -135,88 +155,108 @@
                 {% endif %}
                 
                 <!-- Core Web Vitals -->
-                <div class="space-y-3">
-                    <div class="p-4 bg-base-100 rounded-lg border border-base-200 hover:shadow-sm transition-all">
-                        <div class="flex justify-between items-center">
-                            <div>
-                                <div class="text-sm font-medium flex items-center gap-1">
-                                    <i class="fas fa-image text-xs text-base-content/50"></i>
-                                    LCP
+                <div class="mb-4">
+                    <h4 class="text-sm font-semibold mb-3 text-base-content/80 uppercase tracking-wide">Core Web Vitals</h4>
+                    <div class="grid grid-cols-3 gap-3">
+                        <!-- LCP -->
+                        <div class="tooltip tooltip-top" data-tip="Largest Contentful Paint - Measures loading performance. Good: ≤2.5s, Needs Improvement: ≤4s, Poor: >4s">
+                            <div class="p-3 bg-base-100 rounded-lg border border-base-200 hover:shadow-sm transition-all cursor-help">
+                                <div class="text-center">
+                                    <i class="fas fa-image text-xs text-base-content/50 mb-1"></i>
+                                    {% with lcp=performance_data.desktop_audit.largest_contentful_paint %}
+                                    <div class="text-xl font-bold {% if lcp %}{% if lcp <= 2.5 %}text-success{% elif lcp <= 4 %}text-warning{% else %}text-error{% endif %}{% else %}text-base-content/30{% endif %}">
+                                        {% if lcp %}{{ lcp|floatformat:1 }}s{% else %}--{% endif %}
+                                    </div>
+                                    {% endwith %}
+                                    <div class="text-xs text-base-content/60">LCP</div>
                                 </div>
-                                <div class="text-xs text-base-content/60">Largest Contentful Paint</div>
                             </div>
-                            {% with lcp=performance_data.desktop_audit.largest_contentful_paint|default:0 %}
-                            {% if lcp %}
-                            <div class="text-lg font-bold {% if lcp <= 2.5 %}text-success{% elif lcp <= 4 %}text-warning{% else %}text-error{% endif %}">
-                                {{ lcp|floatformat:1 }}s
-                            </div>
-                            {% else %}
-                            <div class="text-lg font-bold text-base-content/30">--</div>
-                            {% endif %}
-                            {% endwith %}
                         </div>
-                    </div>
-                    
-                    <div class="p-4 bg-base-100 rounded-lg border border-base-200 hover:shadow-sm transition-all">
-                        <div class="flex justify-between items-center">
-                            <div>
-                                <div class="text-sm font-medium flex items-center gap-1">
-                                    <i class="fas fa-hand-pointer text-xs text-base-content/50"></i>
-                                    INP
+                        
+                        <!-- INP -->
+                        <div class="tooltip tooltip-top" data-tip="Interaction to Next Paint - Measures responsiveness. Good: ≤200ms, Needs Improvement: ≤500ms, Poor: >500ms">
+                            <div class="p-3 bg-base-100 rounded-lg border border-base-200 hover:shadow-sm transition-all cursor-help">
+                                <div class="text-center">
+                                    <i class="fas fa-hand-pointer text-xs text-base-content/50 mb-1"></i>
+                                    {% with inp=performance_data.desktop_audit.interaction_to_next_paint %}
+                                    <div class="text-xl font-bold {% if inp %}{% if inp <= 200 %}text-success{% elif inp <= 500 %}text-warning{% else %}text-error{% endif %}{% else %}text-base-content/30{% endif %}">
+                                        {% if inp %}{{ inp|floatformat:0 }}ms{% else %}--{% endif %}
+                                    </div>
+                                    {% endwith %}
+                                    <div class="text-xs text-base-content/60">INP</div>
                                 </div>
-                                <div class="text-xs text-base-content/60">Interaction to Next Paint</div>
                             </div>
-                            {% with inp=performance_data.desktop_audit.interaction_to_next_paint|default:0 %}
-                            {% if inp %}
-                            <div class="text-lg font-bold {% if inp <= 200 %}text-success{% elif inp <= 500 %}text-warning{% else %}text-error{% endif %}">
-                                {{ inp|floatformat:0 }}ms
-                            </div>
-                            {% else %}
-                            <div class="text-lg font-bold text-base-content/30">--</div>
-                            {% endif %}
-                            {% endwith %}
                         </div>
-                    </div>
-                    
-                    <div class="p-4 bg-base-100 rounded-lg border border-base-200 hover:shadow-sm transition-all">
-                        <div class="flex justify-between items-center">
-                            <div>
-                                <div class="text-sm font-medium flex items-center gap-1">
-                                    <i class="fas fa-arrows-alt text-xs text-base-content/50"></i>
-                                    CLS
+                        
+                        <!-- CLS -->
+                        <div class="tooltip tooltip-top" data-tip="Cumulative Layout Shift - Measures visual stability. Good: ≤0.1, Needs Improvement: ≤0.25, Poor: >0.25">
+                            <div class="p-3 bg-base-100 rounded-lg border border-base-200 hover:shadow-sm transition-all cursor-help">
+                                <div class="text-center">
+                                    <i class="fas fa-arrows-alt text-xs text-base-content/50 mb-1"></i>
+                                    {% with cls=performance_data.desktop_audit.cumulative_layout_shift %}
+                                    <div class="text-xl font-bold {% if cls is not None %}{% if cls == 0 or cls %}{% if cls <= 0.1 %}text-success{% elif cls <= 0.25 %}text-warning{% else %}text-error{% endif %}{% else %}text-base-content/30{% endif %}{% else %}text-base-content/30{% endif %}">
+                                        {% if cls is not None %}{% if cls == 0 or cls %}{{ cls|floatformat:2 }}{% else %}--{% endif %}{% else %}--{% endif %}
+                                    </div>
+                                    {% endwith %}
+                                    <div class="text-xs text-base-content/60">CLS</div>
                                 </div>
-                                <div class="text-xs text-base-content/60">Cumulative Layout Shift</div>
                             </div>
-                            {% with cls=performance_data.desktop_audit.cumulative_layout_shift|default:0 %}
-                            {% if cls or cls == 0 %}
-                            <div class="text-lg font-bold {% if cls <= 0.1 %}text-success{% elif cls <= 0.25 %}text-warning{% else %}text-error{% endif %}">
-                                {{ cls|floatformat:2 }}
-                            </div>
-                            {% else %}
-                            <div class="text-lg font-bold text-base-content/30">--</div>
-                            {% endif %}
-                            {% endwith %}
                         </div>
                     </div>
                 </div>
                 
                 <!-- Other Metrics -->
-                <div class="grid grid-cols-2 gap-3 mt-4">
-                    <div class="text-center p-2 bg-base-100 rounded-lg">
-                        <div class="text-lg font-bold">{{ performance_data.desktop_audit.first_contentful_paint|floatformat:1|default:"--" }}s</div>
-                        <div class="text-xs text-base-content/60">FCP</div>
-                    </div>
-                    <div class="text-center p-2 bg-base-100 rounded-lg">
-                        <div class="text-lg font-bold">{{ performance_data.desktop_audit.speed_index|floatformat:1|default:"--" }}s</div>
-                        <div class="text-xs text-base-content/60">Speed Index</div>
-                    </div>
-                    <div class="text-center p-2 bg-base-100 rounded-lg">
-                        <div class="text-lg font-bold">{{ performance_data.desktop_audit.time_to_interactive|floatformat:1|default:"--" }}s</div>
-                        <div class="text-xs text-base-content/60">TTI</div>
-                    </div>
-                    <div class="text-center p-2 bg-base-100 rounded-lg">
-                        <div class="text-lg font-bold">{{ performance_data.desktop_audit.total_blocking_time|floatformat:0|default:"--" }}ms</div>
-                        <div class="text-xs text-base-content/60">TBT</div>
+                <div class="mb-4">
+                    <h4 class="text-sm font-semibold mb-3 text-base-content/80 uppercase tracking-wide">Other Metrics</h4>
+                    <div class="grid grid-cols-4 gap-3">
+                        <div class="tooltip tooltip-top" data-tip="First Contentful Paint - When the first text or image is painted">
+                            <div class="p-3 bg-base-100 rounded-lg border border-base-200 hover:shadow-sm transition-all cursor-help">
+                                <div class="text-center">
+                                    {% with fcp=performance_data.desktop_audit.first_contentful_paint %}
+                                    <div class="text-lg font-bold {% if fcp %}{% if fcp <= 1.8 %}text-success{% elif fcp <= 3 %}text-warning{% else %}text-error{% endif %}{% else %}text-base-content/30{% endif %}">
+                                        {% if fcp %}{{ fcp|floatformat:1 }}s{% else %}--{% endif %}
+                                    </div>
+                                    {% endwith %}
+                                    <div class="text-xs text-base-content/60">FCP</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="tooltip tooltip-top" data-tip="Speed Index - How quickly content is visually displayed">
+                            <div class="p-3 bg-base-100 rounded-lg border border-base-200 hover:shadow-sm transition-all cursor-help">
+                                <div class="text-center">
+                                    {% with si=performance_data.desktop_audit.speed_index %}
+                                    <div class="text-lg font-bold {% if si %}{% if si <= 3.4 %}text-success{% elif si <= 5.8 %}text-warning{% else %}text-error{% endif %}{% else %}text-base-content/30{% endif %}">
+                                        {% if si %}{{ si|floatformat:1 }}s{% else %}--{% endif %}
+                                    </div>
+                                    {% endwith %}
+                                    <div class="text-xs text-base-content/60">SI</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="tooltip tooltip-top" data-tip="Time to Interactive - When the page becomes fully interactive">
+                            <div class="p-3 bg-base-100 rounded-lg border border-base-200 hover:shadow-sm transition-all cursor-help">
+                                <div class="text-center">
+                                    {% with tti=performance_data.desktop_audit.time_to_interactive %}
+                                    <div class="text-lg font-bold {% if tti %}{% if tti <= 3.8 %}text-success{% elif tti <= 7.3 %}text-warning{% else %}text-error{% endif %}{% else %}text-base-content/30{% endif %}">
+                                        {% if tti %}{{ tti|floatformat:1 }}s{% else %}--{% endif %}
+                                    </div>
+                                    {% endwith %}
+                                    <div class="text-xs text-base-content/60">TTI</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="tooltip tooltip-top" data-tip="Total Blocking Time - Time blocked by long tasks">
+                            <div class="p-3 bg-base-100 rounded-lg border border-base-200 hover:shadow-sm transition-all cursor-help">
+                                <div class="text-center">
+                                    {% with tbt=performance_data.desktop_audit.total_blocking_time %}
+                                    <div class="text-lg font-bold {% if tbt is not None and tbt != "" %}{% if tbt <= 200 %}text-success{% elif tbt <= 600 %}text-warning{% else %}text-error{% endif %}{% else %}text-base-content/30{% endif %}">
+                                        {% if tbt is not None and tbt != "" %}{{ tbt|floatformat:0 }}ms{% else %}--{% endif %}
+                                    </div>
+                                    {% endwith %}
+                                    <div class="text-xs text-base-content/60">TBT</div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -224,67 +264,66 @@
     </div>
     
     <!-- Additional Scores -->
-    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <!-- SEO Score -->
-        <div class="card bg-white shadow-md hover:shadow-lg transition-shadow">
-            <div class="card-body p-5">
-                <div class="flex flex-col items-center text-center">
-                    <div class="w-14 h-14 rounded-full bg-success/20 flex items-center justify-center mb-3">
-                        <i class="fas fa-search text-xl text-success"></i>
+    <div class="mb-6">
+        <h3 class="text-lg font-bold mb-4">Additional Scores</h3>
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <!-- SEO Score -->
+            <div class="tooltip tooltip-top" data-tip="Search Engine Optimization - Ensures your page is optimized for search engine results ranking">
+                <div class="p-4 bg-white rounded-lg border border-base-200 shadow-md hover:shadow-lg transition-all cursor-help">
+                    <div class="text-center">
+                        <i class="fas fa-search text-2xl mb-2 {% if performance_data.desktop_audit.seo_score >= 90 %}text-success{% elif performance_data.desktop_audit.seo_score >= 50 %}text-warning{% else %}text-error{% endif %}"></i>
+                        {% with seo=performance_data.desktop_audit.seo_score %}
+                        <div class="text-3xl font-bold {% if seo %}{% if seo >= 90 %}text-success{% elif seo >= 50 %}text-warning{% else %}text-error{% endif %}{% else %}text-base-content/30{% endif %}">
+                            {% if seo %}{{ seo }}{% else %}--{% endif %}
+                        </div>
+                        {% endwith %}
+                        <div class="text-xs text-base-content/60 mt-1">SEO</div>
                     </div>
-                    <h4 class="text-xs font-semibold text-base-content/60 mb-1">SEO Score</h4>
-                    <div class="text-2xl font-bold text-success">{{ performance_data.desktop_audit.seo_score|default:"--" }}</div>
-                    {% if performance_data.desktop_audit.seo_score %}
-                    <progress class="progress progress-success h-1 mt-2 w-full" value="{{ performance_data.desktop_audit.seo_score }}" max="100"></progress>
-                    {% endif %}
                 </div>
             </div>
-        </div>
-        
-        <!-- Accessibility Score -->
-        <div class="card bg-white shadow-md hover:shadow-lg transition-shadow">
-            <div class="card-body p-4">
-                <div class="flex flex-col items-center text-center">
-                    <div class="w-10 h-10 rounded-full bg-info/10 flex items-center justify-center mb-2">
-                        <i class="fas fa-universal-access text-lg text-info"></i>
+            
+            <!-- Accessibility Score -->
+            <div class="tooltip tooltip-top" data-tip="Accessibility - Checks if your page can be used by people with disabilities or impairments">
+                <div class="p-4 bg-white rounded-lg border border-base-200 shadow-md hover:shadow-lg transition-all cursor-help">
+                    <div class="text-center">
+                        <i class="fas fa-universal-access text-2xl mb-2 {% if performance_data.desktop_audit.accessibility_score >= 90 %}text-success{% elif performance_data.desktop_audit.accessibility_score >= 50 %}text-warning{% else %}text-error{% endif %}"></i>
+                        {% with acc=performance_data.desktop_audit.accessibility_score %}
+                        <div class="text-3xl font-bold {% if acc %}{% if acc >= 90 %}text-success{% elif acc >= 50 %}text-warning{% else %}text-error{% endif %}{% else %}text-base-content/30{% endif %}">
+                            {% if acc %}{{ acc }}{% else %}--{% endif %}
+                        </div>
+                        {% endwith %}
+                        <div class="text-xs text-base-content/60 mt-1">Accessibility</div>
                     </div>
-                    <h4 class="text-xs font-semibold text-base-content/60 mb-1">Accessibility</h4>
-                    <div class="text-2xl font-bold text-info">{{ performance_data.desktop_audit.accessibility_score|default:"--" }}</div>
-                    {% if performance_data.desktop_audit.accessibility_score %}
-                    <progress class="progress progress-info h-1 mt-2 w-full" value="{{ performance_data.desktop_audit.accessibility_score }}" max="100"></progress>
-                    {% endif %}
                 </div>
             </div>
-        </div>
-        
-        <!-- Best Practices -->
-        <div class="card bg-white shadow-md hover:shadow-lg transition-shadow">
-            <div class="card-body p-4">
-                <div class="flex flex-col items-center text-center">
-                    <div class="w-10 h-10 rounded-full bg-warning/10 flex items-center justify-center mb-2">
-                        <i class="fas fa-shield-alt text-lg text-warning"></i>
+            
+            <!-- Best Practices -->
+            <div class="tooltip tooltip-top" data-tip="Best Practices - Checks for web development best practices like HTTPS, no console errors, etc.">
+                <div class="p-4 bg-white rounded-lg border border-base-200 shadow-md hover:shadow-lg transition-all cursor-help">
+                    <div class="text-center">
+                        <i class="fas fa-shield-alt text-2xl mb-2 {% if performance_data.desktop_audit.best_practices_score >= 90 %}text-success{% elif performance_data.desktop_audit.best_practices_score >= 50 %}text-warning{% else %}text-error{% endif %}"></i>
+                        {% with bp=performance_data.desktop_audit.best_practices_score %}
+                        <div class="text-3xl font-bold {% if bp %}{% if bp >= 90 %}text-success{% elif bp >= 50 %}text-warning{% else %}text-error{% endif %}{% else %}text-base-content/30{% endif %}">
+                            {% if bp %}{{ bp }}{% else %}--{% endif %}
+                        </div>
+                        {% endwith %}
+                        <div class="text-xs text-base-content/60 mt-1">Best Practices</div>
                     </div>
-                    <h4 class="text-xs font-semibold text-base-content/60 mb-1">Best Practices</h4>
-                    <div class="text-2xl font-bold text-warning">{{ performance_data.desktop_audit.best_practices_score|default:"--" }}</div>
-                    {% if performance_data.desktop_audit.best_practices_score %}
-                    <progress class="progress progress-warning h-1 mt-2 w-full" value="{{ performance_data.desktop_audit.best_practices_score }}" max="100"></progress>
-                    {% endif %}
                 </div>
             </div>
-        </div>
-        
-        <!-- PWA Score -->
-        <div class="card bg-white shadow-md hover:shadow-lg transition-shadow">
-            <div class="card-body p-4">
-                <div class="flex flex-col items-center text-center">
-                    <div class="w-10 h-10 rounded-full bg-secondary/10 flex items-center justify-center mb-2">
-                        <i class="fas fa-rocket text-lg text-secondary"></i>
+            
+            <!-- PWA Score -->
+            <div class="tooltip tooltip-top" data-tip="Progressive Web App - Checks if your site meets the standards for a progressive web application">
+                <div class="p-4 bg-white rounded-lg border border-base-200 shadow-md hover:shadow-lg transition-all cursor-help">
+                    <div class="text-center">
+                        <i class="fas fa-rocket text-2xl mb-2 {% if performance_data.desktop_audit.pwa_score >= 90 %}text-success{% elif performance_data.desktop_audit.pwa_score >= 50 %}text-warning{% else %}text-error{% endif %}"></i>
+                        {% with pwa=performance_data.desktop_audit.pwa_score %}
+                        <div class="text-3xl font-bold {% if pwa %}{% if pwa >= 90 %}text-success{% elif pwa >= 50 %}text-warning{% else %}text-error{% endif %}{% else %}text-base-content/30{% endif %}">
+                            {% if pwa %}{{ pwa }}{% else %}--{% endif %}
+                        </div>
+                        {% endwith %}
+                        <div class="text-xs text-base-content/60 mt-1">PWA</div>
                     </div>
-                    <h4 class="text-xs font-semibold text-base-content/60 mb-1">PWA</h4>
-                    <div class="text-2xl font-bold text-secondary">{{ performance_data.desktop_audit.pwa_score|default:"--" }}</div>
-                    {% if performance_data.desktop_audit.pwa_score %}
-                    <progress class="progress progress-secondary h-1 mt-2 w-full" value="{{ performance_data.desktop_audit.pwa_score }}" max="100"></progress>
-                    {% endif %}
                 </div>
             </div>
         </div>
