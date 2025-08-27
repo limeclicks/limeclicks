@@ -396,6 +396,10 @@ def site_audit_detail(request, audit_id):
                 'impact': template.get('impact', ''),
                 'severity': severity,  # Add severity for coloring
             })
+        
+        # Sort issue types by severity (critical -> high -> medium -> low -> info), then by count
+        severity_priority = {'critical': 1, 'high': 2, 'medium': 3, 'low': 4, 'info': 5}
+        issue_types_with_counts.sort(key=lambda x: (severity_priority.get(x['severity'], 6), -x['count']))
     
     # Calculate improvements if there's previous history
     previous_history = OnPagePerformanceHistory.objects.filter(

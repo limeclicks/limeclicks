@@ -221,19 +221,22 @@ h1 {
                     
                     <!-- Center Section: Stats Tags -->
                     <div class="flex flex-wrap gap-2 items-center">
-                        <!-- Last Audit Tag -->
-                        <div class="badge badge-ghost gap-1 py-2.5 px-2.5">
-                            <i class="fas fa-clock text-[10px] opacity-60"></i>
-                            <span class="text-xs">Last Audit</span>
-                            <span class="font-semibold text-xs">
-                                {% if performance_data.performance_page.last_audit_date %}
-                                    {{ performance_data.performance_page.last_audit_date|timesince|truncatewords:1 }} ago
-                                {% elif audit.created_at %}
-                                    {{ audit.created_at|timesince|truncatewords:1 }} ago
-                                {% else %}
-                                    Never
-                                {% endif %}
-                            </span>
+                        <!-- Last Audit Tag with Tooltip -->
+                        <div class="tooltip" 
+                             data-tip="{% if performance_data.performance_page.last_audit_date %}Last audit: {{ performance_data.performance_page.last_audit_date|date:'M d, Y g:i A' }}{% elif audit.created_at %}Created: {{ audit.created_at|date:'M d, Y g:i A' }}{% else %}No audit data available{% endif %}">
+                            <div class="badge badge-ghost gap-1 py-2.5 px-2.5">
+                                <i class="fas fa-clock text-[10px] opacity-60"></i>
+                                <span class="text-xs">Last Audit</span>
+                                <span class="font-semibold text-xs">
+                                    {% if performance_data.performance_page.last_audit_date %}
+                                        {{ performance_data.performance_page.last_audit_date|timesince|truncatewords:1 }} ago
+                                    {% elif audit.created_at %}
+                                        {{ audit.created_at|timesince|truncatewords:1 }} ago
+                                    {% else %}
+                                        Never
+                                    {% endif %}
+                                </span>
+                            </div>
                         </div>
                         
                         <!-- Health Score Tag -->
