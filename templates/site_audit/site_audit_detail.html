@@ -169,14 +169,14 @@ h1 {
     </div>
     {% endif %}
     
-    <!-- Modern Header Section -->
-    <div class="mb-8">
+    <!-- Compact Header Section -->
+    <div class="mb-4">
         <!-- Breadcrumb with improved styling -->
-        <div class="text-sm breadcrumbs mb-6">
+        <div class="text-sm breadcrumbs mb-3">
             <ul>
                 <li>
                     <a href="{% url 'site_audit:list' %}" class="text-primary hover:text-primary-focus transition-colors">
-                        <i class="fas fa-chart-line mr-1"></i>
+                        <i class="fas fa-chart-line mr-1 text-xs"></i>
                         Site Audits
                     </a>
                 </li>
@@ -184,127 +184,98 @@ h1 {
             </ul>
         </div>
         
-        <!-- Modern Project Header Card -->
-        <div class="card bg-gradient-to-r from-base-100 to-base-100/90 shadow-xl border border-base-300">
-            <div class="card-body p-6 lg:p-8">
-                <div class="flex flex-col lg:flex-row justify-between items-start gap-6">
-                    <!-- Left Section: Project Info -->
-                    <div class="flex items-start gap-5 flex-1">
-                        <!-- Favicon with modern styling -->
-                        <div class="relative animate-fadeIn">
-                            <div class="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary/10 to-primary/5 p-1 shadow-lg">
-                                <div class="w-full h-full rounded-xl bg-base-100 flex items-center justify-center overflow-hidden">
-                                    <img src="{{ audit.project.get_cached_favicon_url }}" 
-                                         alt="{{ audit.project.domain }}" 
-                                         class="w-full h-full object-cover" 
-                                         onerror="this.style.display='none'; this.parentElement.innerHTML='<i class=\'fas fa-globe text-3xl text-primary/60\'></i>';">
-                                </div>
+        <!-- Compact Header Card with Tags -->
+        <div class="card bg-white shadow-md">
+            <div class="card-body py-3 px-4">
+                <div class="flex flex-col lg:flex-row gap-3 items-center justify-between">
+                    <!-- Left Section: Favicon and Title -->
+                    <div class="flex items-center gap-3">
+                        <!-- Favicon with health score -->
+                        <div class="relative">
+                            <div class="w-12 h-12 rounded-lg bg-base-200 flex items-center justify-center overflow-hidden">
+                                <img src="{{ audit.project.get_cached_favicon_url }}" 
+                                     alt="{{ audit.project.domain }}" 
+                                     class="w-8 h-8 object-contain" 
+                                     onerror="this.style.display='none'; this.parentElement.innerHTML='<i class=\'fas fa-globe text-xl text-base-content/40\'></i>';">
                             </div>
                             <!-- Health Score Badge -->
                             {% with health_score=audit.overall_site_health_score|default:0 %}
-                            <div class="absolute -bottom-2 -right-2">
-                                <div class="radial-progress {% if health_score >= 80 %}text-success{% elif health_score >= 60 %}text-warning{% else %}text-error{% endif %} bg-base-100 border-2 border-base-100 shadow-lg" 
-                                     style="--value:{{ health_score }}; --size:3rem; --thickness: 4px;">
-                                    <span class="text-xs font-bold">{{ health_score|floatformat:0 }}%</span>
+                            <div class="absolute -bottom-1 -right-1">
+                                <div class="badge {% if health_score >= 80 %}badge-success{% elif health_score >= 60 %}badge-warning{% else %}badge-error{% endif %} badge-xs font-bold">
+                                    {{ health_score|floatformat:0 }}%
                                 </div>
                             </div>
                             {% endwith %}
                         </div>
                         
                         <!-- Project Details -->
-                        <div class="flex-1">
-                            <div class="flex items-start justify-between mb-2">
-                                <div>
-                                    <h1 class="text-2xl lg:text-3xl font-bold text-base-content mb-1">
-                                        {{ audit.project.domain }}
-                                    </h1>
-                                    <p class="text-base-content/70 text-sm lg:text-base">
-                                        {{ audit.project.title|default:"Website SEO Audit" }}
-                                    </p>
-                                </div>
-                            </div>
-                            
-                            <!-- Stats Grid -->
-                            <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-4">
-                                <!-- Last Audit -->
-                                <div class="stats shadow-sm bg-base-100 border border-base-200 animate-fadeInUp">
-                                    <div class="stat p-3">
-                                        <div class="stat-title text-xs flex items-center gap-1">
-                                            <i class="fas fa-clock text-primary"></i>
-                                            Last Audit
-                                        </div>
-                                        <div class="stat-value text-sm">
-                                            {% if performance_data.performance_page.last_audit_date %}
-                                                {{ performance_data.performance_page.last_audit_date|timesince|truncatewords:1 }}
-                                            {% elif audit.created_at %}
-                                                {{ audit.created_at|timesince|truncatewords:1 }}
-                                            {% else %}
-                                                Never
-                                            {% endif %}
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <!-- Health Score -->
-                                <div class="stats shadow-sm bg-base-100 border border-base-200 animate-fadeInUp" style="animation-delay: 0.1s;">
-                                    <div class="stat p-3">
-                                        <div class="stat-title text-xs flex items-center gap-1">
-                                            <i class="fas fa-heartbeat text-error"></i>
-                                            Health Score
-                                        </div>
-                                        {% with health_score=audit.overall_site_health_score|default:0 %}
-                                        <div class="stat-value text-sm {% if health_score >= 80 %}text-success{% elif health_score >= 60 %}text-warning{% else %}text-error{% endif %}">
-                                            {{ health_score|floatformat:0 }}%
-                                        </div>
-                                        {% endwith %}
-                                    </div>
-                                </div>
-                                
-                                <!-- Total Issues -->
-                                <div class="stats shadow-sm bg-base-100 border border-base-200 animate-fadeInUp" style="animation-delay: 0.2s;">
-                                    <div class="stat p-3">
-                                        <div class="stat-title text-xs flex items-center gap-1">
-                                            <i class="fas fa-exclamation-triangle text-warning"></i>
-                                            Total Issues
-                                        </div>
-                                        <div class="stat-value text-sm {% if audit.total_issues_count == 0 %}text-success{% elif audit.total_issues_count < 10 %}text-warning{% else %}text-error{% endif %}">
-                                            {{ audit.total_issues_count|default:0 }}
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <!-- Pages Crawled -->
-                                <div class="stats shadow-sm bg-base-100 border border-base-200 animate-fadeInUp" style="animation-delay: 0.3s;">
-                                    <div class="stat p-3">
-                                        <div class="stat-title text-xs flex items-center gap-1">
-                                            <i class="fas fa-file-alt text-info"></i>
-                                            Pages Crawled
-                                        </div>
-                                        <div class="stat-value text-sm text-info">
-                                            {{ audit.total_pages_crawled|default:0 }}
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
+                        <div>
+                            <h1 class="text-lg font-bold text-base-content">
+                                {{ audit.project.domain }}
+                            </h1>
+                            <p class="text-xs text-base-content/60">
+                                {{ audit.project.title|default:"Website SEO Audit" }}
+                            </p>
+                        </div>
+                    </div>
+                    
+                    <!-- Center Section: Stats Tags -->
+                    <div class="flex flex-wrap gap-2 items-center">
+                        <!-- Last Audit Tag -->
+                        <div class="badge badge-ghost gap-1 py-2.5 px-2.5">
+                            <i class="fas fa-clock text-[10px] opacity-60"></i>
+                            <span class="text-xs">Last Audit</span>
+                            <span class="font-semibold text-xs">
+                                {% if performance_data.performance_page.last_audit_date %}
+                                    {{ performance_data.performance_page.last_audit_date|timesince|truncatewords:1 }} ago
+                                {% elif audit.created_at %}
+                                    {{ audit.created_at|timesince|truncatewords:1 }} ago
+                                {% else %}
+                                    Never
+                                {% endif %}
+                            </span>
+                        </div>
+                        
+                        <!-- Health Score Tag -->
+                        {% with health_score=audit.overall_site_health_score|default:0 %}
+                        <div class="badge gap-1 py-2.5 px-2.5 {% if health_score >= 80 %}badge-success{% elif health_score >= 60 %}badge-warning{% else %}badge-error{% endif %}">
+                            <i class="fas fa-heartbeat text-[10px]"></i>
+                            <span class="text-xs">Health Score</span>
+                            <span class="font-bold text-xs">{{ health_score|floatformat:0 }}%</span>
+                        </div>
+                        {% endwith %}
+                        
+                        <!-- Total Issues Tag -->
+                        <div class="badge gap-1 py-2.5 px-2.5 {% if audit.total_issues_count == 0 %}badge-success{% elif audit.total_issues_count < 10 %}badge-warning{% else %}badge-error{% endif %}">
+                            <i class="fas fa-exclamation-triangle text-[10px]"></i>
+                            <span class="text-xs">Total Issues</span>
+                            <span class="font-bold text-xs">{{ audit.total_issues_count|default:0 }}</span>
+                        </div>
+                        
+                        <!-- Pages Crawled Tag -->
+                        <div class="badge badge-info gap-1 py-2.5 px-2.5">
+                            <i class="fas fa-file-alt text-[10px]"></i>
+                            <span class="text-xs">Pages Crawled</span>
+                            <span class="font-bold text-xs">{{ audit.total_pages_crawled|default:0 }}</span>
                         </div>
                     </div>
                     
                     <!-- Right Section: Actions -->
-                    <div class="flex flex-col gap-2 lg:ml-auto">
-                        <button class="btn btn-primary btn-sm gap-2"
+                    <div class="flex gap-2">
+                        <button class="btn btn-primary btn-sm"
                                 hx-post="{% url 'site_audit:run_manual' audit.id %}"
                                 hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
                                 hx-confirm="Run a new audit for {{ audit.project.domain }}?"
                                 hx-indicator="#audit-spinner">
-                            <i class="fas fa-sync-alt"></i>
-                            <span>Run Manual Audit</span>
+                            <i class="fas fa-sync-alt text-xs"></i>
+                            <span class="hidden sm:inline text-xs">Run Manual Audit</span>
                             <span class="htmx-indicator" id="audit-spinner">
                                 <span class="loading loading-spinner loading-xs"></span>
                             </span>
                         </button>
-                        <button class="btn btn-outline btn-sm gap-2">
-                            <i class="fas fa-download"></i>
-                            <span>Export Report</span>
+                        <button class="btn btn-ghost btn-sm">
+                            <i class="fas fa-download text-xs"></i>
+                            <span class="hidden sm:inline text-xs">Export Report</span>
                         </button>
                     </div>
                 </div>
