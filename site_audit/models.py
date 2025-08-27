@@ -99,8 +99,8 @@ class SiteAudit(models.Model):
         help_text="Enable/disable automatic audits"
     )
     max_pages_to_crawl = models.IntegerField(
-        default=500,
-        help_text="Maximum pages to crawl per audit"
+        default=5000,
+        help_text="Maximum pages to crawl per audit (subscription-based limit)"
     )
     
     # Rate limiting

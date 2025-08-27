@@ -1,5 +1,18 @@
 <!-- Issues Tab - Clean Professional Design -->
 <div class="p-6 space-y-6">
+    <!-- Scanning Status Alert -->
+    {% if is_audit_running %}
+    <div class="alert alert-info shadow-sm">
+        <div class="flex items-center gap-3">
+            <span class="loading loading-spinner loading-md text-info"></span>
+            <div>
+                <div class="font-bold">Scanning in Progress</div>
+                <div class="text-sm opacity-75">Site audit is currently running. Results will update automatically when complete.</div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
     <!-- Issues Summary Stats - Beautiful Cards -->
     <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
         <div class="card bg-white shadow-md hover:shadow-lg transition-shadow border border-error/20">
@@ -350,8 +363,21 @@
         {% endif %}
         
         {% else %}
-        <div class="card bg-white shadow-lg border-2 border-success/20">
+        <div class="card bg-white shadow-lg {% if is_audit_running %}border-2 border-info/20{% else %}border-2 border-success/20{% endif %}">
             <div class="card-body text-center py-16">
+                {% if is_audit_running %}
+                <div class="w-24 h-24 mx-auto mb-6 rounded-full bg-gradient-to-br from-info/20 to-info/10 flex items-center justify-center shadow-lg">
+                    <span class="loading loading-spinner loading-lg text-info"></span>
+                </div>
+                <h3 class="text-2xl font-bold mb-3 text-info">Scanning Your Site...</h3>
+                <p class="text-base-content/70 text-lg">Please wait while we analyze your site for SEO issues.</p>
+                <div class="mt-6">
+                    <div class="badge badge-info badge-lg gap-2">
+                        <i class="fas fa-search"></i>
+                        In Progress
+                    </div>
+                </div>
+                {% else %}
                 <div class="w-24 h-24 mx-auto mb-6 rounded-full bg-gradient-to-br from-success/20 to-success/10 flex items-center justify-center shadow-lg">
                     <i class="fas fa-trophy text-4xl text-success animate-bounce"></i>
                 </div>
@@ -363,6 +389,7 @@
                         All Clear
                     </div>
                 </div>
+                {% endif %}
             </div>
         </div>
         {% endif %}

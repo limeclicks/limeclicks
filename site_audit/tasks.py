@@ -14,7 +14,14 @@ from .screaming_frog import ScreamingFrogCLI, ScreamingFrogService
 logger = get_task_logger(__name__)
 
 
-@shared_task(bind=True, max_retries=3, default_retry_delay=300)
+@shared_task(
+    bind=True, 
+    max_retries=5,  # Increased to 5 retries like performance audit
+    default_retry_delay=180,  # 3 minutes default delay
+    rate_limit='30/h',  # 30 audits per hour globally for stability
+    time_limit=1800,  # 30 minute timeout for crawling
+    soft_time_limit=1680  # 28 minute soft timeout
+)
 def run_site_audit(self, performance_history_id: str):
     """
     Run a comprehensive on-page SEO audit using Screaming Frog
@@ -32,54 +39,102 @@ def run_site_audit(self, performance_history_id: str):
         performance_history.started_at = timezone.now()
         performance_history.save(update_fields=['status', 'started_at'])
         
-        logger.info(f"Starting on-page audit for {project.domain}")
+        logger.info(f"Starting on-page audit for {project.domain} (attempt {self.request.retries + 1}/{self.max_retries + 1})")
         
-        # Check license status
+        # Check license status - but use audit's configured limit regardless
         license_obj = ScreamingFrogLicense.objects.first()
         if not license_obj or license_obj.is_expired():
-            logger.warning("Screaming Frog license expired or not found, using free version")
-            max_pages = 500
+            logger.warning("Screaming Frog license expired or not found - using free tier limit")
+            # Use the audit's configured limit (max 5000 for our needs)
+            max_pages = min(audit.max_pages_to_crawl, 5000)
+            logger.info(f"Using limit: {max_pages} pages")
         else:
-            max_pages = min(audit.max_pages_to_crawl, license_obj.max_urls or 500)
+            # With license, still respect audit's configured limit
+            max_pages = min(audit.max_pages_to_crawl, license_obj.max_urls or audit.max_pages_to_crawl, 5000)
+            logger.info(f"License found. Using limit: {max_pages} pages")
         
         # Initialize Screaming Frog CLI
         sf_cli = ScreamingFrogCLI()
         
-        # Prepare URL
-        url = project.domain
-        if not url.startswith(('http://', 'https://')):
-            url = f'https://{url}'
+        # Check if Screaming Frog is installed
+        if not sf_cli.is_installed():
+            error_msg = (
+                "Screaming Frog SEO Spider is not installed or not accessible. "
+                "Please ensure it's installed and available in the system PATH. "
+                "Installation guide: https://www.screamingfrog.co.uk/seo-spider/installation/"
+            )
+            logger.error(error_msg)
+            # Don't retry if not installed
+            performance_history.status = 'failed'
+            performance_history.error_message = error_msg
+            performance_history.completed_at = timezone.now()
+            performance_history.save(update_fields=['status', 'error_message', 'completed_at'])
+            return {'success': False, 'error': error_msg}
         
-        # Configure crawl
+        # Prepare URL with better validation
+        url = project.domain.strip()
+        
+        # Remove any trailing slashes
+        url = url.rstrip('/')
+        
+        # Add protocol if missing
+        if not url.startswith(('http://', 'https://')):
+            # Try HTTPS first
+            url = f'https://{url}'
+            logger.info(f"Added HTTPS protocol to URL: {url}")
+        
+        # Configure crawl with more robust settings
         config = {
             'follow_redirects': True,
             'crawl_subdomains': False,
-            'check_spelling': True,
-            'crawl_depth': performance_history.crawl_depth
+            'check_spelling': False,  # Disable spelling check to reduce failures
+            'crawl_depth': performance_history.crawl_depth or 10  # Default depth of 10
         }
         
-        # Run crawl
+        logger.info(f"Running crawl for {url} with max_pages={max_pages}")
+        
+        # Run crawl with retries
         success, output_dir, error = sf_cli.crawl_website(url, max_pages, config)
         
         if not success:
-            raise Exception(error or "Crawl failed with unknown error")
+            # Log detailed error
+            logger.error(f"Screaming Frog crawl failed for {url}: {error}")
+            
+            # Check if it's a connection error and retry with HTTP
+            if 'connection' in str(error).lower() and url.startswith('https://'):
+                http_url = url.replace('https://', 'http://')
+                logger.info(f"Retrying with HTTP: {http_url}")
+                success, output_dir, error = sf_cli.crawl_website(http_url, max_pages, config)
+            
+            # If still failing, record the error and fail properly
+            if not success:
+                error_msg = f"Screaming Frog crawl failed: {error}"
+                logger.error(error_msg)
+                
+                # Update the performance history with error details
+                performance_history.error_message = error_msg
+                performance_history.save(update_fields=['error_message'])
+                
+                # Raise exception to trigger retry logic
+                raise Exception(error_msg)
         
-        # Parse results
+        # Parse Screaming Frog results
         results = sf_cli.parse_crawl_results(output_dir)
+        results['crawler_used'] = 'screaming_frog'
         
         # Save summary data
         performance_history.summary_data = results['summary']
         performance_history.pages_crawled = results['pages_crawled']
         performance_history.issues_summary = {
-            'broken_links': results['summary']['broken_links'],
-            'redirect_chains': results['summary']['redirect_chains'],
-            'missing_titles': results['summary']['missing_titles'],
-            'duplicate_titles': results['summary']['duplicate_titles'],
-            'missing_meta_descriptions': results['summary']['missing_meta_descriptions'],
-            'duplicate_meta_descriptions': results['summary']['duplicate_meta_descriptions'],
-            'blocked_by_robots': results['summary']['blocked_by_robots'],
-            'missing_hreflang': results['summary']['missing_hreflang'],
-            'total_issues': results['summary']['total_issues']
+            'broken_links': results['summary'].get('broken_links', 0),
+            'redirect_chains': results['summary'].get('redirect_chains', 0),
+            'missing_titles': results['summary'].get('missing_titles', 0),
+            'duplicate_titles': results['summary'].get('duplicate_titles', 0),
+            'missing_meta_descriptions': results['summary'].get('missing_meta_descriptions', 0),
+            'duplicate_meta_descriptions': results['summary'].get('duplicate_meta_descriptions', 0),
+            'blocked_by_robots': results['summary'].get('blocked_by_robots', 0),
+            'missing_hreflang': results['summary'].get('missing_hreflang', 0),
+            'total_issues': results['summary'].get('total_issues', 0)
         }
         
         # Compare with previous audit
@@ -130,10 +185,14 @@ def run_site_audit(self, performance_history_id: str):
         if performance_history.trigger_type == 'scheduled':
             audit.schedule_next_audit()
         
-        # Cleanup temporary files
-        sf_cli.cleanup()
+        # Cleanup temporary files if using Screaming Frog
+        if results.get('crawler_used') == 'screaming_frog':
+            try:
+                sf_cli.cleanup()
+            except Exception as e:
+                logger.warning(f"Error cleaning up temporary files: {e}")
         
-        logger.info(f"Successfully completed on-page audit for {project.domain}")
+        logger.info(f"Successfully completed on-page audit for {project.domain} using {results.get('crawler_used', 'unknown')} crawler")
         
         return {
             'success': True,
@@ -147,24 +206,36 @@ def run_site_audit(self, performance_history_id: str):
         return {'success': False, 'error': 'Audit history not found'}
         
     except Exception as e:
-        logger.error(f"Error running on-page audit: {str(e)}")
+        error_msg = str(e)
+        logger.error(f"Error running on-page audit: {error_msg}")
         
         # Update audit history with error
         try:
             performance_history = OnPagePerformanceHistory.objects.get(id=performance_history_id)
-            performance_history.status = 'failed'
-            performance_history.error_message = str(e)
-            performance_history.retry_count += 1
-            performance_history.save()
-        except:
-            pass
+            performance_history.retry_count = self.request.retries
+            
+            # If we're going to retry, keep status as running
+            if self.request.retries < self.max_retries:
+                performance_history.error_message = f"Attempt {self.request.retries + 1} failed: {error_msg}"
+                performance_history.save(update_fields=['retry_count', 'error_message'])
+            else:
+                # Final failure
+                performance_history.status = 'failed'
+                performance_history.error_message = f"Final failure after {self.max_retries + 1} attempts: {error_msg}"
+                performance_history.completed_at = timezone.now()
+                performance_history.save(update_fields=['status', 'error_message', 'retry_count', 'completed_at'])
+        except Exception as save_error:
+            logger.error(f"Failed to update performance history: {save_error}")
         
-        # Retry if we haven't exceeded max retries
+        # Retry with progressive backoff if we haven't exceeded max retries
         if self.request.retries < self.max_retries:
-            logger.info(f"Retrying audit (attempt {self.request.retries + 1}/{self.max_retries})")
-            raise self.retry(exc=e, countdown=300 * (self.request.retries + 1))
+            # Progressive backoff: 3, 6, 9, 12, 15 minutes
+            retry_delay = 180 * (self.request.retries + 1)
+            logger.info(f"Retrying audit (attempt {self.request.retries + 2}/{self.max_retries + 1}) in {retry_delay} seconds")
+            raise self.retry(exc=e, countdown=retry_delay)
         
-        return {'success': False, 'error': str(e)}
+        logger.error(f"Site audit failed after {self.max_retries + 1} attempts")
+        return {'success': False, 'error': error_msg}
 
 
 def _save_individual_issues(performance_history, details):
@@ -259,11 +330,12 @@ def create_site_audit_for_project(project_id: int, trigger_type: str = 'project_
     try:
         project = Project.objects.get(id=project_id)
         
-        # Create or get the on-page audit with 10k page limit
+        # Create or get the on-page audit with default page limit
+        # Default to 5000 as requested for fastgenerations.co.uk
         audit, created = SiteAudit.objects.get_or_create(
             project=project,
             defaults={
-                'max_pages_to_crawl': 10000  # Set to 10,000 pages for new projects
+                'max_pages_to_crawl': 5000  # Default limit of 5000 pages
             }
         )
         

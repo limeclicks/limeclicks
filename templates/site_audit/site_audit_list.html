@@ -83,6 +83,20 @@
         </div>
     </div>
 
+    <!-- Auto-refresh notification -->
+    {% if has_running_audits %}
+    <div class="alert alert-info shadow-sm mb-4">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="stroke-current shrink-0 w-6 h-6">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+        </svg>
+        <div class="flex items-center gap-2">
+            <span>Audits are running</span>
+            <span class="loading loading-spinner loading-sm"></span>
+            <span class="text-sm opacity-75">Page will refresh automatically</span>
+        </div>
+    </div>
+    {% endif %}
+    
     <!-- Stats Cards - Compact Single Row -->
     <div class="stats shadow-sm w-full mb-6">
         <div class="stat">
@@ -147,6 +161,7 @@
                 <tbody class="divide-y divide-base-200">
                     {% for audit in page_obj.object_list %}
                     <tr class="hover:bg-base-200/20 transition-colors audit-row cursor-pointer" 
+                        data-audit-id="{{ audit.id }}"
                         data-status="{% if audit.site_health >= 80 %}healthy{% elif audit.site_health >= 60 %}warning{% else %}critical{% endif %}"
                         onclick="window.location.href='{% url 'site_audit:detail' audit.id %}'"
                         title="Click to view details">
@@ -187,16 +202,21 @@
                         </td>
                         
                         <!-- Status -->
-                        <td class="text-center px-3 py-4">
-                            {% if audit.has_running_audit %}
+                        <td class="text-center px-3 py-4 status-cell">
+                            {% if audit.site_audit_status == 'running' %}
                             <span class="badge badge-primary badge-sm gap-1">
                                 <span class="loading loading-spinner loading-xs"></span>
                                 Running
                             </span>
-                            {% elif audit.display_last_audit_date %}
+                            {% elif audit.site_audit_status == 'complete' %}
                             <span class="badge badge-success badge-sm">
                                 <i class="fas fa-check-circle mr-1"></i>
                                 Complete
+                            </span>
+                            {% elif audit.site_audit_status == 'failed' %}
+                            <span class="badge badge-error badge-sm">
+                                <i class="fas fa-times-circle mr-1"></i>
+                                Failed
                             </span>
                             {% else %}
                             <span class="badge badge-ghost badge-sm">
@@ -208,16 +228,25 @@
                         
                         <!-- Site Health -->
                         <td class="text-center px-3 py-4">
-                            {% with health_score=audit.site_health|default:0 %}
+                            {% if audit.has_running_audit %}
+                            <div class="flex flex-col items-center">
+                                <span class="loading loading-spinner loading-sm text-primary"></span>
+                                <span class="text-xs text-base-content/50 mt-1">Analyzing</span>
+                            </div>
+                            {% elif audit.site_health is not None %}
+                            {% with health_score=audit.site_health %}
                             <div class="radial-progress text-xs {% if health_score >= 80 %}text-success{% elif health_score >= 60 %}text-warning{% else %}text-error{% endif %}" 
                                  style="--value:{{ health_score }}; --size:2.5rem; --thickness:3px;">
                                 {{ health_score|floatformat:0 }}%
                             </div>
                             {% endwith %}
+                            {% else %}
+                            <span class="text-base-content/50 text-sm">N/A</span>
+                            {% endif %}
                         </td>
                         
                         <!-- Mobile Performance -->
-                        <td class="text-center px-3 py-4">
+                        <td class="text-center px-3 py-4 mobile-score-cell">
                             {% if audit.performance_score_mobile is not None %}
                             <span class="text-lg font-bold {% if audit.performance_score_mobile >= 90 %}text-success{% elif audit.performance_score_mobile >= 50 %}text-warning{% else %}text-error{% endif %}">
                                 {{ audit.performance_score_mobile }}
@@ -228,7 +257,7 @@
                         </td>
                         
                         <!-- Desktop Performance -->
-                        <td class="text-center px-3 py-4">
+                        <td class="text-center px-3 py-4 desktop-score-cell">
                             {% if audit.performance_score_desktop is not None %}
                             <span class="text-lg font-bold {% if audit.performance_score_desktop >= 90 %}text-success{% elif audit.performance_score_desktop >= 50 %}text-warning{% else %}text-error{% endif %}">
                                 {{ audit.performance_score_desktop }}
@@ -239,7 +268,7 @@
                         </td>
                         
                         <!-- Pages Crawled -->
-                        <td class="text-center px-3 py-4">
+                        <td class="text-center px-3 py-4 pages-cell">
                             <div class="flex flex-col items-center">
                                 <span class="text-base font-semibold">{{ audit.total_pages_crawled|default:0 }}</span>
                                 <span class="text-xs text-base-content/50">pages</span>
@@ -568,6 +597,119 @@ function showToast(type, message) {
     }, 5000);
 }
 
+// Auto-refresh when audits are running
+{% if has_running_audits %}
+// Initialize SSE connections for running audits
+document.addEventListener('DOMContentLoaded', function() {
+    {% for audit in page_obj.object_list %}
+    {% if audit.has_running_audit %}
+    initializeAuditSSE({{ audit.id }});
+    {% endif %}
+    {% endfor %}
+});
+
+function initializeAuditSSE(auditId) {
+    console.log('Initializing SSE for audit', auditId);
+    
+    // Connect to SSE endpoint
+    const eventSource = new EventSource(`/site-audit/${auditId}/status-stream/`);
+    
+    eventSource.onmessage = function(event) {
+        const data = JSON.parse(event.data);
+        updateAuditRowInRealTime(auditId, data);
+    };
+    
+    eventSource.onerror = function(event) {
+        console.error('SSE error for audit', auditId, event);
+        eventSource.close();
+    };
+    
+    // Store reference for cleanup
+    window[`sse_${auditId}`] = eventSource;
+}
+
+function updateAuditRowInRealTime(auditId, data) {
+    if (data.error) {
+        console.error('Audit error:', data.error);
+        return;
+    }
+    
+    const row = document.querySelector(`tr[data-audit-id="${auditId}"]`);
+    if (!row) return;
+    
+    // Update status indicator
+    const statusCell = row.querySelector('.status-cell');
+    if (statusCell && data.site_audit) {
+        if (data.site_audit.status === 'running') {
+            statusCell.innerHTML = `
+                <div class="flex items-center gap-2">
+                    <span class="loading loading-spinner loading-sm text-primary"></span>
+                    <div class="text-xs">
+                        <div class="font-medium text-primary">Running</div>
+                        <div class="text-base-content/60">${data.site_audit.progress}%</div>
+                    </div>
+                </div>
+            `;
+        } else if (data.site_audit.status === 'completed') {
+            statusCell.innerHTML = `
+                <div class="flex items-center gap-2">
+                    <div class="w-2 h-2 bg-success rounded-full"></div>
+                    <span class="text-xs font-medium text-success">Completed</span>
+                </div>
+            `;
+        }
+    }
+    
+    // Update pages crawled
+    const pagesCell = row.querySelector('.pages-cell');
+    if (pagesCell && data.site_audit && data.site_audit.pages_crawled) {
+        pagesCell.innerHTML = `
+            <div class="flex flex-col items-center">
+                <span class="text-base font-semibold">${data.site_audit.pages_crawled}</span>
+                <span class="text-xs text-base-content/50">pages</span>
+            </div>
+        `;
+    }
+    
+    // Update performance scores when available
+    const mobileCell = row.querySelector('.mobile-score-cell');
+    const desktopCell = row.querySelector('.desktop-score-cell');
+    
+    if (mobileCell && data.performance_audit && data.performance_audit.mobile_score) {
+        const score = data.performance_audit.mobile_score;
+        const colorClass = score >= 90 ? 'text-success' : score >= 50 ? 'text-warning' : 'text-error';
+        mobileCell.innerHTML = `<span class="text-lg font-bold ${colorClass}">${score}</span>`;
+    }
+    
+    if (desktopCell && data.performance_audit && data.performance_audit.desktop_score) {
+        const score = data.performance_audit.desktop_score;
+        const colorClass = score >= 90 ? 'text-success' : score >= 50 ? 'text-warning' : 'text-error';
+        desktopCell.innerHTML = `<span class="text-lg font-bold ${colorClass}">${score}</span>`;
+    }
+    
+    // If both audits completed, refresh after short delay to show final state
+    if (data.final || (
+        data.site_audit && data.site_audit.status === 'completed' &&
+        data.performance_audit && data.performance_audit.status === 'completed'
+    )) {
+        setTimeout(() => {
+            location.reload();
+        }, 3000);
+    }
+}
+
+// Cleanup function
+window.addEventListener('beforeunload', function() {
+    {% for audit in page_obj.object_list %}
+    {% if audit.has_running_audit %}
+    if (window.sse_{{ audit.id }}) {
+        window.sse_{{ audit.id }}.close();
+    }
+    {% endif %}
+    {% endfor %}
+});
+{% endif %}
+
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
     // Check if there's a filter in URL params (for future enhancement)
@@ -576,6 +718,10 @@ document.addEventListener('DOMContentLoaded', function() {
     if (filterParam && ['all', 'healthy', 'warning', 'critical'].includes(filterParam)) {
         filterByStatus(filterParam);
     }
+    
+    {% if has_running_audits %}
+    console.log('Site audits are running - page will auto-refresh in 10 seconds');
+    {% endif %}
 });
 </script>
 

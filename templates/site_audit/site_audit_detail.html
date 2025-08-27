@@ -296,6 +296,9 @@ h1 {
                 hx-indicator="#tab-loading">
             <i class="fas fa-chart-line mr-2"></i>
             Overview
+            {% if latest_history and latest_history.status in 'pending,running' %}
+            <span class="loading loading-spinner loading-xs ml-2"></span>
+            {% endif %}
         </button>
         <button class="tab" 
                 id="issues-tab-btn"
@@ -305,7 +308,9 @@ h1 {
                 hx-indicator="#tab-loading">
             <i class="fas fa-exclamation-triangle mr-2"></i>
             Issues
-            {% if audit.total_issues_count > 0 %}
+            {% if latest_history and latest_history.status in 'pending,running' %}
+            <span class="badge badge-ghost badge-sm ml-2">Scanning...</span>
+            {% elif audit.total_issues_count > 0 %}
             <span class="badge badge-error badge-sm ml-2">{{ audit.total_issues_count }}</span>
             {% endif %}
         </button>
@@ -317,6 +322,9 @@ h1 {
                 hx-indicator="#tab-loading">
             <i class="fas fa-rocket mr-2"></i>
             Performance
+            {% if latest_history and latest_history.status in 'pending,running' %}
+            <span class="loading loading-spinner loading-xs ml-2"></span>
+            {% endif %}
         </button>
     </div>
     

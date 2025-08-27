@@ -21,7 +21,7 @@ LIGHTHOUSE_LOCK_TIMEOUT = 900  # 15 minutes
     bind=True, 
     max_retries=5,  # Increased to 5 retries
     default_retry_delay=180,  # 3 minutes default delay
-    rate_limit='1/2m',  # Only 1 audit per 2 minutes globally for stability
+    rate_limit='30/h',  # 30 audits per hour globally for stability
     time_limit=900,  # 15 minute timeout (increased)
     soft_time_limit=780  # 13 minute soft timeout
 )
