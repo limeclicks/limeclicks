@@ -8,10 +8,8 @@ import boto3
 import logging
 import mimetypes
 from typing import Optional, Dict, Any, BinaryIO, Union
-from datetime import datetime, timedelta
-from botocore.exceptions import ClientError, NoCredentialsError
-from django.conf import settings
-from urllib.parse import urlparse
+from datetime import datetime
+from botocore.exceptions import ClientError
 import hashlib
 import json
 

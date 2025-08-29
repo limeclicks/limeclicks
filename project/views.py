@@ -1,15 +1,10 @@
-from django.shortcuts import render, get_object_or_404, redirect
+from django.shortcuts import render, get_object_or_404
 from django.contrib.auth.decorators import login_required
-from django.http import JsonResponse, HttpResponse
-from django.contrib import messages
+from django.http import JsonResponse
 from django.core.paginator import Paginator
 from django.db.models import Q
 from django.views.decorators.http import require_http_methods
-from django.views.decorators.cache import cache_control
-from django.core.cache import cache
 import json
-import requests
-import hashlib
 from .models import Project
 from .forms import ProjectForm
 from common.utils import create_ajax_response, get_logger

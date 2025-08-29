@@ -5,7 +5,7 @@ Comprehensive tests for SERP HTML fetching and storage
 import pytest
 from datetime import datetime, timedelta
 from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 import tempfile
 import shutil
 
@@ -14,7 +14,7 @@ from django.utils import timezone
 from django.core.cache import cache
 
 from keywords.models import Keyword
-from keywords.tasks import fetch_keyword_serp_html, enqueue_keyword_scrapes_batch
+from keywords.tasks import fetch_keyword_serp_html
 from project.models import Project
 from accounts.models import User
 

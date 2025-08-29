@@ -3,7 +3,7 @@ Tests for batch processing and duplicate prevention
 """
 
 from datetime import timedelta
-from unittest.mock import patch, Mock
+from unittest.mock import patch
 from django.test import TestCase
 from django.utils import timezone
 

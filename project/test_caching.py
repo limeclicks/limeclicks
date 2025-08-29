@@ -12,7 +12,6 @@ from django.core.cache import cache
 from django.urls import reverse
 from unittest.mock import patch, Mock
 from .models import Project
-from .favicon_utils import favicon_proxy
 
 User = get_user_model()
 

@@ -15,27 +15,40 @@ app = Celery('limeclicks')
 # Load config from Django settings
 app.config_from_object('django.conf:settings', namespace='CELERY')
 
-# Define priority queues
+# Define priority queues with routing for new domains vs scheduled audits
 app.conf.task_routes = {
+    # Keywords tasks
     'keywords.tasks.fetch_keyword_serp_html': {'queue': 'serp_default'},
-    'performance_audit.tasks.run_lighthouse_audit': {'queue': 'performance_audit'},
-    'performance_audit.tasks.check_scheduled_audits': {'queue': 'performance_audit'},
-    'performance_audit.tasks.create_audit_for_project': {'queue': 'performance_audit'},
-    'performance_audit.tasks.run_manual_audit': {'queue': 'performance_audit'},
-    'site_audit.tasks.run_site_audit': {'queue': 'onpage'},
-    'site_audit.tasks.check_scheduled_site_audits': {'queue': 'onpage'},
-    'site_audit.tasks.create_site_audit_for_project': {'queue': 'onpage'},
-    'site_audit.tasks.run_manual_site_audit': {'queue': 'onpage'},
-    'site_audit.tasks.validate_screaming_frog_license': {'queue': 'onpage'},
+    
+    
+    # Site audit tasks - High priority for new domains
+    'site_audit.tasks.run_site_audit_high_priority': {'queue': 'audit_high_priority'},
+    'site_audit.tasks.create_site_audit_for_new_project': {'queue': 'audit_high_priority'},
+    
+    # Site audit tasks - Regular priority for scheduled
+    'site_audit.tasks.run_site_audit': {'queue': 'audit_scheduled'},
+    'site_audit.tasks.check_scheduled_site_audits': {'queue': 'audit_scheduled'},
+    'site_audit.tasks.create_site_audit_for_project': {'queue': 'audit_scheduled'},
+    'site_audit.tasks.run_manual_site_audit': {'queue': 'audit_scheduled'},
+    'site_audit.tasks.validate_screaming_frog_license': {'queue': 'audit_scheduled'},
 }
 
 # Queue configuration with priorities
+# High priority queue for new domain audits (priority 10)
+# Scheduled queue for repeating 30-day audits (priority 5)
 app.conf.task_queues = (
-    Queue('serp_high', Exchange('serp'), routing_key='serp.high', priority=10),
-    Queue('serp_default', Exchange('serp'), routing_key='serp.default', priority=5),
-    Queue('performance_audit', Exchange('performance_audit'), routing_key='performance_audit', priority=3),
-    Queue('onpage', Exchange('onpage'), routing_key='onpage', priority=3),
-    Queue('celery', Exchange('celery'), routing_key='celery'),  # Default queue
+    # High priority queue for new domain audits
+    Queue('audit_high_priority', Exchange('audits'), routing_key='audits.high', priority=10),
+    
+    # Regular priority queue for scheduled/repeating audits
+    Queue('audit_scheduled', Exchange('audits'), routing_key='audits.scheduled', priority=5),
+    
+    # SERP queues
+    Queue('serp_high', Exchange('serp'), routing_key='serp.high', priority=8),
+    Queue('serp_default', Exchange('serp'), routing_key='serp.default', priority=4),
+    
+    # Default queue
+    Queue('celery', Exchange('celery'), routing_key='celery', priority=1),
 )
 
 # Enable task priorities
@@ -44,15 +57,8 @@ app.conf.worker_prefetch_multiplier = 1
 app.conf.task_default_priority = 5
 app.conf.task_inherit_parent_priority = True
 
-# Concurrency limits for performance audits
+# General worker configuration
 app.conf.worker_concurrency = 4  # Total worker concurrency
-app.conf.task_annotations = {
-    'performance_audit.tasks.run_lighthouse_audit': {
-        'rate_limit': '2/m',  # Max 2 audits per minute
-        'time_limit': 300,  # 5 minute timeout
-        'soft_time_limit': 240  # 4 minute soft timeout
-    }
-}
 
 # Auto-discover tasks from Django apps
 app.autodiscover_tasks()
@@ -76,20 +82,10 @@ app.conf.beat_schedule = {
         'schedule': crontab(minute='*/30'),  # Run every 30 minutes
         'kwargs': {'stuck_hours': 2}
     },
-    # Performance audit tasks
-    'check-scheduled-audits': {
-        'task': 'performance_audit.tasks.check_scheduled_audits',
-        'schedule': crontab(day_of_month=1, hour=0, minute=0),  # Run on 1st of every month at midnight
-    },
-    'cleanup-old-audits': {
-        'task': 'performance_audit.tasks.cleanup_old_audits',
-        'schedule': crontab(hour=2, minute=0),  # Run daily at 2 AM
-        'kwargs': {'days_to_keep': 90}
-    },
-    # Site audit tasks
-    'check-scheduled-onpage-audits': {
-        'task': 'site_audit.tasks.check_scheduled_site_audits',
-        'schedule': crontab(hour='*/6'),  # Run every 6 hours
+    # Site audit tasks - Check for 30-day scheduled audits
+    'check-scheduled-site-audits': {
+        'task': 'site_audit.tasks.check_and_run_scheduled_audits',
+        'schedule': crontab(hour=0, minute=30),  # Run daily at 12:30 AM to check for due audits
     },
     'cleanup-old-onpage-audits': {
         'task': 'site_audit.tasks.cleanup_old_site_audits',

@@ -3,7 +3,7 @@ Tests for Scrape.do service
 """
 
 from django.test import TestCase, override_settings
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 from django.core.cache import cache
 import requests
 

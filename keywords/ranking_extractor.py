@@ -3,7 +3,6 @@ Ranking extraction service for processing SERP HTML and creating rank records
 """
 
 import logging
-import json
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any, Optional, Tuple

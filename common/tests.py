@@ -1,15 +1,14 @@
 """
 Tests for common utilities, models, and admin mixins
 """
-from django.test import TestCase, override_settings
+from django.test import TestCase
 from unittest import skipUnless
 from django.utils import timezone
 from django.contrib.auth import get_user_model
 from django.http import JsonResponse
-from django.db import models, connection
-from unittest.mock import Mock, patch, MagicMock
+from django.db import models
+from unittest.mock import Mock, patch
 import json
-import uuid
 from datetime import timedelta
 
 from common.utils import (

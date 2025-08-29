@@ -1,5 +1,3 @@
-from celery import shared_task
-from .models import Project
 import logging
 
 logger = logging.getLogger(__name__)

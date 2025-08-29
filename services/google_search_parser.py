@@ -6,9 +6,8 @@ Extracts structured data from Google search HTML with robust selectors
 import logging
 import re
 from typing import List, Dict, Optional, Any
-from urllib.parse import urlparse, parse_qs, unquote
+from urllib.parse import urlparse, parse_qs
 from bs4 import BeautifulSoup
-import json
 
 logger = logging.getLogger(__name__)
 

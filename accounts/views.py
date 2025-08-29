@@ -2,7 +2,7 @@ from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout, get_user_model, update_session_auth_hash
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import PasswordChangeForm
-from django.core.mail import send_mail, get_connection
+from django.core.mail import get_connection
 from django.shortcuts import render, redirect, get_object_or_404
 from django.utils.text import slugify
 from django.conf import settings

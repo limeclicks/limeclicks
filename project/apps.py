@@ -7,4 +7,4 @@ class ProjectConfig(AppConfig):
     
     def ready(self):
         """Import signal handlers when the app is ready"""
-        import project.signals
+        import project.signals  # Import signals to register them

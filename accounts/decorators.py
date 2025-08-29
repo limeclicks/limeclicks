@@ -1,8 +1,6 @@
 from functools import wraps
 from django.contrib import messages
-from django.contrib.auth.decorators import login_required as django_login_required
 from django.shortcuts import redirect
-from django.urls import reverse
 
 
 def login_required_with_message(message="Please sign in to access this page."):

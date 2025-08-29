@@ -51,7 +51,6 @@ INSTALLED_APPS = [
     "project",
     "siteconfig",
     "keywords",
-    "performance_audit",
     "site_audit",
     "django_celery_beat"
 ]

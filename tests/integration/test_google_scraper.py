@@ -4,11 +4,9 @@ These tests make actual API calls to verify the complete scraping pipeline
 """
 
 import os
-import sys
 import django
 import unittest
 from unittest.mock import patch, Mock
-import time
 
 # Setup Django environment
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'limeclicks.settings')

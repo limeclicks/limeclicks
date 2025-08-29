@@ -2,7 +2,6 @@
 Utility functions for keywords app
 """
 
-import json
 import logging
 from datetime import datetime
 from typing import Dict, Any, Optional, List

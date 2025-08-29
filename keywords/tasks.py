@@ -2,23 +2,18 @@
 Celery tasks for SERP HTML fetching and storage
 """
 
-import os
 import logging
-import shutil
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Optional
 
 from celery import shared_task
 from django.conf import settings
 from django.core.cache import cache
 from django.db import models
 from django.utils import timezone
-from redis.exceptions import LockError
 
 from .models import Keyword
 from services.scrape_do import ScrapeDoService
-from .ranking_extractor import RankingExtractor
 
 logger = logging.getLogger(__name__)
 
@@ -26,8 +21,8 @@ logger = logging.getLogger(__name__)
 @shared_task(
     bind=True,
     max_retries=0,  # We handle retries internally for network issues only
-    time_limit=90,  # Hard limit of 90 seconds
-    soft_time_limit=75,  # Soft limit of 75 seconds
+    time_limit=300,  # Hard limit of 5 minutes for keyword jobs
+    soft_time_limit=240,  # Soft limit of 4 minutes
 )
 def fetch_keyword_serp_html(self, keyword_id: int) -> None:
     """
@@ -37,7 +32,7 @@ def fetch_keyword_serp_html(self, keyword_id: int) -> None:
         keyword_id: ID of the keyword to fetch SERP for
     """
     lock_key = f"lock:serp:{keyword_id}"
-    lock_timeout = 300  # 5 minutes
+    lock_timeout = 360  # 6 minutes (slightly longer than task timeout)
     
     try:
         # Try to acquire lock
@@ -340,8 +335,6 @@ def enqueue_keyword_scrapes_batch():
     Runs every minute and enqueues up to 500 keywords that haven't been scraped in 24+ hours.
     Prevents duplicate queuing using the processing flag.
     """
-    from kombu import Queue
-    from limeclicks.celery import app
     
     now = timezone.now()
     min_interval = timedelta(hours=settings.FETCH_MIN_INTERVAL_HOURS)

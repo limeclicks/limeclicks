@@ -3,8 +3,6 @@ Unit tests for Keyword and Rank models
 """
 
 from django.test import TestCase
-from django.utils import timezone
-from datetime import timedelta
 from keywords.models import Keyword, Rank
 from project.models import Project
 from accounts.models import User

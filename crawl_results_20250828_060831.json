@@ -1,0 +1,71 @@
+{
+  "pages_crawled": 0,
+  "issues": {},
+  "summary": {
+    "total_pages_crawled": 0,
+    "broken_links": 0,
+    "redirect_chains": 0,
+    "blocked_by_robots": 0,
+    "non_indexable": 0,
+    "missing_titles": 0,
+    "duplicate_titles": 0,
+    "title_too_long": 0,
+    "title_too_short": 0,
+    "missing_meta_descriptions": 1,
+    "duplicate_meta_descriptions": 0,
+    "meta_description_too_long": 0,
+    "meta_description_too_short": 0,
+    "missing_h1": 0,
+    "duplicate_h1": 0,
+    "multiple_h1": 0,
+    "thin_content": 0,
+    "duplicate_content": 0,
+    "missing_canonical": 1,
+    "missing_hreflang": 0,
+    "orphan_pages": 0,
+    "missing_alt_text": 0,
+    "large_images": 0,
+    "slow_pages": 0,
+    "large_pages": 0,
+    "total_issues": 2
+  },
+  "details": {
+    "broken_links": [],
+    "redirect_chains": [],
+    "blocked_by_robots": [],
+    "non_indexable": [],
+    "missing_titles": [],
+    "duplicate_titles": [],
+    "title_too_long": [],
+    "title_too_short": [],
+    "missing_meta_descriptions": [
+      {
+        "url": "https://example.com/"
+      }
+    ],
+    "duplicate_meta_descriptions": [],
+    "meta_description_too_long": [],
+    "meta_description_too_short": [],
+    "missing_h1": [],
+    "duplicate_h1": [],
+    "multiple_h1": [],
+    "missing_h2": [],
+    "thin_content": [],
+    "duplicate_content": [],
+    "spelling_errors": [],
+    "missing_canonical": [
+      {
+        "url": "https://example.com/"
+      }
+    ],
+    "duplicate_canonical": [],
+    "missing_hreflang": [],
+    "orphan_pages": [],
+    "missing_alt_text": [],
+    "large_images": [],
+    "slow_pages": [],
+    "large_pages": [],
+    "performance_issues": [],
+    "internal_urls": []
+  }
+}

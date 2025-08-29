@@ -3,7 +3,7 @@ Unit tests for location field and rank_file storage
 """
 
 from django.test import TestCase
-from unittest.mock import patch, Mock, MagicMock
+from unittest.mock import patch, MagicMock
 from unittest import skip
 from keywords.models import Keyword, Rank
 from keywords.utils import KeywordRankTracker

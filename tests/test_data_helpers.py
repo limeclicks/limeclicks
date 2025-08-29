@@ -2,7 +2,6 @@
 Helper functions to generate realistic SERP test data
 """
 
-from datetime import datetime
 from typing import Dict, List, Any, Optional
 
 

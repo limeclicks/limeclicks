@@ -2,10 +2,9 @@
 Comprehensive tests for ranking extraction from SERP HTML
 """
 
-import json
 from datetime import datetime, timedelta
 from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 import tempfile
 
 from django.test import TestCase, override_settings

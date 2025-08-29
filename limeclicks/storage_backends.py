@@ -1,5 +1,4 @@
 from storages.backends.s3boto3 import S3Boto3Storage
-from django.conf import settings
 
 
 class CloudflareR2Storage(S3Boto3Storage):
@@ -29,23 +28,6 @@ class BaseAuditStorage(CloudflareR2Storage):
         return super().get_valid_name(name)
 
 
-class LighthouseAuditStorage(BaseAuditStorage):
-    """Storage specifically for Lighthouse audit JSON files"""
-    pass
-
-
 class SiteAuditStorage(BaseAuditStorage):
     """Storage specifically for OnPage audit JSON files"""
     pass
-
-
-# Legacy storage classes for backward compatibility
-class AuditJSONStorage(LighthouseAuditStorage):
-    """Legacy storage class - use LighthouseAuditStorage instead"""
-    pass
-
-
-class AuditHTMLStorage(CloudflareR2Storage):
-    """Legacy storage class - no longer used, keeping for compatibility"""
-    location = 'performance_audit/html'
-    file_overwrite = False

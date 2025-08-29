@@ -4,7 +4,6 @@ from django.contrib.auth import get_user_model
 from django.core.mail import get_connection
 from .email_backend import BrevoTemplateEmailMessage
 from django.conf import settings
-from django.urls import reverse
 import logging
 
 logger = logging.getLogger(__name__)

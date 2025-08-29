@@ -5,7 +5,7 @@ Integration tests for R2 Storage
 import os
 import json
 import unittest
-from unittest.mock import patch, Mock, MagicMock
+from unittest.mock import patch, MagicMock
 from datetime import datetime
 from io import BytesIO
 

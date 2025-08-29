@@ -13,10 +13,9 @@ from django.test import TestCase, TransactionTestCase, Client
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 from django.core.cache import cache
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 import json
 import uuid
-from datetime import timedelta
 
 User = get_user_model()
 

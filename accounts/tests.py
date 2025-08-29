@@ -1,7 +1,6 @@
 from django.test import TestCase, Client, override_settings
 from django.contrib.auth import get_user_model
 from django.urls import reverse
-from django.contrib.auth import authenticate
 from unittest.mock import patch
 from unittest import skip
 from .forms import RegisterForm

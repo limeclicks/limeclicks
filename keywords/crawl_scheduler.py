@@ -2,11 +2,10 @@
 Keyword crawl scheduling and prioritization system
 """
 import logging
-from typing import List, Optional
+from typing import List
 from datetime import timedelta
 
-from django.conf import settings
-from django.db.models import Q, F
+from django.db.models import Q
 from django.utils import timezone
 from celery import shared_task
 
