@@ -61,19 +61,35 @@ def run_site_audit(self, site_audit_id: int) -> dict:
         sf_cli = ScreamingFrogCLI()
         
         # Run the crawl with retry logic for network issues
-        max_pages = site_audit.max_pages_to_crawl
         success = False
         output_dir = None
         error_message = None
-        
+
+        site_audit.status = 'running'
+        site_audit.save(update_fields=['status'])
+
         for attempt in range(3):
             try:
                 success, output_dir, error_message = sf_cli.crawl_website(
-                    url=f"https://{project.domain}",
-                    max_pages=max_pages
+                    url=f"https://{project.domain}"
                 )
                 
                 if success:
+                    # Find the timestamped subdirectory (e.g., 2025.08.29.14.34.06)
+                    actual_output_dir = output_dir
+                    if output_dir and Path(output_dir).exists():
+                        subdirs = [d for d in Path(output_dir).iterdir() if d.is_dir()]
+                        if subdirs:
+                            # Get the first subdirectory (should be the timestamped one)
+                            # Screaming Frog creates a timestamped folder like YYYY.MM.DD.HH.MM.SS
+                            timestamped_dir = subdirs[0]
+                            actual_output_dir = str(timestamped_dir)
+                            logger.info(f"Found timestamped subdirectory: {timestamped_dir.name}")
+                    
+                    # Save the actual output directory path (including timestamped subdir) to the site audit
+                    site_audit.temp_audit_dir = actual_output_dir
+                    site_audit.save(update_fields=['temp_audit_dir'])
+                    logger.info(f"Saved output directory path to site audit: {actual_output_dir}")
                     break
                     
                 logger.warning(f"Crawl attempt {attempt + 1} failed: {error_message}")
@@ -91,81 +107,25 @@ def run_site_audit(self, site_audit_id: int) -> dict:
         
         if not success:
             logger.error(f"All crawl attempts failed for {project.domain}")
+            site_audit.status = 'failed'
+            site_audit.save(update_fields=['status'])
             return {
                 "status": "error",
                 "message": f"Crawl failed: {error_message}"
             }
         
-        # Parse results
+        # Process results using new method
         try:
-            results = sf_cli.parse_crawl_results(output_dir)
-            pages_crawled = results.get('pages_crawled', 0)
+            # Print output directory path for debugging
+            logger.error(f"🔍 DEBUG: Output directory path: {site_audit.temp_audit_dir}")
+            print(f"🔍 DEBUG: Output directory path: {site_audit.temp_audit_dir}")
             
-            # Update site audit with results
-            site_audit.total_pages_crawled = pages_crawled
-            site_audit.last_audit_date = timezone.now()
-            
-            # Update audit status and parse CSV overview
-            site_audit.status = 'running'
-            site_audit.save(update_fields=['status'])
-            
-            # Parse issues overview from CSV if available
-            issues_overview_path = None
-            if output_dir:
-                potential_csv = Path(output_dir) / 'issues_overview_report.csv'
-                if potential_csv.exists():
-                    issues_overview_path = str(potential_csv)
-            
-            if issues_overview_path:
-                try:
-                    issues_count = site_audit.update_from_csv_overview(issues_overview_path)
-                    logger.info(f"Parsed {issues_count} issues from overview CSV")
-                except Exception as e:
-                    logger.error(f"Failed to parse CSV overview: {e}")
-                    site_audit.status = 'failed'
-                    site_audit.save(update_fields=['status'])
-                    return {
-                        "status": "error",
-                        "message": f"CSV parsing failed: {str(e)}"
-                    }
-            
-            # Calculate overall site health score from overview data
-            site_audit.calculate_overall_score()
-            
-            # Update next scheduled audit
-            site_audit.last_automatic_audit = timezone.now()
-            site_audit.next_scheduled_audit = timezone.now() + timedelta(days=site_audit.audit_frequency_days)
-            
-            # Mark audit as completed
-            site_audit.status = 'completed'
-            site_audit.save()
-            
-            total_issues = site_audit.get_total_issues_count()
-            logger.info(
-                f"Site audit completed for {project.domain}: "
-                f"{pages_crawled} pages, {total_issues} issues, "
-                f"health score: {site_audit.overall_site_health_score:.1f}%"
-            )
-            
-            # Clean up temporary directory
-            if output_dir and Path(output_dir).exists():
-                try:
-                    shutil.rmtree(output_dir)
-                    logger.info(f"Cleaned up temporary directory: {output_dir}")
-                except Exception as e:
-                    logger.warning(f"Failed to clean up {output_dir}: {e}")
-            
-            return {
-                "status": "success",
-                "pages_crawled": pages_crawled,
-                "total_issues": site_audit.get_total_issues_count(),
-                "health_score": site_audit.overall_site_health_score,
-                "output_files": results.get('files', [])
-            }
+            # Hand over to new process_results method
+            result = site_audit.process_results()
+            return result
             
         except Exception as e:
-            logger.error(f"Error parsing results: {e}")
-            # Mark audit as failed
+            logger.error(f"Error processing results: {e}")
             try:
                 site_audit.status = 'failed'
                 site_audit.save(update_fields=['status'])
@@ -173,8 +133,19 @@ def run_site_audit(self, site_audit_id: int) -> dict:
                 pass
             return {
                 "status": "error",
-                "message": f"Failed to parse results: {str(e)}"
+                "message": f"Failed to process results: {str(e)}"
             }
+        finally:
+            # Clean up temporary directory (disabled for debugging)
+            # Note: We clean up the original output_dir (parent), not the timestamped subdir
+            if output_dir and Path(output_dir).exists():
+                try:
+                    # DEBUGGING: Don't delete directory, just log the path
+                    logger.error(f"🔍 DEBUG: Output directory preserved for debugging: {output_dir}")
+                    print(f"🔍 DEBUG: Output files preserved at: {site_audit.temp_audit_dir}")
+                    # shutil.rmtree(output_dir)  # Commented out for debugging
+                except Exception as e:
+                    logger.warning(f"Failed to clean up {output_dir}: {e}")
             
     except Exception as e:
         logger.error(f"Site audit task error for id={site_audit_id}: {e}")

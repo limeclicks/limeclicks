@@ -44,8 +44,8 @@ class SiteAudit(models.Model):
     last_audit_date = models.DateTimeField(null=True, blank=True)
     
     # Issues overview from CSV (sorted by priority)
-    overview = models.JSONField(
-        default=list,
+    issues_overview = models.JSONField(
+        default=dict,
         blank=True,
         help_text="Issues overview from issues_overview_report.csv sorted by priority"
     )
@@ -63,10 +63,31 @@ class SiteAudit(models.Model):
         help_text="Current audit status"
     )
     
+    # Temporary audit directory path for accessing crawl results
+    temp_audit_dir = models.CharField(
+        max_length=500,
+        null=True,
+        blank=True,
+        help_text="Path to temporary directory containing latest crawl results"
+    )
+    
+    # Crawl overview data from crawl_overview.csv
+    crawl_overview = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Crawl overview data including URLs encountered, crawled, and top inlinks"
+    )
+    
     # Performance metrics
     average_page_size_kb = models.FloatField(null=True, blank=True)
     average_load_time_ms = models.FloatField(null=True, blank=True)
     total_pages_crawled = models.IntegerField(default=0)
+    
+    # Total pages crawled from crawl overview (alias for compatibility)
+    @property
+    def pages_crawled(self):
+        """Alias for total_pages_crawled field"""
+        return self.total_pages_crawled
     
     # Combined scores
     performance_score_mobile = models.IntegerField(
@@ -116,48 +137,7 @@ class SiteAudit(models.Model):
         if self.is_audit_enabled:
             self.next_scheduled_audit = timezone.now() + timedelta(days=self.audit_frequency_days)
             self.save(update_fields=['next_scheduled_audit'])
-    
-    def update_from_csv_overview(self, csv_file_path):
-        """Update overview from issues_overview_report.csv"""
-        overview_data = []
         
-        if os.path.exists(csv_file_path):
-            try:
-                with open(csv_file_path, 'r', encoding='utf-8') as file:
-                    reader = csv.DictReader(file)
-                    
-                    for row in reader:
-                        # Extract required fields
-                        issue_data = {
-                            'issue_name': row.get('Issue Name', '').strip(),
-                            'issue_type': row.get('Issue Type', '').strip(),
-                            'issue_priority': row.get('Issue Priority', '').strip(),
-                            'urls': row.get('URLs', '').strip()
-                        }
-                        
-                        # Only add if we have valid data
-                        if issue_data['issue_name'] and issue_data['issue_priority']:
-                            overview_data.append(issue_data)
-                
-                # Sort by priority: High, Medium, Low
-                priority_order = {'High': 1, 'Medium': 2, 'Low': 3}
-                overview_data.sort(key=lambda x: priority_order.get(x['issue_priority'], 4))
-                
-                # Update the overview field
-                self.overview = overview_data
-                self.last_audit_date = timezone.now()
-                self.status = 'completed'
-                self.save()
-                
-                return len(overview_data)
-                
-            except Exception as e:
-                self.status = 'failed'
-                self.save()
-                raise e
-        
-        return 0
-    
     def update_from_audit_results(self, crawl_results):
         """Update summary from latest audit results - updated for overview JSON"""
         if crawl_results:
@@ -185,14 +165,15 @@ class SiteAudit(models.Model):
     
     def calculate_overall_score(self):
         """Calculate overall site health score based on overview issues"""
-        if not self.overview or not self.total_pages_crawled:
+        if not self.issues_overview or not self.total_pages_crawled:
             self.overall_site_health_score = 100
             return
         
-        # Count issues by priority
-        high_issues = len([i for i in self.overview if i.get('issue_priority') == 'High'])
-        medium_issues = len([i for i in self.overview if i.get('issue_priority') == 'Medium'])
-        low_issues = len([i for i in self.overview if i.get('issue_priority') == 'Low'])
+        # Count issues by priority from the issues list
+        issues_list = self.issues_overview.get('issues', [])
+        high_issues = len([i for i in issues_list if i.get('issue_priority') == 'High'])
+        medium_issues = len([i for i in issues_list if i.get('issue_priority') == 'Medium'])
+        low_issues = len([i for i in issues_list if i.get('issue_priority') == 'Low'])
         
         # Calculate weighted issue score (High=3, Medium=2, Low=1)
         weighted_issues = (high_issues * 3) + (medium_issues * 2) + (low_issues * 1)
@@ -218,17 +199,86 @@ class SiteAudit(models.Model):
     
     def get_total_issues_count(self):
         """Get total number of issues from overview"""
-        return len(self.overview) if self.overview else 0
+        issues_list = self.issues_overview.get('issues', [])
+        return len(issues_list)
     
     def get_issues_by_priority(self):
         """Get breakdown of issues by priority"""
-        if not self.overview:
+        if not self.issues_overview:
             return {'High': 0, 'Medium': 0, 'Low': 0}
         
         breakdown = {'High': 0, 'Medium': 0, 'Low': 0}
-        for issue in self.overview:
+        issues_list = self.issues_overview.get('issues', [])
+        for issue in issues_list:
             priority = issue.get('issue_priority', '')
             if priority in breakdown:
                 breakdown[priority] += 1
         
         return breakdown
+    
+    def process_results(self):
+        """
+        Process crawl results from temp_audit_dir and update audit.
+        
+        Returns:
+            dict: Processing results with status and metrics
+        """
+        from .parsers.crawl_overview import CrawlOverviewParser
+        from .parsers.issues_overview import IssuesOverviewParser
+        
+        # Print the output directory path from temp_audit_dir
+        if self.temp_audit_dir:
+            print(f"🔍 Processing results from: {self.temp_audit_dir}")
+        else:
+            print("❌ No temp_audit_dir found - cannot process results")
+            return {"status": "error", "message": "No temp_audit_dir available"}
+        
+        try:
+            # Parse crawl overview data with saving logic inside parser
+            parser = CrawlOverviewParser(self.temp_audit_dir, self)
+            crawl_data = parser.parse()
+            
+            # Parse issues overview data
+            issues_parser = IssuesOverviewParser(self.temp_audit_dir, self)
+            issues_data = issues_parser.parse()
+            
+            # Prepare response data
+            response = {
+                "status": "success",
+                "message": "Audit data processed successfully"
+            }
+            
+            if crawl_data:
+                response.update({
+                    "pages_crawled": self.total_pages_crawled,
+                    "urls_encountered": crawl_data.get('total_urls_encountered', 0),
+                    "top_inlinks_count": len(crawl_data.get('top_20_inlinks', []))
+                })
+            
+            if issues_data:
+                response.update({
+                    "total_issues": issues_data.get('total_issues', 0),
+                    "high_priority_issues": issues_data.get('issues_by_priority', {}).get('High', 0),
+                    "medium_priority_issues": issues_data.get('issues_by_priority', {}).get('Medium', 0),
+                    "low_priority_issues": issues_data.get('issues_by_priority', {}).get('Low', 0)
+                })
+            
+            if not crawl_data and not issues_data:
+                print("⚠️ No overview data parsed")
+                # Still mark as completed even if no overview data
+                self.status = 'completed'
+                self.last_audit_date = timezone.now()
+                self.save()
+                
+                response = {
+                    "status": "partial_success",
+                    "message": "Audit completed but no overview data found"
+                }
+            
+            return response
+                
+        except Exception as e:
+            print(f"❌ Error processing crawl results: {e}")
+            self.status = 'failed'
+            self.save()
+            return {"status": "error", "message": f"Failed to process results: {str(e)}"}

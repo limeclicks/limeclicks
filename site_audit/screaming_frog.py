@@ -116,7 +116,9 @@ class ScreamingFrogCLI:
         
         For now, just return the list of files generated
         Actual parsing can be implemented later based on the report formats
-        """
+        """        
+        # Optional: Uncomment this line if you want to pause execution
+        # import pdb; pdb.set_trace()
         output_files = list(Path(output_dir).glob('*'))
         
         result = {
