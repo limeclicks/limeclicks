@@ -1,0 +1,132 @@
+{% load audit_filters %}
+<!-- Just the issue items for pagination/load more -->
+{% for issue in issues %}
+<!-- Issue Card -->
+<div class="card bg-base-100 shadow-sm border border-base-300 hover:shadow-md transition-shadow">
+    <div class="card-body p-4">
+        <div class="flex items-start gap-4">
+            <!-- Severity Indicator -->
+            <div class="flex-shrink-0">
+                {% if issue.severity == "critical" %}
+                <div class="w-10 h-10 rounded-full bg-error/10 flex items-center justify-center">
+                    <i class="fas fa-exclamation-circle text-error"></i>
+                </div>
+                {% elif issue.severity == "high" %}
+                <div class="w-10 h-10 rounded-full bg-error/10 flex items-center justify-center">
+                    <i class="fas fa-exclamation-triangle text-error"></i>
+                </div>
+                {% elif issue.severity == "medium" %}
+                <div class="w-10 h-10 rounded-full bg-warning/10 flex items-center justify-center">
+                    <i class="fas fa-exclamation text-warning"></i>
+                </div>
+                {% elif issue.severity == "low" %}
+                <div class="w-10 h-10 rounded-full bg-info/10 flex items-center justify-center">
+                    <i class="fas fa-info-circle text-info"></i>
+                </div>
+                {% else %}
+                <div class="w-10 h-10 rounded-full bg-base-200 flex items-center justify-center">
+                    <i class="fas fa-info text-base-content/60"></i>
+                </div>
+                {% endif %}
+            </div>
+            
+            <!-- Issue Content -->
+            <div class="flex-1">
+                <!-- Issue Header -->
+                <div class="flex items-start justify-between gap-4 mb-2">
+                    <div>
+                        <h4 class="text-base font-semibold text-base-content">
+                            {{ issue.issue_type|title|truncatechars:80 }}
+                        </h4>
+                        <div class="flex flex-wrap items-center gap-2 mt-1">
+                            <!-- Severity Badge -->
+                            {% if issue.severity == "critical" %}
+                            <span class="badge badge-error badge-sm">Critical</span>
+                            {% elif issue.severity == "high" %}
+                            <span class="badge badge-error badge-sm">High</span>
+                            {% elif issue.severity == "medium" %}
+                            <span class="badge badge-warning badge-sm">Medium</span>
+                            {% elif issue.severity == "low" %}
+                            <span class="badge badge-info badge-sm">Low</span>
+                            {% else %}
+                            <span class="badge badge-ghost badge-sm">Info</span>
+                            {% endif %}
+                            
+                            <!-- Category Badge -->
+                            <span class="badge badge-outline badge-sm">
+                                {{ issue.issue_category|replace_underscore }}
+                            </span>
+                            
+                            <!-- Status Badge -->
+                            {% if issue.status == 'new' %}
+                            <span class="badge badge-success badge-sm gap-1">
+                                <i class="fas fa-sparkles text-xs"></i> New
+                            </span>
+                            {% elif issue.status == 'persisting' %}
+                            <span class="badge badge-warning badge-sm gap-1">
+                                <i class="fas fa-sync-alt text-xs"></i> Persisting
+                            </span>
+                            {% elif issue.status == 'resolved' %}
+                            <span class="badge badge-info badge-sm gap-1">
+                                <i class="fas fa-check text-xs"></i> Resolved
+                            </span>
+                            {% endif %}
+                            
+                            <!-- Inlinks Badge if relevant -->
+                            {% if issue.inlinks_count > 0 %}
+                            <span class="badge badge-ghost badge-sm">
+                                <i class="fas fa-link text-xs mr-1"></i> {{ issue.inlinks_count }} inlinks
+                            </span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Issue Description -->
+                {% if issue.issue_data.content or issue.description %}
+                <p class="text-sm text-base-content/70 mb-2">
+                    {% if issue.issue_data.content %}
+                        {{ issue.issue_data.content|truncatechars:150 }}
+                    {% elif issue.description %}
+                        {{ issue.description|truncatechars:150 }}
+                    {% endif %}
+                </p>
+                {% endif %}
+                
+                <!-- Issue URL -->
+                {% if issue.url %}
+                <div class="flex items-center gap-2 text-xs text-base-content/60">
+                    <i class="fas fa-link"></i>
+                    <a href="{{ issue.url }}" target="_blank" 
+                       class="hover:text-primary transition-colors truncate max-w-xl">
+                        {{ issue.url|truncatechars:100 }}
+                    </a>
+                </div>
+                {% endif %}
+                
+                <!-- Additional Details (collapsible) -->
+                {% if issue.issue_data %}
+                <div class="collapse collapse-arrow mt-2">
+                    <input type="checkbox" />
+                    <div class="collapse-title text-sm font-medium p-0 min-h-0">
+                        View Details
+                    </div>
+                    <div class="collapse-content p-0 mt-2">
+                        <div class="bg-base-200/50 rounded-lg p-3 text-xs space-y-1">
+                            {% for key, value in issue.issue_data.items %}
+                            {% if value %}
+                            <div class="flex gap-2">
+                                <span class="font-medium text-base-content/60">{{ key|title }}:</span>
+                                <span class="text-base-content/80">{{ value|truncatechars:100 }}</span>
+                            </div>
+                            {% endif %}
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endfor %}

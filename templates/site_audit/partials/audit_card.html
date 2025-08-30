@@ -145,15 +145,21 @@
         {% if item.audit and item.audit.status == 'completed' and item.audit.get_total_issues_count > 0 %}
         <div class="mt-4 flex items-center gap-4 text-xs">
             {% with issues=item.audit.get_issues_by_priority %}
-            {% if issues.High > 0 %}
+            {% if issues.Critical > 0 %}
             <span class="badge badge-error badge-sm">
                 <i class="fas fa-exclamation-circle mr-1"></i>
+                {{ issues.Critical }} Critical
+            </span>
+            {% endif %}
+            {% if issues.High > 0 %}
+            <span class="badge badge-error badge-sm">
+                <i class="fas fa-exclamation-triangle mr-1"></i>
                 {{ issues.High }} High
             </span>
             {% endif %}
             {% if issues.Medium > 0 %}
             <span class="badge badge-warning badge-sm">
-                <i class="fas fa-exclamation-triangle mr-1"></i>
+                <i class="fas fa-exclamation mr-1"></i>
                 {{ issues.Medium }} Medium
             </span>
             {% endif %}

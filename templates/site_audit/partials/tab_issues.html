@@ -1,307 +1,135 @@
 <!-- Issues Tab Content -->
 <div class="space-y-6">
+    <!-- Issue Lifecycle Summary Cards (Outside of issues-container to prevent duplication) -->
+    {% if lifecycle_stats %}
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <!-- Total Issues Card -->
+        <div class="card bg-gradient-to-br from-primary/5 to-primary/10 border border-primary/20">
+            <div class="card-body p-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-medium text-base-content/60 uppercase tracking-wider">Total Issues</p>
+                        <p class="text-3xl font-bold text-primary mt-1">{{ total_issues|default:0 }}</p>
+                    </div>
+                    <div class="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center">
+                        <i class="fas fa-exclamation-triangle text-xl text-primary"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- New Issues Card -->
+        <div class="card bg-gradient-to-br from-success/5 to-success/10 border border-success/20">
+            <div class="card-body p-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-medium text-base-content/60 uppercase tracking-wider">New Issues</p>
+                        <p class="text-3xl font-bold text-success mt-1">{{ lifecycle_stats.new_count|default:0 }}</p>
+                    </div>
+                    <div class="w-12 h-12 rounded-full bg-success/20 flex items-center justify-center">
+                        <i class="fas fa-plus-circle text-xl text-success"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Persisting Issues Card -->
+        <div class="card bg-gradient-to-br from-warning/5 to-warning/10 border border-warning/20">
+            <div class="card-body p-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-medium text-base-content/60 uppercase tracking-wider">Persisting</p>
+                        <p class="text-3xl font-bold text-warning mt-1">{{ lifecycle_stats.persisting_count|default:0 }}</p>
+                    </div>
+                    <div class="w-12 h-12 rounded-full bg-warning/20 flex items-center justify-center">
+                        <i class="fas fa-sync-alt text-xl text-warning"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Resolved Issues Card -->
+        <div class="card bg-gradient-to-br from-info/5 to-info/10 border border-info/20">
+            <div class="card-body p-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-medium text-base-content/60 uppercase tracking-wider">Resolved</p>
+                        <p class="text-3xl font-bold text-info mt-1">{{ lifecycle_stats.resolved_count|default:0 }}</p>
+                    </div>
+                    <div class="w-12 h-12 rounded-full bg-info/20 flex items-center justify-center">
+                        <i class="fas fa-check-circle text-xl text-info"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
     <!-- Filters and Search -->
     <div class="card bg-base-100 shadow-sm border border-base-300">
         <div class="card-body p-4">
-            <div class="flex flex-col md:flex-row gap-4">
+            <div class="flex flex-col lg:flex-row gap-4">
                 <!-- Search -->
                 <div class="flex-1">
                     <div class="relative">
                         <input type="text" 
                                id="issue-search"
-                               placeholder="Search issues..." 
-                               class="input input-bordered w-full pl-10"
+                               placeholder="Search issues by type or URL..." 
+                               class="input input-bordered w-full pl-10 h-10"
                                hx-get="{% url 'site_audit:detail' audit.id %}?tab=issues"
                                hx-trigger="keyup changed delay:500ms"
-                               hx-target="#issues-list"
+                               hx-target="#issues-content-area"
                                hx-include="[name='severity'], [name='category']">
                         <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-base-content/40"></i>
                     </div>
                 </div>
                 
-                <!-- Severity Filter -->
+                <!-- Filters -->
                 <div class="flex gap-2">
-                    <select name="severity" class="select select-bordered select-sm"
+                    <!-- Severity Filter -->
+                    <select name="severity" class="select select-bordered select-sm min-w-[150px]"
                             hx-get="{% url 'site_audit:detail' audit.id %}?tab=issues"
                             hx-trigger="change"
-                            hx-target="#issues-list"
+                            hx-target="#issues-content-area"
                             hx-include="#issue-search, [name='category']">
                         <option value="">All Severities</option>
-                        <option value="High">High Priority</option>
-                        <option value="Medium">Medium Priority</option>
-                        <option value="Low">Low Priority</option>
+                        <option value="critical">Critical</option>
+                        <option value="high">High Priority</option>
+                        <option value="medium">Medium Priority</option>
+                        <option value="low">Low Priority</option>
                     </select>
                     
                     <!-- Category Filter -->
-                    <select name="category" class="select select-bordered select-sm"
+                    <select name="category" class="select select-bordered select-sm min-w-[150px]"
                             hx-get="{% url 'site_audit:detail' audit.id %}?tab=issues"
                             hx-trigger="change"
-                            hx-target="#issues-list"
+                            hx-target="#issues-content-area"
                             hx-include="#issue-search, [name='severity']">
                         <option value="">All Categories</option>
-                        {% for category in issues_by_category %}
-                        <option value="{{ category.issue_category }}">{{ category.issue_category|title }}</option>
-                        {% endfor %}
+                        <option value="meta_content">Meta Content</option>
+                        <option value="response_code">Response Code</option>
+                        <option value="image">Images</option>
+                        <option value="technical_seo">Technical SEO</option>
+                        <option value="content_quality">Content Quality</option>
+                        <option value="security">Security</option>
                     </select>
                 </div>
             </div>
         </div>
     </div>
     
-    <!-- Issues List -->
-    <div id="issues-list">
-        <!-- High Priority Issues -->
-        {% with high_issues=issues|dictsort:"severity"|slice:":50" %}
-        {% for issue in high_issues %}
-        {% if issue.severity == "high" or issue.severity == "High" %}
-        {% if forloop.first %}
-        <div class="card bg-base-100 shadow-sm border border-error/30">
-            <div class="card-body">
-                <h3 class="text-lg font-semibold text-error mb-4">
-                    <i class="fas fa-exclamation-circle mr-2"></i>
-                    High Priority Issues
-                </h3>
-                <div class="space-y-3">
-        {% endif %}
-                    <div class="issue-row p-4 rounded-lg bg-error/5 border border-error/20 hover:bg-error/10 transition-colors">
-                        <div class="flex items-start justify-between">
-                            <div class="flex-1">
-                                <div class="flex items-center gap-2 mb-2">
-                                    <span class="badge badge-error badge-sm">High</span>
-                                    <span class="badge badge-ghost badge-sm">{{ issue.issue_category|title }}</span>
-                                </div>
-                                <h4 class="font-medium text-base-content mb-1">{{ issue.issue_type|title }}</h4>
-                                <p class="text-sm text-base-content/70">
-                                    {% if issue.issue_data %}
-                                        {% if issue.issue_data.content %}
-                                            {{ issue.issue_data.content|truncatechars:100 }}
-                                        {% else %}
-                                            Issue detected on this page
-                                        {% endif %}
-                                    {% elif issue.description %}
-                                        {{ issue.description }}
-                                    {% else %}
-                                        Issue detected
-                                    {% endif %}
-                                </p>
-                                {% if issue.url %}
-                                <div class="mt-2">
-                                    <p class="text-xs text-base-content/50">URL:</p>
-                                    <a href="{{ issue.url }}" target="_blank" 
-                                       class="text-xs text-primary hover:underline inline-flex items-center gap-1">
-                                        {{ issue.url|truncatechars:80 }}
-                                        <i class="fas fa-external-link-alt text-xs"></i>
-                                    </a>
-                                </div>
-                                {% elif issue.affected_url %}
-                                <div class="mt-2">
-                                    <p class="text-xs text-base-content/50">Affected:</p>
-                                    <span class="text-xs text-base-content/70">{{ issue.affected_url }}</span>
-                                </div>
-                                {% endif %}
-                                {% if issue.inlinks_count and issue.inlinks_count > 0 %}
-                                <span class="text-xs text-base-content/50">{{ issue.inlinks_count }} inlinks</span>
-                                {% endif %}
-                                {% if issue.recommendation %}
-                                <div class="mt-3 p-3 bg-base-100 rounded">
-                                    <p class="text-xs font-medium text-base-content mb-1">
-                                        <i class="fas fa-lightbulb text-warning mr-1"></i>
-                                        Recommendation:
-                                    </p>
-                                    <p class="text-xs text-base-content/70">{{ issue.recommendation }}</p>
-                                </div>
-                                {% endif %}
-                            </div>
-                            <div class="ml-4">
-                                <button class="btn btn-ghost btn-xs">
-                                    <i class="fas fa-chevron-down"></i>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-        {% if forloop.last %}
-                </div>
-            </div>
-        </div>
-        {% endif %}
-        {% endif %}
-        {% endfor %}
-        {% endwith %}
-        
-        <!-- Medium Priority Issues -->
-        {% with medium_issues=issues|dictsort:"severity"|slice:":50" %}
-        {% for issue in medium_issues %}
-        {% if issue.severity == "medium" or issue.severity == "Medium" %}
-        {% if forloop.first %}
-        <div class="card bg-base-100 shadow-sm border border-warning/30 mt-4">
-            <div class="card-body">
-                <h3 class="text-lg font-semibold text-warning mb-4">
-                    <i class="fas fa-exclamation-triangle mr-2"></i>
-                    Medium Priority Issues
-                </h3>
-                <div class="space-y-3">
-        {% endif %}
-                    <div class="issue-row p-4 rounded-lg bg-warning/5 border border-warning/20 hover:bg-warning/10 transition-colors">
-                        <div class="flex items-start justify-between">
-                            <div class="flex-1">
-                                <div class="flex items-center gap-2 mb-2">
-                                    <span class="badge badge-warning badge-sm">Medium</span>
-                                    <span class="badge badge-ghost badge-sm">{{ issue.issue_category|title }}</span>
-                                </div>
-                                <h4 class="font-medium text-base-content mb-1">{{ issue.issue_type|title }}</h4>
-                                <p class="text-sm text-base-content/70">
-                                    {% if issue.issue_data %}
-                                        {% if issue.issue_data.content %}
-                                            {{ issue.issue_data.content|truncatechars:100 }}
-                                        {% else %}
-                                            Issue detected on this page
-                                        {% endif %}
-                                    {% elif issue.description %}
-                                        {{ issue.description }}
-                                    {% else %}
-                                        Issue detected
-                                    {% endif %}
-                                </p>
-                                {% if issue.url %}
-                                <div class="mt-2">
-                                    <p class="text-xs text-base-content/50">URL:</p>
-                                    <a href="{{ issue.url }}" target="_blank" 
-                                       class="text-xs text-primary hover:underline inline-flex items-center gap-1">
-                                        {{ issue.url|truncatechars:80 }}
-                                        <i class="fas fa-external-link-alt text-xs"></i>
-                                    </a>
-                                </div>
-                                {% elif issue.affected_url %}
-                                <div class="mt-2">
-                                    <p class="text-xs text-base-content/50">Affected:</p>
-                                    <span class="text-xs text-base-content/70">{{ issue.affected_url }}</span>
-                                </div>
-                                {% endif %}
-                                {% if issue.inlinks_count and issue.inlinks_count > 0 %}
-                                <span class="text-xs text-base-content/50">{{ issue.inlinks_count }} inlinks</span>
-                                {% endif %}
-                                {% if issue.recommendation %}
-                                <div class="mt-3 p-3 bg-base-100 rounded">
-                                    <p class="text-xs font-medium text-base-content mb-1">
-                                        <i class="fas fa-lightbulb text-warning mr-1"></i>
-                                        Recommendation:
-                                    </p>
-                                    <p class="text-xs text-base-content/70">{{ issue.recommendation }}</p>
-                                </div>
-                                {% endif %}
-                            </div>
-                            <div class="ml-4">
-                                <button class="btn btn-ghost btn-xs">
-                                    <i class="fas fa-chevron-down"></i>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-        {% if forloop.last %}
-                </div>
-            </div>
-        </div>
-        {% endif %}
-        {% endif %}
-        {% endfor %}
-        {% endwith %}
-        
-        <!-- Low Priority Issues -->
-        {% with low_issues=issues|dictsort:"severity"|slice:":50" %}
-        {% for issue in low_issues %}
-        {% if issue.severity == "low" or issue.severity == "Low" %}
-        {% if forloop.first %}
-        <div class="card bg-base-100 shadow-sm border border-info/30 mt-4">
-            <div class="card-body">
-                <h3 class="text-lg font-semibold text-info mb-4">
-                    <i class="fas fa-info-circle mr-2"></i>
-                    Low Priority Issues
-                </h3>
-                <div class="space-y-3">
-        {% endif %}
-                    <div class="issue-row p-4 rounded-lg bg-info/5 border border-info/20 hover:bg-info/10 transition-colors">
-                        <div class="flex items-start justify-between">
-                            <div class="flex-1">
-                                <div class="flex items-center gap-2 mb-2">
-                                    <span class="badge badge-info badge-sm">Low</span>
-                                    <span class="badge badge-ghost badge-sm">{{ issue.issue_category|title }}</span>
-                                </div>
-                                <h4 class="font-medium text-base-content mb-1">{{ issue.issue_type|title }}</h4>
-                                <p class="text-sm text-base-content/70">
-                                    {% if issue.issue_data %}
-                                        {% if issue.issue_data.content %}
-                                            {{ issue.issue_data.content|truncatechars:100 }}
-                                        {% else %}
-                                            Issue detected on this page
-                                        {% endif %}
-                                    {% elif issue.description %}
-                                        {{ issue.description }}
-                                    {% else %}
-                                        Issue detected
-                                    {% endif %}
-                                </p>
-                                {% if issue.url %}
-                                <div class="mt-2">
-                                    <p class="text-xs text-base-content/50">URL:</p>
-                                    <a href="{{ issue.url }}" target="_blank" 
-                                       class="text-xs text-primary hover:underline inline-flex items-center gap-1">
-                                        {{ issue.url|truncatechars:80 }}
-                                        <i class="fas fa-external-link-alt text-xs"></i>
-                                    </a>
-                                </div>
-                                {% elif issue.affected_url %}
-                                <div class="mt-2">
-                                    <p class="text-xs text-base-content/50">Affected:</p>
-                                    <span class="text-xs text-base-content/70">{{ issue.affected_url }}</span>
-                                </div>
-                                {% endif %}
-                                {% if issue.inlinks_count and issue.inlinks_count > 0 %}
-                                <span class="text-xs text-base-content/50">{{ issue.inlinks_count }} inlinks</span>
-                                {% endif %}
-                                {% if issue.recommendation %}
-                                <div class="mt-3 p-3 bg-base-100 rounded">
-                                    <p class="text-xs font-medium text-base-content mb-1">
-                                        <i class="fas fa-lightbulb text-info mr-1"></i>
-                                        Recommendation:
-                                    </p>
-                                    <p class="text-xs text-base-content/70">{{ issue.recommendation }}</p>
-                                </div>
-                                {% endif %}
-                            </div>
-                            <div class="ml-4">
-                                <button class="btn btn-ghost btn-xs">
-                                    <i class="fas fa-chevron-down"></i>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-        {% if forloop.last %}
-                </div>
-            </div>
-        </div>
-        {% endif %}
-        {% endif %}
-        {% endfor %}
-        {% endwith %}
-        
-        {% if not issues %}
-        <div class="card bg-base-100 shadow-sm border border-base-300">
-            <div class="card-body text-center py-12">
-                <i class="fas fa-check-circle text-5xl text-success mb-4"></i>
-                <h3 class="text-xl font-semibold text-base-content mb-2">No Issues Found!</h3>
-                <p class="text-base-content/60">Your website is in excellent condition.</p>
-            </div>
-        </div>
-        {% endif %}
+    <!-- Issues Content Area (This gets replaced on pagination) -->
+    <div id="issues-content-area">
+        {% include 'site_audit/partials/issues_content.html' %}
     </div>
-    
-    <!-- Load More Button -->
-    {% if issues.count > 50 %}
-    <div class="text-center">
-        <button class="btn btn-primary btn-outline">
-            Load More Issues
-            <i class="fas fa-chevron-down ml-2"></i>
-        </button>
-    </div>
-    {% endif %}
 </div>
+
+<style>
+.htmx-indicator {
+    display: none;
+}
+.htmx-request .htmx-indicator {
+    display: block;
+}
+</style>
+

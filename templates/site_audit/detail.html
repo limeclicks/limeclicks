@@ -131,6 +131,9 @@
                 </p>
                 <div class="flex gap-1 justify-center mt-3">
                     {% with issues=audit.get_issues_by_priority %}
+                    {% if issues.Critical > 0 %}
+                    <span class="badge badge-error badge-xs">{{ issues.Critical }} Critical</span>
+                    {% endif %}
                     {% if issues.High > 0 %}
                     <span class="badge badge-error badge-xs">{{ issues.High }} High</span>
                     {% endif %}

@@ -408,8 +408,21 @@ def audit_detail(request, audit_id):
     from site_audit.models import SiteIssue
     from django.db.models import Count
     
-    # Get issues from database
-    issues_qs = SiteIssue.objects.filter(site_audit=audit).select_related('site_audit')
+    # Get issues from database with proper ordering (Critical -> High -> Medium -> Low)
+    from django.db.models import Case, When, IntegerField
+    severity_order = Case(
+        When(severity='critical', then=0),
+        When(severity='high', then=1),
+        When(severity='medium', then=2),
+        When(severity='low', then=3),
+        When(severity='info', then=4),
+        default=5,
+        output_field=IntegerField()
+    )
+    
+    issues_qs = SiteIssue.objects.filter(site_audit=audit).select_related('site_audit').annotate(
+        severity_order=severity_order
+    ).order_by('severity_order', 'issue_type', 'url')
     
     # Apply filters if on issues tab
     if tab == 'issues':
@@ -430,65 +443,104 @@ def audit_detail(request, audit_id):
         if category_filter:
             issues_qs = issues_qs.filter(issue_category=category_filter)
     
-    # Get issues list
-    issues = list(issues_qs[:50])  # Show first 50 issues
+    # Pagination support
+    page = request.GET.get('page', 1)
+    try:
+        page = int(page)
+    except:
+        page = 1
     
-    # If no database issues, fall back to JSON (for backward compatibility)
-    if not issues and audit.issues_overview:
-        issues_list = audit.issues_overview.get('issues', [])
-        
-        # Convert JSON issues to a format similar to model objects
-        issues = []
-        for issue_data in issues_list[:50]:
-            issues.append({
-                'severity': issue_data.get('issue_priority', 'Low').lower(),
-                'issue_category': issue_data.get('issue_type', 'Other'),
-                'issue_type': issue_data.get('issue_name', ''),
-                'url': '',  # No URL in overview
-                'description': issue_data.get('description', ''),
-                'affected_url': f"{issue_data.get('urls', 0)} URLs affected",
-                'recommendation': issue_data.get('how_to_fix', ''),
-                'inlinks_count': issue_data.get('urls', 0),
-                'issue_data': {}
-            })
+    items_per_page = 50
+    offset = (page - 1) * items_per_page
     
-    # Calculate issues by category from database
-    if issues_qs.exists():
-        category_counts = issues_qs.values('issue_category').annotate(
-            count=Count('id')
-        ).order_by('-count')
-        issues_by_category = list(category_counts)
-    else:
-        # Fall back to JSON for category counts
-        issues_list = audit.issues_overview.get('issues', []) if audit.issues_overview else []
-        category_counts = {}
-        for issue in issues_list:
-            cat = issue.get('issue_type', 'Other')
-            category_counts[cat] = category_counts.get(cat, 0) + 1
-        issues_by_category = [{'issue_category': k, 'count': v} for k, v in category_counts.items()]
-        issues_by_category.sort(key=lambda x: x['count'], reverse=True)
+    # Get issues list with pagination - database only
+    issues = list(issues_qs[offset:offset + items_per_page])
+    
+    # Calculate issues by category from database only
+    category_counts = issues_qs.values('issue_category').annotate(
+        count=Count('id')
+    ).order_by('-count')
+    issues_by_category = list(category_counts)
     
     # Get issues by severity using the existing model method
     issues_by_severity = audit.get_issues_by_priority()
     
-    # Get total count from database or JSON
-    if issues_qs.exists():
-        total_issues = SiteIssue.objects.filter(site_audit=audit).count()
-    else:
-        total_issues = audit.get_total_issues_count()  # From JSON
+    # Get total count from database only
+    total_issues = SiteIssue.objects.filter(site_audit=audit).count()
+    
+    # Get issue lifecycle statistics from database only
+    from django.db.models import Count, Q
+    lifecycle_stats = SiteIssue.objects.filter(site_audit=audit).aggregate(
+        new_count=Count('id', filter=Q(status='new')),
+        persisting_count=Count('id', filter=Q(status='persisting')),
+        resolved_count=Count('id', filter=Q(status='resolved'))
+    )
+    
+    # Calculate pagination info
+    import math
+    total_pages = math.ceil(total_issues / items_per_page) if total_issues else 1
+    has_more = page < total_pages
+    
+    # Calculate issue range for display
+    issues_start = ((page - 1) * items_per_page) + 1 if total_issues > 0 else 0
+    issues_end = min(page * items_per_page, total_issues)
+    
+    # Generate page range for pagination display (with ellipsis for many pages)
+    def get_page_range(current, total):
+        if total <= 7:
+            return list(range(1, total + 1))
+        
+        # Always show first, last, current and 2 neighbors
+        pages = []
+        
+        # First pages
+        if current <= 3:
+            pages.extend(range(1, 5))
+            if total > 5:
+                pages.append('...')
+            pages.append(total)
+        # Last pages
+        elif current >= total - 2:
+            pages.append(1)
+            pages.append('...')
+            pages.extend(range(total - 3, total + 1))
+        # Middle pages
+        else:
+            pages.append(1)
+            pages.append('...')
+            pages.extend(range(current - 1, current + 2))
+            pages.append('...')
+            pages.append(total)
+        
+        return pages
+    
+    page_range = get_page_range(page, total_pages)
     
     context = {
         'audit': audit,
         'project': audit.project,
-        'issues': issues,  # Already limited to 50
+        'issues': issues,  # Paginated issues
         'issues_by_category': issues_by_category,
         'issues_by_severity': issues_by_severity,
         'total_issues': total_issues,
-        'tab': tab
+        'lifecycle_stats': lifecycle_stats,
+        'tab': tab,
+        'current_page': page,
+        'total_pages': total_pages,
+        'has_more': has_more,
+        'items_per_page': items_per_page,
+        'issues_start': issues_start,
+        'issues_end': issues_end,
+        'page_range': page_range
     }
     
-    # Handle HTMX requests for tab switching
+    # Handle HTMX requests for tab switching and pagination
     if request.headers.get('HX-Request'):
+        # For pagination requests (page > 1 or with filters), return only the content area
+        if tab == 'issues' and (page > 1 or request.GET.get('severity') or request.GET.get('category') or request.GET.get('search')):
+            return render(request, 'site_audit/partials/issues_content.html', context)
+        
+        # For initial tab switching, return the full tab content
         template_map = {
             'overview': 'site_audit/partials/tab_overview.html',
             'issues': 'site_audit/partials/tab_issues.html',

@@ -26,21 +26,25 @@ from project.models import Project
 
 def create_test_audit():
     """Create a test site audit for testing parsers"""
-    # Get or create test user
-    try:
-        user = User.objects.get(username='testuser')
-    except User.DoesNotExist:
+    # Use existing superuser
+    user = User.objects.filter(email='tomuaaz@gmail.com').first()
+    if not user:
+        user = User.objects.filter(is_superuser=True).first()
+    if not user:
         user = User.objects.create_user(
             username='testuser_parser',
             email='test_parser@example.com'
         )
     
-    # Get or create test project
-    project, _ = Project.objects.get_or_create(
-        user=user,
-        domain='test-site.com',
-        defaults={'title': 'Test Site', 'active': True}
-    )
+    # Use the seo-test.limeclicks.com project
+    project = Project.objects.filter(domain='seo-test.limeclicks.com').order_by('-id').first()
+    if not project:
+        project = Project.objects.create(
+            user=user,
+            domain='seo-test.limeclicks.com',
+            title='SEO Test Site',
+            active=True
+        )
     
     # Create site audit
     audit = SiteAudit.objects.create(

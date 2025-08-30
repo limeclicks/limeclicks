@@ -1,3 +1,4 @@
+{% load audit_filters %}
 <!-- Overview Tab Content -->
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
     <!-- Crawl Overview Section -->
@@ -80,6 +81,29 @@
             
             <div class="space-y-4">
                 {% with issues=audit.get_issues_by_priority %}
+                <!-- Critical Issues -->
+                {% if issues.Critical > 0 %}
+                <div class="stat-card p-3 rounded-lg bg-red-50 border border-error/20">
+                    <div class="flex justify-between items-center">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 bg-error/20 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-times-circle text-error"></i>
+                            </div>
+                            <div>
+                                <p class="text-sm font-medium text-base-content">Critical</p>
+                                <p class="text-xs text-base-content/60">Must fix immediately</p>
+                            </div>
+                        </div>
+                        <p class="text-2xl font-bold text-error">{{ issues.Critical|default:0 }}</p>
+                    </div>
+                    <div class="mt-2">
+                        <div class="w-full bg-error/20 rounded-full h-2">
+                            <div class="bg-error h-2 rounded-full" style="width: {% widthratio issues.Critical audit.get_total_issues_count 100 %}%"></div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+                
                 <!-- High Priority Issues -->
                 <div class="stat-card p-3 rounded-lg bg-base-200/50 {% if issues.High > 0 %}error{% endif %}">
                     <div class="flex justify-between items-center">
@@ -89,7 +113,7 @@
                             </div>
                             <div>
                                 <p class="text-sm font-medium text-base-content">High Priority</p>
-                                <p class="text-xs text-base-content/60">Critical issues to fix</p>
+                                <p class="text-xs text-base-content/60">Important to fix</p>
                             </div>
                         </div>
                         <p class="text-2xl font-bold text-error">{{ issues.High|default:0 }}</p>
@@ -173,7 +197,7 @@
             {% for category in issues_by_category %}
             <div class="p-4 rounded-lg bg-base-200/30 hover:bg-base-200/50 transition-colors">
                 <div class="flex items-center justify-between mb-2">
-                    <p class="text-sm font-medium text-base-content">{{ category.issue_category|title }}</p>
+                    <p class="text-sm font-medium text-base-content">{{ category.issue_category|replace_underscore }}</p>
                     <span class="badge badge-sm">{{ category.count }}</span>
                 </div>
                 <div class="w-full bg-base-300 rounded-full h-1.5">

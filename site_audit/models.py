@@ -176,22 +176,40 @@ class SiteAudit(models.Model):
                 audit.delete()
     
     def calculate_overall_score(self):
-        """Calculate overall site health score based on SEO issues only (no PageSpeed scores)"""
-        if not self.issues_overview:
+        """Calculate overall site health score based on database issues"""
+        from site_audit.models import SiteIssue
+        from django.db.models import Count
+        
+        # Get issues from database
+        issues = SiteIssue.objects.filter(site_audit=self)
+        
+        if not issues.exists():
             self.overall_site_health_score = 100
             return
         
-        # Get issues from issues_overview
-        issues_list = self.issues_overview.get('issues', [])
+        # Count issues by severity from database
+        severity_counts = issues.values('severity').annotate(
+            count=Count('id')
+        )
         
-        # Count issues by priority
-        high_issues = len([i for i in issues_list if i.get('issue_priority') == 'High'])
-        medium_issues = len([i for i in issues_list if i.get('issue_priority') == 'Medium'])
-        low_issues = len([i for i in issues_list if i.get('issue_priority') == 'Low'])
+        critical_issues = 0
+        high_issues = 0
+        medium_issues = 0
+        low_issues = 0
+        
+        for item in severity_counts:
+            if item['severity'] == 'critical':
+                critical_issues = item['count']
+            elif item['severity'] == 'high':
+                high_issues = item['count']
+            elif item['severity'] == 'medium':
+                medium_issues = item['count']
+            elif item['severity'] == 'low':
+                low_issues = item['count']
         
         # Calculate weighted issue score with stronger penalties
-        # High = 5 points, Medium = 2 points, Low = 1 point
-        weighted_issues = (high_issues * 5) + (medium_issues * 2) + (low_issues * 1)
+        # Critical = 10 points, High = 5 points, Medium = 2 points, Low = 1 point
+        weighted_issues = (critical_issues * 10) + (high_issues * 5) + (medium_issues * 2) + (low_issues * 1)
         
         # Calculate health score based on weighted issues
         if self.total_pages_crawled and self.total_pages_crawled > 0:
@@ -230,22 +248,26 @@ class SiteAudit(models.Model):
         self.overall_site_health_score = round(self.overall_site_health_score, 1)
     
     def get_total_issues_count(self):
-        """Get total number of issues from overview"""
-        issues_list = self.issues_overview.get('issues', [])
-        return len(issues_list)
+        """Get total issues count from database only"""
+        from site_audit.models import SiteIssue
+        return SiteIssue.objects.filter(site_audit=self).count()
     
     def get_issues_by_priority(self):
-        """Get breakdown of issues by priority"""
-        if not self.issues_overview:
-            return {'High': 0, 'Medium': 0, 'Low': 0}
+        """Get breakdown of issues by severity from database only"""
+        from site_audit.models import SiteIssue
+        from django.db.models import Count
         
-        breakdown = {'High': 0, 'Medium': 0, 'Low': 0}
-        issues_list = self.issues_overview.get('issues', [])
-        for issue in issues_list:
-            priority = issue.get('issue_priority', '')
-            if priority in breakdown:
-                breakdown[priority] += 1
+        # Get from database only
+        issues = SiteIssue.objects.filter(site_audit=self)
+        severity_counts = issues.values('severity').annotate(
+            count=Count('id')
+        )
         
+        breakdown = {'Critical': 0, 'High': 0, 'Medium': 0, 'Low': 0}
+        for item in severity_counts:
+            severity = item['severity'].capitalize()
+            if severity in breakdown:
+                breakdown[severity] = item['count']
         return breakdown
     
     def process_results(self):
@@ -360,6 +382,13 @@ class SiteIssue(models.Model):
         ('security', 'Security'),
     ]
     
+    # Issue status choices
+    STATUS_CHOICES = [
+        ('new', 'New'),
+        ('persisting', 'Persisting'),
+        ('resolved', 'Resolved'),
+    ]
+    
     # Core relationships
     site_audit = models.ForeignKey(
         SiteAudit, 
@@ -399,6 +428,28 @@ class SiteIssue(models.Model):
     indexability = models.CharField(max_length=50, blank=True)
     indexability_status = models.CharField(max_length=100, blank=True)
     inlinks_count = models.IntegerField(default=0)
+    
+    # Issue lifecycle tracking
+    status = models.CharField(
+        max_length=20, 
+        choices=STATUS_CHOICES, 
+        default='new',
+        db_index=True,
+        help_text="Track if issue is new, persisting, or resolved"
+    )
+    first_detected_audit = models.ForeignKey(
+        SiteAudit,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='first_detected_issues',
+        help_text="The audit where this issue was first detected"
+    )
+    resolved_at = models.DateTimeField(
+        null=True, 
+        blank=True,
+        help_text="When the issue was resolved"
+    )
     
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)

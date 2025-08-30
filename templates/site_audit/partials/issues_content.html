@@ -1,0 +1,91 @@
+<!-- Issues List -->
+<div id="issues-list" class="space-y-4">
+    {% include 'site_audit/partials/issues_items.html' %}
+    
+    {% if not issues %}
+    <!-- No Issues Found -->
+    <div class="card bg-base-100 shadow-sm border border-base-300">
+        <div class="card-body text-center py-12">
+            <i class="fas fa-check-circle text-5xl text-success mb-4"></i>
+            <h3 class="text-xl font-semibold text-base-content mb-2">No Issues Found!</h3>
+            <p class="text-base-content/60">Your website is in excellent condition.</p>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Pagination Controls -->
+{% if total_pages > 1 %}
+<div id="pagination-container" class="mt-8">
+    <!-- Results Info -->
+    <div class="flex justify-between items-center mb-4">
+        <div class="text-sm text-base-content/70">
+            Showing 
+            <span class="font-semibold">{{ issues_start|default:1 }}</span> - 
+            <span class="font-semibold">{{ issues_end|default:issues|length }}</span> 
+            of <span class="font-semibold">{{ total_issues|default:0 }}</span> issues
+        </div>
+        <div class="text-sm text-base-content/70">
+            Page <span class="font-semibold">{{ current_page }}</span> of <span class="font-semibold">{{ total_pages }}</span>
+        </div>
+    </div>
+    
+    <!-- Pagination Buttons -->
+    <div class="join flex justify-center">
+        <!-- Previous Button -->
+        {% if current_page > 1 %}
+        <button class="join-item btn btn-sm"
+                hx-get="{% url 'site_audit:detail' audit.id %}?tab=issues&page={{ current_page|add:-1 }}"
+                hx-trigger="click"
+                hx-target="#issues-content-area"
+                hx-swap="innerHTML"
+                hx-include="[name='severity'], [name='category'], #issue-search">
+            <i class="fas fa-chevron-left"></i>
+        </button>
+        {% else %}
+        <button class="join-item btn btn-sm btn-disabled">
+            <i class="fas fa-chevron-left"></i>
+        </button>
+        {% endif %}
+        
+        <!-- Page Numbers -->
+        {% for page_num in page_range %}
+            {% if page_num == '...' %}
+                <button class="join-item btn btn-sm btn-disabled">...</button>
+            {% elif page_num == current_page %}
+                <button class="join-item btn btn-sm btn-active btn-primary">{{ page_num }}</button>
+            {% else %}
+                <button class="join-item btn btn-sm"
+                        hx-get="{% url 'site_audit:detail' audit.id %}?tab=issues&page={{ page_num }}"
+                        hx-trigger="click"
+                        hx-target="#issues-content-area"
+                        hx-swap="innerHTML"
+                        hx-include="[name='severity'], [name='category'], #issue-search">
+                    {{ page_num }}
+                </button>
+            {% endif %}
+        {% endfor %}
+        
+        <!-- Next Button -->
+        {% if current_page < total_pages %}
+        <button class="join-item btn btn-sm"
+                hx-get="{% url 'site_audit:detail' audit.id %}?tab=issues&page={{ current_page|add:1 }}"
+                hx-trigger="click"
+                hx-target="#issues-content-area"
+                hx-swap="innerHTML"
+                hx-include="[name='severity'], [name='category'], #issue-search">
+            <i class="fas fa-chevron-right"></i>
+        </button>
+        {% else %}
+        <button class="join-item btn btn-sm btn-disabled">
+            <i class="fas fa-chevron-right"></i>
+        </button>
+        {% endif %}
+    </div>
+</div>
+{% elif issues %}
+<!-- Single Page -->
+<div class="text-center mt-8 text-sm text-base-content/70">
+    Showing all <span class="font-semibold">{{ total_issues|default:0 }}</span> issues
+</div>
+{% endif %}

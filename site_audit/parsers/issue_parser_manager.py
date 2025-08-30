@@ -116,69 +116,111 @@ class IssueParserManager:
     
     def save_all_issues(self) -> int:
         """
-        Save all parsed issues to database with duplicate prevention
-        Ensures same issue_type + URL combination is stored only once
+        Save all parsed issues to database with lifecycle tracking
+        Tracks new, persisting, and resolved issues across audits
         
         Returns:
             Number of issues saved
         """
-        from site_audit.models import SiteIssue
+        from site_audit.models import SiteIssue, SiteAudit
+        from django.utils import timezone
         
         if not self.all_issues:
             print("\n⚠️ No issues to save")
             return 0
         
-        print(f"\n💾 Saving {len(self.all_issues)} issues to database...")
+        print(f"\n💾 Processing {len(self.all_issues)} issues with lifecycle tracking...")
         
-        # Get existing issues for this audit to check for duplicates
-        existing_issues = SiteIssue.objects.filter(site_audit=self.site_audit)
-        existing_combinations = set()
+        # Get the previous audit for this project (if exists)
+        previous_audit = SiteAudit.objects.filter(
+            project=self.site_audit.project,
+            status='completed',
+            id__lt=self.site_audit.id  # Audits before this one
+        ).order_by('-id').first()
         
-        if existing_issues.exists():
-            # Build set of existing (url, issue_type) combinations for fast lookup
-            existing_combinations = set(
-                existing_issues.values_list('url', 'issue_type')
-            )
-            print(f"  📋 Found {len(existing_combinations)} existing issue combinations")
+        # Get existing issues from previous audit
+        previous_issues_map = {}
+        if previous_audit:
+            print(f"  📊 Found previous audit #{previous_audit.id}")
+            previous_issues = SiteIssue.objects.filter(
+                site_audit=previous_audit
+            ).exclude(status='resolved')  # Don't include already resolved issues
+            
+            # Create a map of (url, issue_type) -> issue for fast lookup
+            for issue in previous_issues:
+                key = (issue.url, issue.issue_type)
+                previous_issues_map[key] = issue
+            print(f"  📋 Found {len(previous_issues_map)} active issues from previous audit")
+        else:
+            print("  ℹ️ No previous audit found - all issues will be marked as new")
         
-        # Filter out duplicates from new issues
-        unique_issues = []
-        duplicate_count = 0
-        seen_combinations = set()
+        # Process current issues
+        issues_to_create = []
+        issues_to_update = []
+        current_issue_keys = set()
+        
+        new_count = 0
+        persisting_count = 0
         
         for issue_data in self.all_issues:
             url = issue_data.get('url', '')
             issue_type = issue_data.get('issue_type', '')
-            combination = (url, issue_type)
+            key = (url, issue_type)
+            current_issue_keys.add(key)
             
-            # Skip if already exists in database or already seen in this batch
-            if combination in existing_combinations or combination in seen_combinations:
-                duplicate_count += 1
-                continue
+            # Check if this issue existed in previous audit
+            if key in previous_issues_map:
+                # Issue is persisting - create new record linked to current audit
+                issue_data['status'] = 'persisting'
+                issue_data['first_detected_audit'] = previous_issues_map[key].first_detected_audit or previous_audit
+                persisting_count += 1
+            else:
+                # New issue
+                issue_data['status'] = 'new'
+                issue_data['first_detected_audit'] = self.site_audit
+                new_count += 1
             
-            unique_issues.append(issue_data)
-            seen_combinations.add(combination)
+            issues_to_create.append(SiteIssue(**issue_data))
         
-        if duplicate_count > 0:
-            print(f"  🔍 Skipped {duplicate_count} duplicate issues")
+        # Mark issues from previous audit as resolved if not in current audit
+        resolved_count = 0
+        if previous_audit and previous_issues_map:
+            resolved_issues = []
+            for key, prev_issue in previous_issues_map.items():
+                if key not in current_issue_keys:
+                    # Issue has been resolved - create a resolved record
+                    resolved_issue_data = {
+                        'site_audit': self.site_audit,
+                        'url': prev_issue.url,
+                        'issue_type': prev_issue.issue_type,
+                        'issue_category': prev_issue.issue_category,
+                        'severity': prev_issue.severity,
+                        'issue_data': prev_issue.issue_data,
+                        'indexability': prev_issue.indexability,
+                        'indexability_status': prev_issue.indexability_status,
+                        'inlinks_count': prev_issue.inlinks_count,
+                        'status': 'resolved',
+                        'first_detected_audit': prev_issue.first_detected_audit or previous_audit,
+                        'resolved_at': timezone.now()
+                    }
+                    resolved_issues.append(SiteIssue(**resolved_issue_data))
+                    resolved_count += 1
+            
+            if resolved_issues:
+                issues_to_create.extend(resolved_issues)
         
-        if not unique_issues:
-            print("  ℹ️ No new unique issues to save")
-            return 0
+        # Bulk create all issues
+        if issues_to_create:
+            created_issues = SiteIssue.objects.bulk_create(issues_to_create, batch_size=1000)
+            print(f"  ✅ Saved {len(created_issues)} total issue records")
+        else:
+            created_issues = []
         
-        print(f"  💾 Saving {len(unique_issues)} unique issues...")
-        
-        # Create SiteIssue objects for unique issues only
-        issue_objects = []
-        for issue_data in unique_issues:
-            issue_objects.append(SiteIssue(**issue_data))
-        
-        # Bulk create for efficiency
-        created_issues = SiteIssue.objects.bulk_create(issue_objects, batch_size=1000)
-        
-        print(f"  ✅ Successfully saved {len(created_issues)} new issues")
-        if duplicate_count > 0:
-            print(f"  🔄 Prevented {duplicate_count} duplicates")
+        # Print summary
+        print(f"\n📊 Issue Lifecycle Summary:")
+        print(f"  🆕 New Issues: {new_count}")
+        print(f"  🔄 Persisting Issues: {persisting_count}")
+        print(f"  ✅ Resolved Issues: {resolved_count}")
         
         # Update site audit statistics
         self._update_site_audit_stats()
@@ -189,13 +231,27 @@ class IssueParserManager:
         """Update site audit model with issue statistics"""
         from django.db.models import Count
         from site_audit.models import SiteIssue
+        import os
+        import csv
         
         # Get total issue count
         total_issues = SiteIssue.objects.filter(site_audit=self.site_audit).count()
         
-        # Don't calculate health score here - it's calculated from issues_overview.csv
-        # The overview-based calculation considers issue priority (High/Medium/Low)
-        # which is more accurate than just counting individual issue instances
+        # Try to get pages crawled from crawl_overview.csv
+        crawl_overview_path = os.path.join(os.path.dirname(self.output_dir), 'crawl_overview.csv')
+        if os.path.exists(crawl_overview_path):
+            try:
+                with open(crawl_overview_path, 'r', encoding='utf-8-sig') as f:
+                    reader = csv.reader(f)
+                    for row in reader:
+                        if len(row) >= 2 and row[0] == 'Total Internal URLs':
+                            self.site_audit.total_pages_crawled = int(row[1])
+                            break
+            except Exception as e:
+                print(f"  ⚠️ Could not read pages crawled: {e}")
+        
+        # Calculate health score from database issues
+        self.site_audit.calculate_overall_score()
         
         # Set audit as completed
         self.site_audit.status = 'completed'
@@ -204,6 +260,7 @@ class IssueParserManager:
         
         print(f"\n📊 Site Audit Statistics Updated:")
         print(f"  • Total Issues: {total_issues}")
+        print(f"  • Pages Crawled: {self.site_audit.total_pages_crawled}")
         print(f"  • Health Score: {self.site_audit.overall_site_health_score}%")
     
     def get_issue_summary(self) -> Dict[str, Any]:
