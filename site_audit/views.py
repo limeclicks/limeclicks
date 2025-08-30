@@ -11,10 +11,40 @@ from datetime import timedelta
 import json
 import time
 import re
+import boto3
+from django.conf import settings
 
 from project.models import Project
 from .models import SiteAudit, SiteIssue
 from .tasks import trigger_manual_site_audit
+
+
+def fetch_pagespeed_data_from_r2(r2_path):
+    """Fetch PageSpeed Insights data from R2 storage"""
+    if not r2_path:
+        return None
+    
+    try:
+        # Initialize R2 client using AWS settings
+        s3_client = boto3.client(
+            's3',
+            endpoint_url=settings.AWS_S3_ENDPOINT_URL,
+            aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+            aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+            region_name='auto'
+        )
+        
+        # Download and parse the JSON file
+        response = s3_client.get_object(
+            Bucket=settings.AWS_STORAGE_BUCKET_NAME,
+            Key=r2_path
+        )
+        
+        content = response['Body'].read()
+        return json.loads(content)
+    except Exception as e:
+        print(f"Error fetching PageSpeed data from R2: {e}")
+        return None
 
 
 @login_required
@@ -192,6 +222,7 @@ def audit_status_stream(request):
         """Generate server-sent events"""
         # Track previous states and scores to detect changes
         audit_states = {}
+        is_initial_load = True
         
         while True:
             # Get all audits for the user's projects
@@ -217,25 +248,34 @@ def audit_status_stream(request):
                 
                 # Detect any change (status, scores, or pages)
                 if previous_state != current_state:
-                    # Send update for any change
-                    data = {
-                        'project_id': audit.project.id,
-                        'audit_id': audit.id,
-                        'status': audit.status,
-                        'previous_status': previous_state[0] if previous_state else None,
-                        'health_score': audit.overall_site_health_score,
-                        'pages_crawled': audit.total_pages_crawled,
-                        'issues_count': audit.get_total_issues_count(),
-                        'performance_mobile': audit.performance_score_mobile,
-                        'performance_desktop': audit.performance_score_desktop,
-                        'update_type': 'score_update' if previous_state and previous_state[0] == audit.status else 'status_update'
-                    }
-                    
-                    # Send as named event for HTMX SSE
-                    yield f"event: audit_update\ndata: {json.dumps(data)}\n\n"
-                    
-                    # Update tracked state
-                    audit_states[audit_key] = current_state
+                    # On initial load, just populate the state without sending updates
+                    # This prevents notifications for already completed audits
+                    if is_initial_load:
+                        audit_states[audit_key] = current_state
+                    else:
+                        # Send update for any change
+                        data = {
+                            'project_id': audit.project.id,
+                            'audit_id': audit.id,
+                            'status': audit.status,
+                            'previous_status': previous_state[0] if previous_state else None,
+                            'health_score': audit.overall_site_health_score,
+                            'pages_crawled': audit.total_pages_crawled,
+                            'issues_count': audit.get_total_issues_count(),
+                            'performance_mobile': audit.performance_score_mobile,
+                            'performance_desktop': audit.performance_score_desktop,
+                            'update_type': 'score_update' if previous_state and previous_state[0] == audit.status else 'status_update',
+                            'is_new_completion': previous_state and previous_state[0] != 'completed' and audit.status == 'completed'
+                        }
+                        
+                        # Send as named event for HTMX SSE
+                        yield f"event: audit_update\ndata: {json.dumps(data)}\n\n"
+                        
+                        # Update tracked state
+                        audit_states[audit_key] = current_state
+            
+            # After first iteration, mark as no longer initial load
+            is_initial_load = False
             
             # Also send heartbeat to keep connection alive
             yield f": heartbeat\n\n"
@@ -516,6 +556,19 @@ def audit_detail(request, audit_id):
     
     page_range = get_page_range(page, total_pages)
     
+    # Fetch PageSpeed data from R2 if on performance tab
+    mobile_pagespeed_data = None
+    desktop_pagespeed_data = None
+    
+    if tab == 'performance':
+        # Fetch mobile PageSpeed data
+        if audit.pagespeed_mobile_response_r2_path:
+            mobile_pagespeed_data = fetch_pagespeed_data_from_r2(audit.pagespeed_mobile_response_r2_path)
+        
+        # Fetch desktop PageSpeed data
+        if audit.pagespeed_desktop_response_r2_path:
+            desktop_pagespeed_data = fetch_pagespeed_data_from_r2(audit.pagespeed_desktop_response_r2_path)
+    
     context = {
         'audit': audit,
         'project': audit.project,
@@ -531,7 +584,9 @@ def audit_detail(request, audit_id):
         'items_per_page': items_per_page,
         'issues_start': issues_start,
         'issues_end': issues_end,
-        'page_range': page_range
+        'page_range': page_range,
+        'mobile_pagespeed_data': mobile_pagespeed_data,
+        'desktop_pagespeed_data': desktop_pagespeed_data
     }
     
     # Handle HTMX requests for tab switching and pagination

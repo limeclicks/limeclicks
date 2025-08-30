@@ -7,13 +7,13 @@ from typing import List, Dict, Any
 class ImageParser(BaseIssueParser):
     """Parser for image related issues"""
     
-    # CSV files this parser handles
+    # CSV files this parser handles (updated to match actual file names)
     CSV_FILES = {
         'images_missing_alt_text.csv': 'missing_alt_text',
         'images_missing_alt_attribute.csv': 'missing_alt_attribute', 
         'images_over_100_kb.csv': 'large_image',
-        'images_with_nofollow.csv': 'image_with_nofollow',
-        'images_internal_missing.csv': 'missing_image'
+        'images_alt_text_over_100_characters.csv': 'alt_text_too_long',
+        'images_images_with_alt_text_over_x_characters.csv': 'alt_text_too_long_custom'
     }
     
     def parse(self) -> List[Dict[str, Any]]:

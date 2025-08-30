@@ -240,9 +240,10 @@ def trigger_manual_site_audit(self, project_id: int) -> dict:
                 "days_remaining": site_audit.manual_audit_frequency_days - days_since_last
             }
     
-    # Update last manual audit time
+    # Update last manual audit time and set status to pending
     site_audit.last_manual_audit = timezone.now()
-    site_audit.save(update_fields=['last_manual_audit'])
+    site_audit.status = 'pending'
+    site_audit.save(update_fields=['last_manual_audit', 'status'])
     
     # Enqueue the actual audit task
     task = run_site_audit.apply_async(
@@ -456,28 +457,24 @@ def collect_pagespeed_insights(self, site_audit_id: int) -> dict:
         # Update site audit with collected data
         updates = []
         
-        # Store mobile performance data
+        # Extract and store performance scores only (not full data)
         if 'mobile' in psi_data and psi_data['mobile']:
-            site_audit.mobile_performance = psi_data['mobile']
             # The scores are already at the top level of the parsed data
             mobile_scores = psi_data['mobile'].get('scores', {})
             mobile_score = mobile_scores.get('performance') if mobile_scores else None
             if mobile_score is not None:
                 site_audit.performance_score_mobile = mobile_score
                 updates.append('performance_score_mobile')
-            updates.append('mobile_performance')
             logger.info(f"Mobile PageSpeed score: {mobile_score}, Full scores: {mobile_scores}")
         
-        # Store desktop performance data  
+        # Store desktop performance scores only
         if 'desktop' in psi_data and psi_data['desktop']:
-            site_audit.desktop_performance = psi_data['desktop']
             # The scores are already at the top level of the parsed data
             desktop_scores = psi_data['desktop'].get('scores', {})
             desktop_score = desktop_scores.get('performance') if desktop_scores else None
             if desktop_score is not None:
                 site_audit.performance_score_desktop = desktop_score
                 updates.append('performance_score_desktop')
-            updates.append('desktop_performance')
             logger.info(f"Desktop PageSpeed score: {desktop_score}, Full scores: {desktop_scores}")
         
         # Add R2 paths to updates if they were saved

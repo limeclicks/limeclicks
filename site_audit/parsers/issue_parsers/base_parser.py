@@ -39,9 +39,19 @@ class BaseIssueParser:
         Returns:
             List of dictionaries representing CSV rows
         """
-        file_path = os.path.join(self.output_dir, filename)
+        # Try multiple locations for the file
+        possible_paths = [
+            os.path.join(self.output_dir, 'issues_reports', filename),  # New location
+            os.path.join(self.output_dir, filename)  # Original location
+        ]
         
-        if not os.path.exists(file_path):
+        file_path = None
+        for path in possible_paths:
+            if os.path.exists(path):
+                file_path = path
+                break
+        
+        if not file_path:
             print(f"  ⚠️ File not found: {filename}")
             return []
             

@@ -1,0 +1,429 @@
+{% load pagespeed_filters %}
+<!-- PageSpeed Insights Detail View -->
+<div class="space-y-6">
+    {% with lighthouse=pagespeed_data.data.lighthouseResult %}
+    
+    <!-- Performance Score Card -->
+    <div class="card bg-base-100 shadow-sm border border-base-300">
+        <div class="card-body">
+            <div class="flex items-center justify-between mb-6">
+                <h3 class="text-xl font-semibold text-base-content">
+                    {% if device_type == "mobile" %}
+                        <i class="fas fa-mobile-alt mr-2 text-primary"></i>
+                        Mobile Performance
+                    {% else %}
+                        <i class="fas fa-desktop mr-2 text-secondary"></i>
+                        Desktop Performance  
+                    {% endif %}
+                </h3>
+                <div class="text-sm text-base-content/60">
+                    Analyzed: {{ audit.last_audit_date|date:"M d, Y g:i A" }}
+                </div>
+            </div>
+
+            <!-- Main Performance Score -->
+            <div class="text-center mb-8">
+                {% if lighthouse.categories.performance %}
+                {% with score=lighthouse.categories.performance.score|score_to_percent %}
+                <div class="radial-progress {% if score >= 90 %}text-success{% elif score >= 50 %}text-warning{% else %}text-error{% endif %}" 
+                     style="--value:{{ score|default:0 }}; --size:10rem; --thickness: 10px;">
+                    <div>
+                        <span class="text-4xl font-bold">{{ score|default:"-" }}</span>
+                        <p class="text-sm text-base-content/60 mt-1">Performance</p>
+                    </div>
+                </div>
+                <p class="mt-4 text-lg {% if score >= 90 %}text-success{% elif score >= 50 %}text-warning{% else %}text-error{% endif %}">
+                    {% if score >= 90 %}
+                        Excellent Performance
+                    {% elif score >= 50 %}
+                        Needs Improvement
+                    {% else %}
+                        Poor Performance
+                    {% endif %}
+                </p>
+                {% endwith %}
+                {% endif %}
+            </div>
+
+            <!-- Other Scores Grid -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                <!-- Accessibility Score -->
+                {% if lighthouse.categories.accessibility %}
+                <div class="text-center">
+                    {% with score=lighthouse.categories.accessibility.score|score_to_percent %}
+                    <div class="radial-progress {% if score >= 90 %}text-success{% elif score >= 50 %}text-warning{% else %}text-error{% endif %}" 
+                         style="--value:{{ score|default:0 }}; --size:5rem; --thickness: 4px;">
+                        <span class="text-xl font-semibold">{{ score|default:"-" }}</span>
+                    </div>
+                    <p class="text-xs text-base-content/60 mt-2">Accessibility</p>
+                    {% endwith %}
+                </div>
+                {% endif %}
+
+                <!-- Best Practices Score -->
+                {% if lighthouse.categories.best-practices %}
+                <div class="text-center">
+                    {% with bp=lighthouse.categories|get_item:"best-practices" %}
+                    {% with score=bp.score|score_to_percent %}
+                    <div class="radial-progress {% if score >= 90 %}text-success{% elif score >= 50 %}text-warning{% else %}text-error{% endif %}" 
+                         style="--value:{{ score|default:0 }}; --size:5rem; --thickness: 4px;">
+                        <span class="text-xl font-semibold">{{ score|default:"-" }}</span>
+                    </div>
+                    <p class="text-xs text-base-content/60 mt-2">Best Practices</p>
+                    {% endwith %}
+                    {% endwith %}
+                </div>
+                {% endif %}
+
+                <!-- SEO Score -->
+                {% if lighthouse.categories.seo %}
+                <div class="text-center">
+                    {% with score=lighthouse.categories.seo.score|score_to_percent %}
+                    <div class="radial-progress {% if score >= 90 %}text-success{% elif score >= 50 %}text-warning{% else %}text-error{% endif %}" 
+                         style="--value:{{ score|default:0 }}; --size:5rem; --thickness: 4px;">
+                        <span class="text-xl font-semibold">{{ score|default:"-" }}</span>
+                    </div>
+                    <p class="text-xs text-base-content/60 mt-2">SEO</p>
+                    {% endwith %}
+                </div>
+                {% endif %}
+
+                <!-- PWA Score (if available) -->
+                {% if lighthouse.categories.pwa %}
+                <div class="text-center">
+                    {% with score=lighthouse.categories.pwa.score|score_to_percent %}
+                    <div class="radial-progress {% if score >= 90 %}text-success{% elif score >= 50 %}text-warning{% else %}text-error{% endif %}" 
+                         style="--value:{{ score|default:0 }}; --size:5rem; --thickness: 4px;">
+                        <span class="text-xl font-semibold">{{ score|default:"-" }}</span>
+                    </div>
+                    <p class="text-xs text-base-content/60 mt-2">PWA</p>
+                    {% endwith %}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Core Web Vitals -->
+    {% if lighthouse.audits %}
+    <div class="card bg-base-100 shadow-sm border border-base-300">
+        <div class="card-body">
+            <h3 class="text-lg font-semibold text-base-content mb-6">
+                <i class="fas fa-heartbeat mr-2 text-error"></i>
+                Core Web Vitals
+            </h3>
+            
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <!-- LCP -->
+                {% with lcp=lighthouse.audits|get_item:"largest-contentful-paint" %}
+                {% if lcp %}
+                <div class="p-4 rounded-lg bg-base-200/50">
+                    <div class="flex items-start justify-between mb-3">
+                        <div>
+                            <p class="font-medium text-base-content">Largest Contentful Paint</p>
+                            <p class="text-xs text-base-content/60">LCP</p>
+                        </div>
+                        {% with score=lcp.score|score_to_percent %}
+                        <span class="badge {% if score >= 90 %}badge-success{% elif score >= 50 %}badge-warning{% else %}badge-error{% endif %}">
+                            {{ lcp.displayValue|default:"N/A" }}
+                        </span>
+                        {% endwith %}
+                    </div>
+                    <div class="text-xs text-base-content/70">
+                        {% with score=lcp.score|score_to_percent %}
+                        {% if score >= 90 %}
+                            Good (< 2.5s)
+                        {% elif score >= 50 %}
+                            Needs Improvement (2.5s - 4s)
+                        {% else %}
+                            Poor (> 4s)
+                        {% endif %}
+                        {% endwith %}
+                    </div>
+                </div>
+                {% endif %}
+                {% endwith %}
+
+                <!-- FID/TBT -->
+                {% with tbt=lighthouse.audits|get_item:"total-blocking-time" %}
+                {% if tbt %}
+                <div class="p-4 rounded-lg bg-base-200/50">
+                    <div class="flex items-start justify-between mb-3">
+                        <div>
+                            <p class="font-medium text-base-content">Total Blocking Time</p>
+                            <p class="text-xs text-base-content/60">TBT</p>
+                        </div>
+                        {% with score=tbt.score|score_to_percent %}
+                        <span class="badge {% if score >= 90 %}badge-success{% elif score >= 50 %}badge-warning{% else %}badge-error{% endif %}">
+                            {{ tbt.displayValue|default:"N/A" }}
+                        </span>
+                        {% endwith %}
+                    </div>
+                    <div class="text-xs text-base-content/70">
+                        {% with score=tbt.score|score_to_percent %}
+                        {% if score >= 90 %}
+                            Good (< 200ms)
+                        {% elif score >= 50 %}
+                            Needs Improvement
+                        {% else %}
+                            Poor (> 600ms)
+                        {% endif %}
+                        {% endwith %}
+                    </div>
+                </div>
+                {% endif %}
+                {% endwith %}
+
+                <!-- CLS -->
+                {% with cls=lighthouse.audits|get_item:"cumulative-layout-shift" %}
+                {% if cls %}
+                <div class="p-4 rounded-lg bg-base-200/50">
+                    <div class="flex items-start justify-between mb-3">
+                        <div>
+                            <p class="font-medium text-base-content">Cumulative Layout Shift</p>
+                            <p class="text-xs text-base-content/60">CLS</p>
+                        </div>
+                        {% with score=cls.score|score_to_percent %}
+                        <span class="badge {% if score >= 90 %}badge-success{% elif score >= 50 %}badge-warning{% else %}badge-error{% endif %}">
+                            {{ cls.displayValue|default:"N/A" }}
+                        </span>
+                        {% endwith %}
+                    </div>
+                    <div class="text-xs text-base-content/70">
+                        {% with score=cls.score|score_to_percent %}
+                        {% if score >= 90 %}
+                            Good (< 0.1)
+                        {% elif score >= 50 %}
+                            Needs Improvement (0.1 - 0.25)
+                        {% else %}
+                            Poor (> 0.25)
+                        {% endif %}
+                        {% endwith %}
+                    </div>
+                </div>
+                {% endif %}
+                {% endwith %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Lab Metrics -->
+    {% if lighthouse.audits %}
+    <div class="card bg-base-100 shadow-sm border border-base-300">
+        <div class="card-body">
+            <h3 class="text-lg font-semibold text-base-content mb-6">
+                <i class="fas fa-flask mr-2 text-info"></i>
+                Lab Metrics
+            </h3>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <!-- First Contentful Paint -->
+                {% with fcp=lighthouse.audits|get_item:"first-contentful-paint" %}
+                {% if fcp %}
+                <div class="flex items-center justify-between p-3 rounded-lg bg-base-200/30">
+                    <div class="flex-1">
+                        <p class="font-medium text-sm text-base-content">First Contentful Paint</p>
+                        <p class="text-xs text-base-content/60 mt-1">{{ fcp.description }}</p>
+                    </div>
+                    <div class="text-right ml-4">
+                        <span class="text-lg font-semibold text-base-content">{{ fcp.displayValue }}</span>
+                        {% with score=fcp.score|score_to_percent %}
+                        <div class="text-xs {% if score >= 90 %}text-success{% elif score >= 50 %}text-warning{% else %}text-error{% endif %}">
+                            {% if score >= 90 %}Good{% elif score >= 50 %}Average{% else %}Poor{% endif %}
+                        </div>
+                        {% endwith %}
+                    </div>
+                </div>
+                {% endif %}
+                {% endwith %}
+
+                <!-- Speed Index -->
+                {% with si=lighthouse.audits|get_item:"speed-index" %}
+                {% if si %}
+                <div class="flex items-center justify-between p-3 rounded-lg bg-base-200/30">
+                    <div class="flex-1">
+                        <p class="font-medium text-sm text-base-content">Speed Index</p>
+                        <p class="text-xs text-base-content/60 mt-1">{{ si.description }}</p>
+                    </div>
+                    <div class="text-right ml-4">
+                        <span class="text-lg font-semibold text-base-content">{{ si.displayValue }}</span>
+                        {% with score=si.score|score_to_percent %}
+                        <div class="text-xs {% if score >= 90 %}text-success{% elif score >= 50 %}text-warning{% else %}text-error{% endif %}">
+                            {% if score >= 90 %}Good{% elif score >= 50 %}Average{% else %}Poor{% endif %}
+                        </div>
+                        {% endwith %}
+                    </div>
+                </div>
+                {% endif %}
+                {% endwith %}
+
+                <!-- Time to Interactive -->
+                {% with tti=lighthouse.audits.interactive %}
+                {% if tti %}
+                <div class="flex items-center justify-between p-3 rounded-lg bg-base-200/30">
+                    <div class="flex-1">
+                        <p class="font-medium text-sm text-base-content">Time to Interactive</p>
+                        <p class="text-xs text-base-content/60 mt-1">{{ tti.description }}</p>
+                    </div>
+                    <div class="text-right ml-4">
+                        <span class="text-lg font-semibold text-base-content">{{ tti.displayValue }}</span>
+                        {% with score=tti.score|score_to_percent %}
+                        <div class="text-xs {% if score >= 90 %}text-success{% elif score >= 50 %}text-warning{% else %}text-error{% endif %}">
+                            {% if score >= 90 %}Good{% elif score >= 50 %}Average{% else %}Poor{% endif %}
+                        </div>
+                        {% endwith %}
+                    </div>
+                </div>
+                {% endif %}
+                {% endwith %}
+
+                <!-- First Meaningful Paint -->
+                {% with fmp=lighthouse.audits|get_item:"first-meaningful-paint" %}
+                {% if fmp %}
+                <div class="flex items-center justify-between p-3 rounded-lg bg-base-200/30">
+                    <div class="flex-1">
+                        <p class="font-medium text-sm text-base-content">First Meaningful Paint</p>
+                        <p class="text-xs text-base-content/60 mt-1">{{ fmp.description }}</p>
+                    </div>
+                    <div class="text-right ml-4">
+                        <span class="text-lg font-semibold text-base-content">{{ fmp.displayValue }}</span>
+                        {% with score=fmp.score|score_to_percent %}
+                        <div class="text-xs {% if score >= 90 %}text-success{% elif score >= 50 %}text-warning{% else %}text-error{% endif %}">
+                            {% if score >= 90 %}Good{% elif score >= 50 %}Average{% else %}Poor{% endif %}
+                        </div>
+                        {% endwith %}
+                    </div>
+                </div>
+                {% endif %}
+                {% endwith %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Opportunities -->
+    {% if lighthouse.audits %}
+    <div class="card bg-base-100 shadow-sm border border-base-300">
+        <div class="card-body">
+            <h3 class="text-lg font-semibold text-base-content mb-6">
+                <i class="fas fa-rocket mr-2 text-warning"></i>
+                Opportunities
+            </h3>
+            
+            <div class="space-y-4">
+                {% for audit_key, audit in lighthouse.audits.items %}
+                {% if audit.details.type == "opportunity" and audit.score < 0.9 %}
+                <div class="collapse collapse-arrow bg-base-200/30">
+                    <input type="checkbox" /> 
+                    <div class="collapse-title">
+                        <div class="flex items-center justify-between">
+                            <div class="flex-1">
+                                <p class="font-medium text-base-content">{{ audit.title }}</p>
+                                <p class="text-sm text-base-content/60 mt-1">{{ audit.description }}</p>
+                            </div>
+                            {% if audit.displayValue %}
+                            <div class="ml-4">
+                                <span class="badge badge-warning">
+                                    {{ audit.displayValue }}
+                                </span>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="collapse-content">
+                        {% if audit.details.items %}
+                        <div class="mt-4 p-4 bg-base-100 rounded-lg overflow-x-auto">
+                            <table class="table table-sm">
+                                <tbody>
+                                    {% for item in audit.details.items|slice:":5" %}
+                                    <tr>
+                                        <td class="text-xs">{{ item.url|default:item }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Diagnostics -->
+    {% if lighthouse.audits %}
+    <div class="card bg-base-100 shadow-sm border border-base-300">
+        <div class="card-body">
+            <h3 class="text-lg font-semibold text-base-content mb-6">
+                <i class="fas fa-stethoscope mr-2 text-primary"></i>
+                Diagnostics
+            </h3>
+            
+            <div class="space-y-4">
+                {% for audit_key, audit in lighthouse.audits.items %}
+                {% if audit.details.type == "table" and audit.score and audit.score < 1 and audit_key != "screenshot-thumbnails" and audit_key != "final-screenshot" %}
+                <div class="collapse collapse-arrow bg-base-200/30">
+                    <input type="checkbox" /> 
+                    <div class="collapse-title">
+                        <div class="flex items-center justify-between">
+                            <div class="flex-1">
+                                <p class="font-medium text-base-content">{{ audit.title }}</p>
+                                <p class="text-sm text-base-content/60 mt-1">{{ audit.description }}</p>
+                            </div>
+                            {% if audit.displayValue %}
+                            <div class="ml-4">
+                                <span class="text-sm font-medium text-base-content">
+                                    {{ audit.displayValue }}
+                                </span>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="collapse-content">
+                        {% if audit.details.items %}
+                        <div class="mt-4 p-4 bg-base-100 rounded-lg overflow-x-auto">
+                            <table class="table table-sm">
+                                <tbody>
+                                    {% for item in audit.details.items|slice:":5" %}
+                                    <tr>
+                                        <td class="text-xs">{{ item.url|default:item.source|default:item }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Screenshot -->
+    {% with screenshot=lighthouse.audits|get_item:"final-screenshot" %}
+    {% if screenshot and screenshot.details.data %}
+    <div class="card bg-base-100 shadow-sm border border-base-300">
+        <div class="card-body">
+            <h3 class="text-lg font-semibold text-base-content mb-4">
+                <i class="fas fa-camera mr-2 text-secondary"></i>
+                Page Screenshot
+            </h3>
+            <div class="rounded-lg overflow-hidden border border-base-300">
+                <img src="{{ screenshot.details.data }}" 
+                     alt="Page screenshot" 
+                     class="w-full h-auto">
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    {% endwith %}
+
+    {% endwith %}
+</div>

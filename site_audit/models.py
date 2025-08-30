@@ -89,18 +89,6 @@ class SiteAudit(models.Model):
         """Alias for total_pages_crawled field"""
         return self.total_pages_crawled
     
-    # PageSpeed Insights Performance Data
-    desktop_performance = models.JSONField(
-        default=dict,
-        blank=True,
-        help_text="Desktop PageSpeed Insights data including scores, core web vitals, and lab metrics"
-    )
-    mobile_performance = models.JSONField(
-        default=dict,
-        blank=True,
-        help_text="Mobile PageSpeed Insights data including scores, core web vitals, and lab metrics"
-    )
-    
     # PageSpeed API response storage paths (separate for mobile and desktop)
     pagespeed_mobile_response_r2_path = models.CharField(
         max_length=500,

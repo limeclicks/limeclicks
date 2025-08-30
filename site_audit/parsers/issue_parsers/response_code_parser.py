@@ -9,12 +9,14 @@ class ResponseCodeParser(BaseIssueParser):
     
     # CSV files this parser handles
     CSV_FILES = {
-        'response_codes_internal_redirection_3xx.csv': 'internal_redirection_3xx',
-        'response_codes_internal_client_error_4xx.csv': 'internal_client_error_4xx',
-        'response_codes_internal_server_error_5xx.csv': 'internal_server_error_5xx',
-        'response_codes_external_redirection_3xx.csv': 'external_redirection_3xx',
-        'response_codes_external_client_error_4xx.csv': 'external_client_error_4xx',
-        'response_codes_external_server_error_5xx.csv': 'external_server_error_5xx'
+        'response_codes_internal_redirection_(3xx).csv': 'internal_redirection_3xx',
+        'response_codes_internal_client_error_(4xx).csv': 'internal_client_error_4xx',
+        'response_codes_internal_server_error_(5xx).csv': 'internal_server_error_5xx',
+        'response_codes_external_redirection_(3xx).csv': 'external_redirection_3xx',
+        'response_codes_external_client_error_(4xx).csv': 'external_client_error_4xx',
+        'response_codes_external_server_error_(5xx).csv': 'external_server_error_5xx',
+        'response_codes_external_no_response.csv': 'external_no_response',
+        'response_codes_internal_blocked_by_robots_txt.csv': 'internal_blocked_robots'
     }
     
     def parse(self) -> List[Dict[str, Any]]:

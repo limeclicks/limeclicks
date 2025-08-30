@@ -7,26 +7,27 @@ from typing import List, Dict, Any
 class MetaContentParser(BaseIssueParser):
     """Parser for meta content related issues"""
     
-    # CSV files this parser handles
+    # CSV files this parser handles (updated to match actual file names)
     CSV_FILES = {
-        'title_missing.csv': 'missing_title',
-        'title_duplicate.csv': 'duplicate_title',
-        'title_over_65_characters.csv': 'title_too_long',
-        'title_below_30_characters.csv': 'title_too_short',
-        'title_same_as_h1.csv': 'title_same_as_h1',
-        'title_multiple.csv': 'multiple_titles',
+        'page_titles_missing.csv': 'missing_title',
+        'page_titles_duplicate.csv': 'duplicate_title',
+        'page_titles_over_60_characters.csv': 'title_too_long',
+        'page_titles_over_561_pixels.csv': 'title_too_long_pixels',
+        'page_titles_below_30_characters.csv': 'title_too_short',
+        'page_titles_below_200_pixels.csv': 'title_too_short_pixels',
+        'page_titles_same_as_h1.csv': 'title_same_as_h1',
         'meta_description_missing.csv': 'missing_meta_description',
         'meta_description_duplicate.csv': 'duplicate_meta_description',
         'meta_description_over_155_characters.csv': 'meta_too_long',
+        'meta_description_over_985_pixels.csv': 'meta_too_long_pixels',
         'meta_description_below_70_characters.csv': 'meta_too_short',
-        'meta_description_multiple.csv': 'multiple_meta_descriptions',
+        'meta_description_below_400_pixels.csv': 'meta_too_short_pixels',
         'h1_missing.csv': 'missing_h1',
         'h1_duplicate.csv': 'duplicate_h1',
-        'h1_over_70_characters.csv': 'h1_too_long',
         'h1_multiple.csv': 'multiple_h1',
         'h2_missing.csv': 'missing_h2',
         'h2_duplicate.csv': 'duplicate_h2',
-        'h2_over_70_characters.csv': 'h2_too_long'
+        'h2_multiple.csv': 'multiple_h2'
     }
     
     def parse(self) -> List[Dict[str, Any]]:

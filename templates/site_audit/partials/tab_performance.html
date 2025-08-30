@@ -1,297 +1,68 @@
-<!-- Performance Tab Content -->
+<!-- Performance Tab Content with Desktop/Mobile Sub-tabs -->
 <div class="space-y-6">
-    <!-- Performance Overview -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <!-- Mobile Performance -->
-        <div class="card bg-base-100 shadow-sm border border-base-300">
-            <div class="card-body">
-                <h3 class="text-lg font-semibold text-base-content mb-4">
-                    <i class="fas fa-mobile-alt mr-2 text-primary"></i>
-                    Mobile Performance
-                </h3>
-                
-                <div class="text-center mb-6">
-                    <div class="radial-progress {% if audit.performance_score_mobile >= 90 %}text-success{% elif audit.performance_score_mobile >= 50 %}text-warning{% else %}text-error{% endif %}" 
-                         style="--value:{{ audit.performance_score_mobile|default:0 }}; --size:8rem; --thickness: 8px;">
-                        <div>
-                            <span class="text-3xl font-bold">{{ audit.performance_score_mobile|default:"-" }}</span>
-                            <p class="text-xs text-base-content/60 mt-1">Score</p>
-                        </div>
-                    </div>
-                    <p class="mt-3 text-sm {% if audit.performance_score_mobile >= 90 %}text-success{% elif audit.performance_score_mobile >= 50 %}text-warning{% else %}text-error{% endif %}">
-                        {% if audit.performance_score_mobile >= 90 %}
-                            Excellent Performance
-                        {% elif audit.performance_score_mobile >= 50 %}
-                            Needs Improvement
-                        {% else %}
-                            Poor Performance
-                        {% endif %}
-                    </p>
-                </div>
-                
-                <!-- Mobile Metrics -->
-                <div class="space-y-3">
-                    {% if audit.mobile_metrics %}
-                    {% with metrics=audit.mobile_metrics %}
-                    <div class="flex justify-between items-center p-3 rounded-lg bg-base-200/50">
-                        <div>
-                            <p class="text-sm font-medium text-base-content">First Contentful Paint</p>
-                            <p class="text-xs text-base-content/60">FCP</p>
-                        </div>
-                        <span class="badge {% if metrics.fcp < 1.8 %}badge-success{% elif metrics.fcp < 3 %}badge-warning{% else %}badge-error{% endif %}">
-                            {{ metrics.fcp|floatformat:1 }}s
-                        </span>
-                    </div>
-                    
-                    <div class="flex justify-between items-center p-3 rounded-lg bg-base-200/50">
-                        <div>
-                            <p class="text-sm font-medium text-base-content">Largest Contentful Paint</p>
-                            <p class="text-xs text-base-content/60">LCP</p>
-                        </div>
-                        <span class="badge {% if metrics.lcp < 2.5 %}badge-success{% elif metrics.lcp < 4 %}badge-warning{% else %}badge-error{% endif %}">
-                            {{ metrics.lcp|floatformat:1 }}s
-                        </span>
-                    </div>
-                    
-                    <div class="flex justify-between items-center p-3 rounded-lg bg-base-200/50">
-                        <div>
-                            <p class="text-sm font-medium text-base-content">Cumulative Layout Shift</p>
-                            <p class="text-xs text-base-content/60">CLS</p>
-                        </div>
-                        <span class="badge {% if metrics.cls < 0.1 %}badge-success{% elif metrics.cls < 0.25 %}badge-warning{% else %}badge-error{% endif %}">
-                            {{ metrics.cls|floatformat:3 }}
-                        </span>
-                    </div>
-                    
-                    <div class="flex justify-between items-center p-3 rounded-lg bg-base-200/50">
-                        <div>
-                            <p class="text-sm font-medium text-base-content">Total Blocking Time</p>
-                            <p class="text-xs text-base-content/60">TBT</p>
-                        </div>
-                        <span class="badge {% if metrics.tbt < 200 %}badge-success{% elif metrics.tbt < 600 %}badge-warning{% else %}badge-error{% endif %}">
-                            {{ metrics.tbt }}ms
-                        </span>
-                    </div>
-                    
-                    <div class="flex justify-between items-center p-3 rounded-lg bg-base-200/50">
-                        <div>
-                            <p class="text-sm font-medium text-base-content">Speed Index</p>
-                            <p class="text-xs text-base-content/60">SI</p>
-                        </div>
-                        <span class="badge {% if metrics.si < 3.4 %}badge-success{% elif metrics.si < 5.8 %}badge-warning{% else %}badge-error{% endif %}">
-                            {{ metrics.si|floatformat:1 }}s
-                        </span>
-                    </div>
-                    {% endwith %}
-                    {% else %}
-                    <div class="text-center py-8">
-                        <i class="fas fa-chart-line text-3xl text-base-content/30 mb-2"></i>
-                        <p class="text-sm text-base-content/60">Detailed metrics not available</p>
-                    </div>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-        
-        <!-- Desktop Performance -->
-        <div class="card bg-base-100 shadow-sm border border-base-300">
-            <div class="card-body">
-                <h3 class="text-lg font-semibold text-base-content mb-4">
-                    <i class="fas fa-desktop mr-2 text-secondary"></i>
-                    Desktop Performance
-                </h3>
-                
-                <div class="text-center mb-6">
-                    <div class="radial-progress {% if audit.performance_score_desktop >= 90 %}text-success{% elif audit.performance_score_desktop >= 50 %}text-warning{% else %}text-error{% endif %}" 
-                         style="--value:{{ audit.performance_score_desktop|default:0 }}; --size:8rem; --thickness: 8px;">
-                        <div>
-                            <span class="text-3xl font-bold">{{ audit.performance_score_desktop|default:"-" }}</span>
-                            <p class="text-xs text-base-content/60 mt-1">Score</p>
-                        </div>
-                    </div>
-                    <p class="mt-3 text-sm {% if audit.performance_score_desktop >= 90 %}text-success{% elif audit.performance_score_desktop >= 50 %}text-warning{% else %}text-error{% endif %}">
-                        {% if audit.performance_score_desktop >= 90 %}
-                            Excellent Performance
-                        {% elif audit.performance_score_desktop >= 50 %}
-                            Needs Improvement
-                        {% else %}
-                            Poor Performance
-                        {% endif %}
-                    </p>
-                </div>
-                
-                <!-- Desktop Metrics -->
-                <div class="space-y-3">
-                    {% if audit.desktop_metrics %}
-                    {% with metrics=audit.desktop_metrics %}
-                    <div class="flex justify-between items-center p-3 rounded-lg bg-base-200/50">
-                        <div>
-                            <p class="text-sm font-medium text-base-content">First Contentful Paint</p>
-                            <p class="text-xs text-base-content/60">FCP</p>
-                        </div>
-                        <span class="badge {% if metrics.fcp < 1.8 %}badge-success{% elif metrics.fcp < 3 %}badge-warning{% else %}badge-error{% endif %}">
-                            {{ metrics.fcp|floatformat:1 }}s
-                        </span>
-                    </div>
-                    
-                    <div class="flex justify-between items-center p-3 rounded-lg bg-base-200/50">
-                        <div>
-                            <p class="text-sm font-medium text-base-content">Largest Contentful Paint</p>
-                            <p class="text-xs text-base-content/60">LCP</p>
-                        </div>
-                        <span class="badge {% if metrics.lcp < 2.5 %}badge-success{% elif metrics.lcp < 4 %}badge-warning{% else %}badge-error{% endif %}">
-                            {{ metrics.lcp|floatformat:1 }}s
-                        </span>
-                    </div>
-                    
-                    <div class="flex justify-between items-center p-3 rounded-lg bg-base-200/50">
-                        <div>
-                            <p class="text-sm font-medium text-base-content">Cumulative Layout Shift</p>
-                            <p class="text-xs text-base-content/60">CLS</p>
-                        </div>
-                        <span class="badge {% if metrics.cls < 0.1 %}badge-success{% elif metrics.cls < 0.25 %}badge-warning{% else %}badge-error{% endif %}">
-                            {{ metrics.cls|floatformat:3 }}
-                        </span>
-                    </div>
-                    
-                    <div class="flex justify-between items-center p-3 rounded-lg bg-base-200/50">
-                        <div>
-                            <p class="text-sm font-medium text-base-content">Total Blocking Time</p>
-                            <p class="text-xs text-base-content/60">TBT</p>
-                        </div>
-                        <span class="badge {% if metrics.tbt < 200 %}badge-success{% elif metrics.tbt < 600 %}badge-warning{% else %}badge-error{% endif %}">
-                            {{ metrics.tbt }}ms
-                        </span>
-                    </div>
-                    
-                    <div class="flex justify-between items-center p-3 rounded-lg bg-base-200/50">
-                        <div>
-                            <p class="text-sm font-medium text-base-content">Speed Index</p>
-                            <p class="text-xs text-base-content/60">SI</p>
-                        </div>
-                        <span class="badge {% if metrics.si < 3.4 %}badge-success{% elif metrics.si < 5.8 %}badge-warning{% else %}badge-error{% endif %}">
-                            {{ metrics.si|floatformat:1 }}s
-                        </span>
-                    </div>
-                    {% endwith %}
-                    {% else %}
-                    <div class="text-center py-8">
-                        <i class="fas fa-chart-line text-3xl text-base-content/30 mb-2"></i>
-                        <p class="text-sm text-base-content/60">Detailed metrics not available</p>
-                    </div>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
+    <!-- Performance Sub-tabs -->
+    <div class="tabs tabs-boxed bg-base-100 border border-base-300">
+        <button class="tab tab-active" 
+                id="mobile-tab-btn"
+                onclick="showPerformanceTab('mobile', this)">
+            <i class="fas fa-mobile-alt mr-2"></i>
+            Mobile
+        </button>
+        <button class="tab" 
+                id="desktop-tab-btn"
+                onclick="showPerformanceTab('desktop', this)">
+            <i class="fas fa-desktop mr-2"></i>
+            Desktop
+        </button>
     </div>
-    
-    <!-- Performance Recommendations -->
-    <div class="card bg-base-100 shadow-sm border border-base-300">
-        <div class="card-body">
-            <h3 class="text-lg font-semibold text-base-content mb-4">
-                <i class="fas fa-rocket mr-2 text-warning"></i>
-                Performance Recommendations
-            </h3>
-            
-            <div class="space-y-4">
-                <!-- Image Optimization -->
-                <div class="p-4 rounded-lg bg-base-200/30">
-                    <div class="flex items-start gap-3">
-                        <div class="w-10 h-10 bg-warning/10 rounded-lg flex items-center justify-center flex-shrink-0">
-                            <i class="fas fa-image text-warning"></i>
-                        </div>
-                        <div class="flex-1">
-                            <h4 class="font-medium text-base-content mb-1">Optimize Images</h4>
-                            <p class="text-sm text-base-content/70 mb-2">
-                                Compress and properly size images to reduce page load time.
-                            </p>
-                            <div class="flex items-center gap-4 text-xs text-base-content/50">
-                                <span><i class="fas fa-chart-line mr-1"></i> High Impact</span>
-                                <span><i class="fas fa-clock mr-1"></i> ~2s improvement</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- JavaScript Optimization -->
-                <div class="p-4 rounded-lg bg-base-200/30">
-                    <div class="flex items-start gap-3">
-                        <div class="w-10 h-10 bg-info/10 rounded-lg flex items-center justify-center flex-shrink-0">
-                            <i class="fab fa-js text-info"></i>
-                        </div>
-                        <div class="flex-1">
-                            <h4 class="font-medium text-base-content mb-1">Minimize JavaScript</h4>
-                            <p class="text-sm text-base-content/70 mb-2">
-                                Reduce JavaScript execution time and remove unused code.
-                            </p>
-                            <div class="flex items-center gap-4 text-xs text-base-content/50">
-                                <span><i class="fas fa-chart-line mr-1"></i> Medium Impact</span>
-                                <span><i class="fas fa-clock mr-1"></i> ~1s improvement</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Caching -->
-                <div class="p-4 rounded-lg bg-base-200/30">
-                    <div class="flex items-start gap-3">
-                        <div class="w-10 h-10 bg-success/10 rounded-lg flex items-center justify-center flex-shrink-0">
-                            <i class="fas fa-database text-success"></i>
-                        </div>
-                        <div class="flex-1">
-                            <h4 class="font-medium text-base-content mb-1">Enable Browser Caching</h4>
-                            <p class="text-sm text-base-content/70 mb-2">
-                                Leverage browser caching for static resources to improve repeat visit performance.
-                            </p>
-                            <div class="flex items-center gap-4 text-xs text-base-content/50">
-                                <span><i class="fas fa-chart-line mr-1"></i> Medium Impact</span>
-                                <span><i class="fas fa-clock mr-1"></i> ~0.5s improvement</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- CDN -->
-                <div class="p-4 rounded-lg bg-base-200/30">
-                    <div class="flex items-start gap-3">
-                        <div class="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0">
-                            <i class="fas fa-globe text-primary"></i>
-                        </div>
-                        <div class="flex-1">
-                            <h4 class="font-medium text-base-content mb-1">Use a CDN</h4>
-                            <p class="text-sm text-base-content/70 mb-2">
-                                Distribute content globally to reduce latency for international visitors.
-                            </p>
-                            <div class="flex items-center gap-4 text-xs text-base-content/50">
-                                <span><i class="fas fa-chart-line mr-1"></i> High Impact</span>
-                                <span><i class="fas fa-clock mr-1"></i> ~1.5s improvement</span>
-                            </div>
-                        </div>
-                    </div>
+
+    <!-- Mobile Performance Content -->
+    <div id="mobile-performance-content" class="performance-content">
+        {% if mobile_pagespeed_data %}
+            {% include "site_audit/partials/performance_detail.html" with pagespeed_data=mobile_pagespeed_data device_type="mobile" %}
+        {% else %}
+            <div class="card bg-base-100 shadow-sm border border-base-300">
+                <div class="card-body text-center py-12">
+                    <i class="fas fa-mobile-alt text-5xl text-base-content/20 mb-4"></i>
+                    <h3 class="text-xl font-semibold text-base-content mb-2">Mobile Performance Data Not Available</h3>
+                    <p class="text-base-content/60">PageSpeed Insights data for mobile is not available for this audit.</p>
+                    <p class="text-sm text-base-content/50 mt-2">Run a new audit to collect performance metrics.</p>
                 </div>
             </div>
-        </div>
+        {% endif %}
     </div>
-    
-    <!-- Core Web Vitals Status -->
-    <div class="card bg-gradient-to-r from-success/10 to-primary/10 border border-success/20">
-        <div class="card-body">
-            <div class="flex items-center justify-between">
-                <div>
-                    <h3 class="text-lg font-semibold text-base-content mb-2">Core Web Vitals Status</h3>
-                    <p class="text-sm text-base-content/60">
-                        {% if audit.performance_score_mobile >= 90 and audit.performance_score_desktop >= 90 %}
-                            ✅ Passing - Your site meets Google's Core Web Vitals thresholds
-                        {% else %}
-                            ⚠️ Needs Improvement - Work on the recommendations above
-                        {% endif %}
-                    </p>
-                </div>
-                <div class="text-right">
-                    <p class="text-xs text-base-content/50 mb-1">Assessment Date</p>
-                    <p class="text-sm font-medium text-base-content">{{ audit.last_audit_date|date:"M d, Y" }}</p>
+
+    <!-- Desktop Performance Content -->
+    <div id="desktop-performance-content" class="performance-content hidden">
+        {% if desktop_pagespeed_data %}
+            {% include "site_audit/partials/performance_detail.html" with pagespeed_data=desktop_pagespeed_data device_type="desktop" %}
+        {% else %}
+            <div class="card bg-base-100 shadow-sm border border-base-300">
+                <div class="card-body text-center py-12">
+                    <i class="fas fa-desktop text-5xl text-base-content/20 mb-4"></i>
+                    <h3 class="text-xl font-semibold text-base-content mb-2">Desktop Performance Data Not Available</h3>
+                    <p class="text-base-content/60">PageSpeed Insights data for desktop is not available for this audit.</p>
+                    <p class="text-sm text-base-content/50 mt-2">Run a new audit to collect performance metrics.</p>
                 </div>
             </div>
-        </div>
+        {% endif %}
     </div>
 </div>
+
+<script>
+    function showPerformanceTab(tabName, element) {
+        // Update active tab styling
+        document.querySelectorAll('#mobile-tab-btn, #desktop-tab-btn').forEach(tab => {
+            tab.classList.remove('tab-active');
+        });
+        element.classList.add('tab-active');
+        
+        // Hide all performance content
+        document.querySelectorAll('.performance-content').forEach(content => {
+            content.classList.add('hidden');
+        });
+        
+        // Show selected content
+        document.getElementById(`${tabName}-performance-content`).classList.remove('hidden');
+    }
+</script>

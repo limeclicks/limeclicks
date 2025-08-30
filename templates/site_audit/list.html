@@ -363,9 +363,12 @@
                         console.log(`Card updated for project ${data.project_id}`);
                     });
                     
-                    // Show notification for completed/failed status changes only
-                    if (data.update_type === 'status_update' && (data.status === 'completed' || data.status === 'failed')) {
-                        showNotification(data.status, data.project_id);
+                    // Show notification only for new completions (not already completed audits)
+                    // Use the is_new_completion flag to determine if this is a real new completion
+                    if (data.is_new_completion === true) {
+                        showNotification('completed', data.project_id);
+                    } else if (data.update_type === 'status_update' && data.status === 'failed' && data.previous_status !== 'failed') {
+                        showNotification('failed', data.project_id);
                     }
                 }
             } catch (e) {
