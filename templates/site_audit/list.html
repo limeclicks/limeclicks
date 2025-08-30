@@ -103,7 +103,7 @@
                 <div class="flex items-center justify-between">
                     <div>
                         <p class="text-base-content/60 text-sm">Total Projects</p>
-                        <p class="text-2xl font-bold text-base-content">{{ total_projects }}</p>
+                        <p class="text-2xl font-bold text-base-content" data-stat="total">{{ total_projects }}</p>
                     </div>
                     <div class="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
                         <i class="fas fa-folder text-primary text-lg"></i>
@@ -161,9 +161,17 @@
     <!-- Audit List -->
     <div id="audit-list">
         <div class="grid grid-cols-1 gap-4" id="audit-cards-container">
-            {% for item in projects_with_audits %}
-                {% include "site_audit/partials/audit_card.html" %}
-            {% endfor %}
+            {% if projects_with_audits %}
+                {% for item in projects_with_audits %}
+                    {% include "site_audit/partials/audit_card.html" %}
+                {% endfor %}
+                
+                <!-- Add New Project Card -->
+                {% include "site_audit/partials/add_project_card.html" %}
+            {% else %}
+                <!-- Empty State -->
+                {% include "site_audit/partials/empty_state.html" %}
+            {% endif %}
         </div>
         
         {% if has_next %}
@@ -188,7 +196,10 @@
     </div>
 </div>
 
-<!-- Server-Sent Events for Real-time Updates -->
+<!-- Modal Container for HTMX -->
+<div id="modal-container"></div>
+
+<!-- Minimal JavaScript for HTMX enhancements -->
 <script>
     // Initialize Server-Sent Events for real-time updates
     let eventSource;
@@ -203,16 +214,38 @@
         eventSource.onmessage = function(event) {
             const data = JSON.parse(event.data);
             
-            // Update the specific project card when audit completes
-            if (data.status === 'completed' || data.status === 'failed') {
-                // Fetch updated card HTML via HTMX
+            // Update the specific project card for any status change
+            if (data.project_id) {
+                console.log(`Status update: Project ${data.project_id} - ${data.previous_status || 'new'} → ${data.status}`);
+                
+                // Always fetch updated card HTML via HTMX for any status change
                 htmx.ajax('GET', `/site-audit/card/${data.project_id}/`, {
                     target: `#project-card-${data.project_id}`,
                     swap: 'outerHTML'
                 });
                 
-                // Show notification
-                showNotification(data.status, data.project_id);
+                // Show notification for completed/failed status
+                if (data.status === 'completed' || data.status === 'failed') {
+                    showNotification(data.status, data.project_id);
+                }
+                
+                // Update status indicator if status is running
+                if (data.status === 'running') {
+                    // Add visual indicator that audit is running
+                    const card = document.querySelector(`#project-card-${data.project_id}`);
+                    if (card) {
+                        const statusBadge = card.querySelector('.badge');
+                        if (statusBadge) {
+                            statusBadge.textContent = 'Running';
+                            statusBadge.className = 'badge badge-warning';
+                        }
+                    }
+                }
+                
+                // Update statistics if completed
+                if (data.status === 'completed' && data.health_score) {
+                    updateStatistics(data.health_score);
+                }
             }
         };
         
@@ -246,6 +279,29 @@
         }, 5000);
     }
     
+    function updateStatistics(healthScore) {
+        // Update statistics based on health score
+        if (healthScore >= 80) {
+            const healthyElement = document.querySelector('.text-success.text-2xl');
+            if (healthyElement) {
+                const current = parseInt(healthyElement.textContent) || 0;
+                healthyElement.textContent = current + 1;
+            }
+        } else if (healthScore >= 60) {
+            const attentionElement = document.querySelector('.text-warning.text-2xl');
+            if (attentionElement) {
+                const current = parseInt(attentionElement.textContent) || 0;
+                attentionElement.textContent = current + 1;
+            }
+        } else {
+            const criticalElement = document.querySelector('.text-error.text-2xl');
+            if (criticalElement) {
+                const current = parseInt(criticalElement.textContent) || 0;
+                criticalElement.textContent = current + 1;
+            }
+        }
+    }
+    
     // Initialize on page load
     document.addEventListener('DOMContentLoaded', function() {
         initSSE();
@@ -270,6 +326,32 @@
     window.addEventListener('beforeunload', function() {
         if (eventSource) {
             eventSource.close();
+        }
+    });
+    
+    // Listen for HTMX events
+    document.body.addEventListener('projectAdded', function(evt) {
+        // Close modal (handled by HTMX)
+        
+        // Show success notification
+        const notification = document.createElement('div');
+        notification.className = 'alert alert-success fixed top-20 right-4 z-50 shadow-lg max-w-sm';
+        notification.innerHTML = `
+            <i class="fas fa-check-circle"></i>
+            <span>Project added successfully!</span>
+        `;
+        document.body.appendChild(notification);
+        
+        setTimeout(() => {
+            notification.remove();
+        }, 3000);
+        
+        // Update statistics (you could make an HTMX call here to refresh stats)
+        // For now, we'll just increment the total
+        const totalElement = document.querySelector('[data-stat="total"]');
+        if (totalElement) {
+            const current = parseInt(totalElement.textContent);
+            totalElement.textContent = current + 1;
         }
     });
 </script>

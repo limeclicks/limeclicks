@@ -390,6 +390,9 @@ SCRAPPER_API_KEY = os.getenv('SCRAPPER_API_KEY')
 # Screaming Frog License
 SCREAMING_FROG_LICENSE = os.getenv('SCREAMING_FROG_LICENSE')
 
+# Google PageSpeed Insights API Key
+GOOGLE_PSI_KEY = os.getenv('GOOGLE_PSI_KEY')
+
 # AWS S3 Settings for django-storages (Cloudflare R2 is S3-compatible)
 AWS_ACCESS_KEY_ID = os.getenv('R2_ACCESS_KEY_ID')
 AWS_SECRET_ACCESS_KEY = os.getenv('R2_SECRET_ACCESS_KEY')

@@ -1,0 +1,318 @@
+<!-- DaisyUI Modal -->
+<style>
+    .loading-spinner {
+        animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+    }
+</style>
+<dialog class="modal modal-open">
+    <div class="modal-box">
+        <h3 class="font-bold text-lg mb-4">Add New Project</h3>
+        
+        <form hx-post="{% url 'site_audit:add_project' %}"
+              hx-target="#audit-cards-container"
+              hx-swap="beforeend"
+              hx-on::after-swap="handleProjectAdded()"
+              class="space-y-4">
+            {% csrf_token %}
+            
+            <!-- Domain Input -->
+            <div class="form-control">
+                <label class="label">
+                    <span class="label-text">Project Domain</span>
+                    <span class="label-text-alt text-error">*</span>
+                </label>
+                <input type="text" 
+                       name="domain" 
+                       id="domain-input"
+                       placeholder="example.com or blog.example.com" 
+                       class="input input-bordered w-full"
+                       required
+                       autocomplete="off">
+                <div id="domain-feedback" class="mt-1"></div>
+                <label class="label">
+                    <span class="label-text-alt">Enter domain or subdomain only (e.g., shop.example.com)</span>
+                </label>
+            </div>
+            
+            <!-- Title Input -->
+            <div class="form-control">
+                <label class="label">
+                    <span class="label-text">Project Title</span>
+                </label>
+                <input type="text" 
+                       name="title" 
+                       placeholder="My Website" 
+                       class="input input-bordered w-full">
+                <label class="label">
+                    <span class="label-text-alt">Optional: A friendly name for your project</span>
+                </label>
+            </div>
+            
+            <!-- Error Message Container -->
+            <div id="add-project-error" class="hidden">
+                <div class="alert alert-error">
+                    <i class="fas fa-exclamation-circle"></i>
+                    <span id="error-message"></span>
+                </div>
+            </div>
+            
+            <!-- Action Buttons -->
+            <div class="modal-action">
+                <button type="button" 
+                        class="btn btn-ghost"
+                        onclick="closeModal()">
+                    Cancel
+                </button>
+                <button type="submit" 
+                        class="btn btn-primary"
+                        id="submit-btn">
+                    <i class="fas fa-plus mr-2"></i>
+                    <span class="mx-1">Add Project</span>
+                    <span class="htmx-indicator ml-2">
+                        <i class="fas fa-spinner loading-spinner"></i>
+                    </span>
+                </button>
+            </div>
+        </form>
+    </div>
+    
+    <!-- Modal backdrop -->
+    <div class="modal-backdrop">
+        <button type="button" onclick="closeModal()">close</button>
+    </div>
+</dialog>
+
+<!-- JavaScript validation and modal handling -->
+<script>
+(function() {
+    const domainInput = document.getElementById('domain-input');
+    const feedbackDiv = document.getElementById('domain-feedback');
+    const submitBtn = document.getElementById('submit-btn');
+    const errorDiv = document.getElementById('add-project-error');
+    const errorMsg = document.getElementById('error-message');
+    
+    // Domain validation regex
+    const domainRegex = /^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)*[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.[a-zA-Z]{2,}$/;
+    
+    // Clean domain function
+    function cleanDomain(input) {
+        if (!input) return '';
+        
+        // Convert to lowercase and trim
+        let domain = input.trim().toLowerCase();
+        
+        // Remove protocol
+        domain = domain.replace(/^https?:\/\//, '');
+        
+        // Remove www.
+        domain = domain.replace(/^www\./, '');
+        
+        // Remove path, query string, and hash
+        domain = domain.split('/')[0];
+        domain = domain.split('?')[0];
+        domain = domain.split('#')[0];
+        
+        // Remove port
+        domain = domain.split(':')[0];
+        
+        return domain;
+    }
+    
+    // Validate domain function
+    function validateDomain(domain) {
+        if (!domain) {
+            return { valid: false, message: '' };
+        }
+        
+        // Clean the domain
+        const cleaned = cleanDomain(domain);
+        
+        // Check if it changed after cleaning
+        if (cleaned !== domain) {
+            return { 
+                valid: false, 
+                message: `Domain will be cleaned to: <strong>${cleaned}</strong>`,
+                cleaned: cleaned,
+                isWarning: true
+            };
+        }
+        
+        // Check length
+        if (cleaned.length < 4) {
+            return { valid: false, message: 'Domain must be at least 4 characters long' };
+        }
+        
+        if (cleaned.length > 255) {
+            return { valid: false, message: 'Domain is too long (maximum 255 characters)' };
+        }
+        
+        // Validate format
+        if (!domainRegex.test(cleaned)) {
+            return { valid: false, message: 'Please enter a valid domain (e.g., example.com)' };
+        }
+        
+        return { valid: true, message: `Valid domain: <strong>${cleaned}</strong>`, cleaned: cleaned };
+    }
+    
+    // Real-time validation
+    let validationTimeout;
+    domainInput.addEventListener('input', function() {
+        clearTimeout(validationTimeout);
+        validationTimeout = setTimeout(() => {
+            const result = validateDomain(this.value);
+            
+            if (!this.value) {
+                feedbackDiv.innerHTML = '';
+                return;
+            }
+            
+            if (result.valid) {
+                feedbackDiv.innerHTML = `
+                    <div class="text-sm text-success flex items-center gap-2">
+                        <i class="fas fa-check-circle"></i>
+                        <span>${result.message}</span>
+                    </div>
+                `;
+                // Auto-update the input with cleaned value if needed
+                if (result.cleaned && result.cleaned !== this.value) {
+                    this.value = result.cleaned;
+                }
+            } else if (result.isWarning) {
+                feedbackDiv.innerHTML = `
+                    <div class="text-sm text-warning flex items-center gap-2">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <span>${result.message}</span>
+                    </div>
+                `;
+                // Auto-clean the domain after showing warning
+                setTimeout(() => {
+                    if (result.cleaned) {
+                        this.value = result.cleaned;
+                        // Re-validate with cleaned value
+                        const cleanResult = validateDomain(result.cleaned);
+                        if (cleanResult.valid) {
+                            feedbackDiv.innerHTML = `
+                                <div class="text-sm text-success flex items-center gap-2">
+                                    <i class="fas fa-check-circle"></i>
+                                    <span>${cleanResult.message}</span>
+                                </div>
+                            `;
+                        }
+                    }
+                }, 1000);
+            } else {
+                feedbackDiv.innerHTML = `
+                    <div class="text-sm text-error flex items-center gap-2">
+                        <i class="fas fa-exclamation-circle"></i>
+                        <span>${result.message}</span>
+                    </div>
+                `;
+            }
+        }, 500);
+    });
+    
+    // Handle paste event
+    domainInput.addEventListener('paste', function(e) {
+        setTimeout(() => {
+            // Trigger validation after paste
+            this.dispatchEvent(new Event('input'));
+        }, 100);
+    });
+    
+    // Prevent Enter key from closing modal
+    domainInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            return false;
+        }
+    });
+    
+    // Focus on domain input
+    domainInput.focus();
+    
+    // Handle HTMX events for form submission
+    document.body.addEventListener('htmx:beforeRequest', function(evt) {
+        if (evt.detail.elt && evt.detail.elt.matches('form[hx-post*="add_project"]')) {
+            // Clean the domain before submission
+            const domain = domainInput.value;
+            const cleaned = cleanDomain(domain);
+            domainInput.value = cleaned;
+            
+            // Hide any previous errors
+            errorDiv.classList.add('hidden');
+        }
+    });
+    
+    document.body.addEventListener('htmx:afterRequest', function(evt) {
+        if (evt.detail.elt && evt.detail.elt.matches('form[hx-post*="add_project"]')) {
+            if (evt.detail.successful) {
+                // Close modal on success
+                closeModal();
+            }
+        }
+    });
+    
+    // Also listen for the projectAdded event triggered by the server
+    document.body.addEventListener('projectAdded', function(evt) {
+        // Close modal when project is successfully added
+        closeModal();
+    });
+    
+    document.body.addEventListener('htmx:responseError', function(evt) {
+        if (evt.detail.elt && evt.detail.elt.matches('form[hx-post*="add_project"]')) {
+            // Show error message
+            errorDiv.classList.remove('hidden');
+            errorMsg.textContent = evt.detail.xhr.responseText || 'Error creating project. Please try again.';
+        }
+    });
+})();
+
+// Global function to close modal (make it available globally)
+window.closeModal = function() {
+    const modal = document.querySelector('.modal');
+    if (modal) {
+        modal.classList.remove('modal-open');
+    }
+    setTimeout(() => {
+        const container = document.getElementById('modal-container');
+        if (container) {
+            container.innerHTML = '';
+        }
+    }, 200);
+}
+
+// Handle project added - remove empty state and close modal
+window.handleProjectAdded = function() {
+    // Remove empty state card if it exists
+    const emptyState = document.querySelector('#audit-cards-container > div:has(.fa-folder-plus)');
+    if (emptyState && emptyState.querySelector('h3')?.textContent?.includes('No Projects Yet')) {
+        emptyState.remove();
+    }
+    
+    // Add the "Add New Project" card if it doesn't exist
+    const addProjectCard = document.querySelector('[hx-get*="add_project_modal"]');
+    if (!addProjectCard) {
+        // Fetch and append the add project card
+        fetch("{% url 'site_audit:add_project_modal' %}")
+            .then(response => response.text())
+            .then(html => {
+                // This would need the add project card HTML
+                // For now, we'll skip this as it should be handled by the view
+            });
+    }
+    
+    // Close the modal
+    closeModal();
+    
+    // Update statistics
+    const totalElement = document.querySelector('[data-stat="total"]');
+    if (totalElement) {
+        const current = parseInt(totalElement.textContent) || 0;
+        totalElement.textContent = current + 1;
+    }
+}
+</script>

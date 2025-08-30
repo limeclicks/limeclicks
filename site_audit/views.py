@@ -6,9 +6,11 @@ from django.db.models import Q, Count, Avg, F, Case, When, IntegerField
 from django.core.paginator import Paginator
 from django.template.loader import render_to_string
 from django.utils import timezone
+from django.core.exceptions import ValidationError
 from datetime import timedelta
 import json
 import time
+import re
 
 from project.models import Project
 from .models import SiteAudit, SiteIssue
@@ -104,8 +106,7 @@ def trigger_audit(request, project_id):
         project=project,
         defaults={
             'audit_frequency_days': 30,
-            'manual_audit_frequency_days': 1,
-            'max_pages_to_crawl': 5000
+            'manual_audit_frequency_days': 1
         }
     )
     
@@ -166,36 +167,47 @@ def audit_status_stream(request):
     """Server-sent events stream for real-time audit status updates"""
     def event_stream():
         """Generate server-sent events"""
+        # Track previous states to detect changes
+        audit_states = {}
+        
         while True:
-            # Get all running audits for the user's projects
+            # Get all audits for the user's projects
             user_projects = Project.objects.filter(user=request.user).values_list('id', flat=True)
-            running_audits = SiteAudit.objects.filter(
-                project_id__in=user_projects,
-                status__in=['running', 'pending']
+            audits = SiteAudit.objects.filter(
+                project_id__in=user_projects
             ).select_related('project')
             
             # Check for status changes
-            for audit in running_audits:
-                # Refresh from database
-                audit.refresh_from_db()
+            for audit in audits:
+                audit_key = f"audit_{audit.id}"
+                current_status = audit.status
+                previous_status = audit_states.get(audit_key)
                 
-                # If status changed to completed or failed, send update
-                if audit.status in ['completed', 'failed']:
+                # Detect status change or new audit
+                if previous_status != current_status:
+                    # Send update for any status change
                     data = {
                         'project_id': audit.project.id,
-                        'status': audit.status,
+                        'audit_id': audit.id,
+                        'status': current_status,
+                        'previous_status': previous_status,
                         'health_score': audit.overall_site_health_score,
                         'pages_crawled': audit.total_pages_crawled,
-                        'issues_count': audit.get_total_issues_count()
+                        'issues_count': audit.get_total_issues_count(),
+                        'performance_mobile': audit.performance_score_mobile,
+                        'performance_desktop': audit.performance_score_desktop
                     }
                     
                     yield f"data: {json.dumps(data)}\n\n"
+                    
+                    # Update tracked state
+                    audit_states[audit_key] = current_status
             
             # Also send heartbeat to keep connection alive
             yield f": heartbeat\n\n"
             
             # Wait before next check
-            time.sleep(5)  # Check every 5 seconds
+            time.sleep(3)  # Check every 3 seconds for faster updates
     
     response = StreamingHttpResponse(
         event_stream(),
@@ -220,6 +232,114 @@ def get_audit_card(request, project_id):
     })
     
     return HttpResponse(html)
+
+
+def clean_domain_input(domain_input):
+    """Clean and validate domain input"""
+    if not domain_input:
+        return None, "Domain is required"
+    
+    # Remove whitespace and convert to lowercase
+    domain = domain_input.strip().lower()
+    
+    # Remove common prefixes and suffixes
+    prefixes_to_remove = ['http://', 'https://', 'www.']
+    for prefix in prefixes_to_remove:
+        if domain.startswith(prefix):
+            domain = domain[len(prefix):]
+    
+    # Remove trailing slash and paths
+    domain = domain.split('/')[0]
+    
+    # Remove port numbers
+    domain = domain.split(':')[0]
+    
+    # Basic domain validation pattern (supports subdomains)
+    domain_pattern = re.compile(
+        r'^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)*[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.[a-zA-Z]{2,}$'
+    )
+    
+    if not domain_pattern.match(domain):
+        return None, "Please enter a valid domain or subdomain (e.g., example.com or blog.example.com)"
+    
+    # Check for minimum domain length
+    if len(domain) < 4:
+        return None, "Domain must be at least 4 characters long"
+    
+    # Check for maximum domain length
+    if len(domain) > 255:
+        return None, "Domain is too long (maximum 255 characters)"
+    
+    return domain, None
+
+
+@login_required
+def add_project_modal(request):
+    """Render the add project modal via HTMX"""
+    return render(request, 'site_audit/partials/add_project_modal.html')
+
+
+@login_required
+@require_http_methods(["POST"])
+def add_project(request):
+    """Add a new project via HTMX"""
+    domain_input = request.POST.get('domain', '').strip()
+    title = request.POST.get('title', '').strip()
+    active = True  # Always active for user-created projects, admin can change later
+    run_audit = True  # Always run initial audit automatically
+    
+    # Clean and validate domain
+    cleaned_domain, error = clean_domain_input(domain_input)
+    if error:
+        return HttpResponse(error, status=400)
+    
+    # Check if project already exists for this user
+    if Project.objects.filter(user=request.user, domain=cleaned_domain).exists():
+        return HttpResponse('A project with this domain already exists in your account', status=400)
+    
+    try:
+        # Create the project
+        project = Project.objects.create(
+            user=request.user,
+            domain=cleaned_domain,
+            title=title or cleaned_domain.title(),
+            active=active
+        )
+        
+        # Create initial site audit
+        site_audit = SiteAudit.objects.create(
+            project=project,
+            audit_frequency_days=30,
+            manual_audit_frequency_days=1,
+            is_audit_enabled=active,
+            status='pending' if run_audit else 'completed'
+        )
+        
+        # Trigger initial audit if requested
+        if run_audit:
+            try:
+                trigger_manual_site_audit.apply_async(args=[project.id])
+                site_audit.status = 'pending'
+                site_audit.save()
+            except Exception as e:
+                # Don't fail project creation if audit trigger fails
+                pass
+        
+        # Return the new project card HTML
+        html = render_to_string('site_audit/partials/audit_card.html', {
+            'item': {
+                'project': project,
+                'audit': site_audit
+            }
+        })
+        
+        # Add HX-Trigger header to close modal
+        response = HttpResponse(html)
+        response['HX-Trigger'] = 'projectAdded'
+        return response
+        
+    except Exception as e:
+        return HttpResponse(f'Error creating project: {str(e)}', status=500)
 
 
 @login_required

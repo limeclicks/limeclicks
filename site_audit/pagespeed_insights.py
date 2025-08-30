@@ -239,20 +239,28 @@ def collect_pagespeed_data(url: str) -> Dict[str, Dict]:
     client = PageSpeedInsightsClient()
     results = {}
     
+    logger.info(f"Starting PageSpeed Insights collection for {url}")
+    
     # Collect mobile data
+    logger.info(f"Collecting mobile PageSpeed data for {url}")
     mobile_data = client.analyze_url(url, strategy='mobile')
     if mobile_data:
         results['mobile'] = mobile_data
+        logger.info(f"Mobile data collected successfully. Scores: {mobile_data.get('scores', {})}")
     else:
         logger.error(f"Failed to collect mobile PageSpeed data for {url}")
         results['mobile'] = {}
     
     # Collect desktop data
+    logger.info(f"Collecting desktop PageSpeed data for {url}")
     desktop_data = client.analyze_url(url, strategy='desktop')
     if desktop_data:
         results['desktop'] = desktop_data
+        logger.info(f"Desktop data collected successfully. Scores: {desktop_data.get('scores', {})}")
     else:
         logger.error(f"Failed to collect desktop PageSpeed data for {url}")
         results['desktop'] = {}
+    
+    logger.info(f"PageSpeed collection complete. Mobile: {bool(results.get('mobile'))}, Desktop: {bool(results.get('desktop'))}")
     
     return results

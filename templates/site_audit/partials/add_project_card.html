@@ -1,0 +1,17 @@
+<div class="audit-card card bg-base-100 shadow-sm border-2 border-dashed border-base-300 hover:border-primary hover:shadow-lg transition-all duration-300 cursor-pointer" 
+     hx-get="{% url 'site_audit:add_project_modal' %}"
+     hx-trigger="click"
+     hx-target="#modal-container"
+     hx-swap="innerHTML">
+    <div class="card-body p-6">
+        <div class="flex items-center justify-center h-32">
+            <div class="text-center">
+                <div class="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <i class="fas fa-plus text-primary text-2xl"></i>
+                </div>
+                <h3 class="text-lg font-semibold text-base-content">Add New Project</h3>
+                <p class="text-sm text-base-content/60 mt-1">Click to add a new website for SEO monitoring</p>
+            </div>
+        </div>
+    </div>
+</div>

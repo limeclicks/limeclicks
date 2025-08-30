@@ -404,22 +404,26 @@ def collect_pagespeed_insights(self, site_audit_id: int) -> dict:
         # Store mobile performance data
         if 'mobile' in psi_data and psi_data['mobile']:
             site_audit.mobile_performance = psi_data['mobile']
-            mobile_score = psi_data['mobile'].get('scores', {}).get('performance')
+            # The scores are already at the top level of the parsed data
+            mobile_scores = psi_data['mobile'].get('scores', {})
+            mobile_score = mobile_scores.get('performance') if mobile_scores else None
             if mobile_score is not None:
                 site_audit.performance_score_mobile = mobile_score
+                updates.append('performance_score_mobile')
             updates.append('mobile_performance')
-            updates.append('performance_score_mobile')
-            logger.info(f"Mobile PageSpeed score: {mobile_score}")
+            logger.info(f"Mobile PageSpeed score: {mobile_score}, Full scores: {mobile_scores}")
         
         # Store desktop performance data  
         if 'desktop' in psi_data and psi_data['desktop']:
             site_audit.desktop_performance = psi_data['desktop']
-            desktop_score = psi_data['desktop'].get('scores', {}).get('performance')
+            # The scores are already at the top level of the parsed data
+            desktop_scores = psi_data['desktop'].get('scores', {})
+            desktop_score = desktop_scores.get('performance') if desktop_scores else None
             if desktop_score is not None:
                 site_audit.performance_score_desktop = desktop_score
+                updates.append('performance_score_desktop')
             updates.append('desktop_performance')
-            updates.append('performance_score_desktop')
-            logger.info(f"Desktop PageSpeed score: {desktop_score}")
+            logger.info(f"Desktop PageSpeed score: {desktop_score}, Full scores: {desktop_scores}")
         
         # Save the updates
         if updates:
@@ -453,4 +457,82 @@ def collect_pagespeed_insights(self, site_audit_id: int) -> dict:
         return {
             "status": "error",
             "message": f"Failed to collect PageSpeed Insights data: {str(e)}"
+        }
+
+
+@shared_task(
+    bind=True,
+    max_retries=3,
+    time_limit=1800,
+    soft_time_limit=1500,
+    queue='high_priority'  # Use high priority queue for new projects
+)
+def create_site_audit_for_new_project(self, project_id: int) -> dict:
+    """
+    Create and run a site audit for a newly created project.
+    This is triggered automatically when a new project is created.
+    
+    Args:
+        project_id: ID of the newly created project
+        
+    Returns:
+        dict: Results of the audit task
+    """
+    from project.models import Project
+    
+    try:
+        # Get the project
+        try:
+            project = Project.objects.get(id=project_id)
+        except Project.DoesNotExist:
+            logger.error(f"Project with id={project_id} not found")
+            return {"status": "error", "message": "Project not found"}
+        
+        logger.info(f"Creating site audit for new project: {project.domain}")
+        
+        # Check if a site audit already exists
+        site_audit = SiteAudit.objects.filter(project=project).first()
+        
+        if not site_audit:
+            # Create a new site audit with default settings
+            site_audit = SiteAudit.objects.create(
+                project=project,
+                audit_frequency_days=30,
+                manual_audit_frequency_days=1,
+                is_audit_enabled=True,
+                status='pending'
+            )
+            logger.info(f"Created new SiteAudit id={site_audit.id} for project {project.domain}")
+        else:
+            # Update existing audit to pending status
+            site_audit.status = 'pending'
+            site_audit.save()
+            logger.info(f"Using existing SiteAudit id={site_audit.id} for project {project.domain}")
+        
+        # Trigger the site audit
+        result = run_site_audit.apply_async(
+            args=[site_audit.id],
+            queue='high_priority'  # Use high priority queue
+        )
+        
+        logger.info(f"Triggered HIGH PRIORITY site audit task {result.id} for project {project.domain}")
+        
+        return {
+            "status": "success",
+            "site_audit_id": site_audit.id,
+            "task_id": result.id,
+            "message": f"Site audit created and triggered for {project.domain}"
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to create site audit for project id={project_id}: {e}")
+        
+        # Retry if we haven't exceeded max retries
+        if self.request.retries < self.max_retries:
+            logger.info(f"Retrying create_site_audit_for_new_project, attempt {self.request.retries + 1}")
+            raise self.retry(exc=e, countdown=10 * (self.request.retries + 1))
+        
+        return {
+            "status": "error",
+            "message": f"Failed to create site audit: {str(e)}"
         }
