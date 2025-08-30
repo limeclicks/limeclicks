@@ -14,6 +14,7 @@ from django.utils import timezone
 
 from .models import SiteAudit
 from .screaming_frog import ScreamingFrogCLI
+from .pagespeed_insights import collect_pagespeed_data
 
 logger = logging.getLogger(__name__)
 
@@ -122,6 +123,20 @@ def run_site_audit(self, site_audit_id: int) -> dict:
             
             # Hand over to new process_results method
             result = site_audit.process_results()
+            
+            # Trigger PageSpeed Insights collection in parallel
+            try:
+                psi_task = collect_pagespeed_insights.apply_async(
+                    args=[site_audit.id],
+                    queue='audit_scheduled',
+                    priority=4  # Slightly lower priority than main audit
+                )
+                logger.info(f"PageSpeed Insights task triggered: {psi_task.id}")
+                result['psi_task_id'] = psi_task.id
+            except Exception as e:
+                logger.warning(f"Failed to trigger PageSpeed Insights collection: {e}")
+                result['psi_error'] = str(e)
+            
             return result
             
         except Exception as e:
@@ -342,3 +357,100 @@ def cleanup_old_site_audits(days_to_keep=90):
         "deleted_count": deleted_count,
         "cutoff_date": cutoff_date.isoformat()
     }
+
+
+@shared_task(
+    bind=True,
+    max_retries=3,
+    time_limit=300,  # 5 minutes for PageSpeed Insights
+    soft_time_limit=240  # 4 minutes soft limit
+)
+def collect_pagespeed_insights(self, site_audit_id: int) -> dict:
+    """
+    Collect PageSpeed Insights data for a site audit.
+    
+    This task runs alongside the main site audit to gather performance data
+    from Google PageSpeed Insights API for both mobile and desktop.
+    
+    Args:
+        site_audit_id: ID of the SiteAudit instance
+        
+    Returns:
+        dict: Results of the PageSpeed Insights collection
+    """
+    try:
+        # Fetch site audit
+        try:
+            site_audit = SiteAudit.objects.get(id=site_audit_id)
+        except SiteAudit.DoesNotExist:
+            logger.error(f"SiteAudit with id={site_audit_id} not found")
+            return {"status": "error", "message": "SiteAudit not found"}
+        
+        project = site_audit.project
+        url = f"https://{project.domain}"
+        
+        logger.info(f"Collecting PageSpeed Insights data for {url}")
+        
+        # Collect PageSpeed data for both mobile and desktop
+        psi_data = collect_pagespeed_data(url)
+        
+        if not psi_data:
+            logger.warning(f"No PageSpeed Insights data collected for {url}")
+            return {"status": "no_data", "message": "No PageSpeed data available"}
+        
+        # Update site audit with collected data
+        updates = []
+        
+        # Store mobile performance data
+        if 'mobile' in psi_data and psi_data['mobile']:
+            site_audit.mobile_performance = psi_data['mobile']
+            mobile_score = psi_data['mobile'].get('scores', {}).get('performance')
+            if mobile_score is not None:
+                site_audit.performance_score_mobile = mobile_score
+            updates.append('mobile_performance')
+            updates.append('performance_score_mobile')
+            logger.info(f"Mobile PageSpeed score: {mobile_score}")
+        
+        # Store desktop performance data  
+        if 'desktop' in psi_data and psi_data['desktop']:
+            site_audit.desktop_performance = psi_data['desktop']
+            desktop_score = psi_data['desktop'].get('scores', {}).get('performance')
+            if desktop_score is not None:
+                site_audit.performance_score_desktop = desktop_score
+            updates.append('desktop_performance')
+            updates.append('performance_score_desktop')
+            logger.info(f"Desktop PageSpeed score: {desktop_score}")
+        
+        # Save the updates
+        if updates:
+            update_fields = list(set(updates))  # Remove duplicates
+            site_audit.save(update_fields=update_fields)
+            logger.info(f"Updated site audit with PageSpeed Insights data: {update_fields}")
+        
+        # Recalculate overall score to include performance data
+        site_audit.calculate_overall_score()
+        site_audit.save(update_fields=['overall_site_health_score'])
+        
+        return {
+            "status": "success",
+            "message": f"PageSpeed Insights data collected for {url}",
+            "mobile_score": site_audit.performance_score_mobile,
+            "desktop_score": site_audit.performance_score_desktop,
+            "data_collected": {
+                "mobile": bool(psi_data.get('mobile')),
+                "desktop": bool(psi_data.get('desktop'))
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"PageSpeed Insights task error for id={site_audit_id}: {e}")
+        
+        # Retry if we haven't exceeded max retries
+        if self.request.retries < self.max_retries:
+            logger.info(f"Retrying PageSpeed Insights task, attempt {self.request.retries + 1}")
+            raise self.retry(exc=e, countdown=30 * (self.request.retries + 1))
+        
+        return {
+            "status": "error",
+            "message": f"Failed to collect PageSpeed Insights data: {str(e)}"
+        }
