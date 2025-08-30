@@ -1,0 +1,190 @@
+<div class="audit-card card bg-base-100 shadow-sm border border-base-300 hover:shadow-lg" id="project-card-{{ item.project.id }}">
+    <div class="card-body p-6">
+        <div class="flex items-start justify-between">
+            <!-- Left Section: Project Info -->
+            <div class="flex items-center gap-4 flex-1">
+                <!-- Favicon with Loading Indicator -->
+                <div class="relative">
+                    <img 
+                        src="{{ item.project.get_cached_favicon_url }}" 
+                        alt="{{ item.project.domain }}" 
+                        class="w-12 h-12 rounded-lg object-contain bg-base-200 p-2 {% if item.audit.status == 'running' or item.audit.status == 'pending' %}opacity-50{% endif %}"
+                    >
+                    {% if item.audit and item.audit.status == 'running' %}
+                    <div class="absolute inset-0 flex items-center justify-center">
+                        <i class="fas fa-spinner loading-spinner text-primary text-lg"></i>
+                    </div>
+                    {% elif item.audit and item.audit.status == 'pending' %}
+                    <div class="absolute inset-0 flex items-center justify-center">
+                        <i class="fas fa-clock text-warning text-lg"></i>
+                    </div>
+                    {% endif %}
+                </div>
+                
+                <!-- Domain and Title -->
+                <div class="flex-1">
+                    <h3 class="text-lg font-semibold text-base-content flex items-center gap-2">
+                        {{ item.project.domain }}
+                        {% if item.project.active %}
+                        <span class="w-2 h-2 bg-success rounded-full pulse-dot"></span>
+                        {% endif %}
+                    </h3>
+                    <p class="text-sm text-base-content/60">{{ item.project.title|default:"No title" }}</p>
+                    
+                    <!-- Status Badge -->
+                    {% if item.audit %}
+                    <div class="mt-2">
+                        {% if item.audit.status == 'completed' %}
+                        <span class="badge badge-success badge-sm">
+                            <i class="fas fa-check mr-1"></i> Completed
+                        </span>
+                        {% elif item.audit.status == 'running' %}
+                        <span class="badge badge-warning badge-sm">
+                            <i class="fas fa-spinner loading-spinner mr-1"></i> Running
+                        </span>
+                        {% elif item.audit.status == 'pending' %}
+                        <span class="badge badge-info badge-sm">
+                            <i class="fas fa-clock mr-1"></i> Pending
+                        </span>
+                        {% elif item.audit.status == 'failed' %}
+                        <span class="badge badge-error badge-sm">
+                            <i class="fas fa-times mr-1"></i> Failed
+                        </span>
+                        {% else %}
+                        <span class="badge badge-ghost badge-sm">Never Run</span>
+                        {% endif %}
+                        
+                        {% if item.audit.last_audit_date %}
+                        <span class="text-xs text-base-content/40 ml-2">
+                            Last: {{ item.audit.last_audit_date|timesince }} ago
+                        </span>
+                        {% endif %}
+                    </div>
+                    {% else %}
+                    <div class="mt-2">
+                        <span class="badge badge-ghost badge-sm">No audits yet</span>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- Right Section: Metrics -->
+            <div class="flex items-center gap-6">
+                {% if item.audit and item.audit.status == 'completed' %}
+                <!-- Health Score -->
+                <div class="text-center">
+                    <p class="text-xs text-base-content/60 mb-1">Health Score</p>
+                    <div class="radial-progress {% if item.audit.overall_site_health_score >= 80 %}text-success{% elif item.audit.overall_site_health_score >= 60 %}text-warning{% else %}text-error{% endif %}" 
+                         style="--value:{{ item.audit.overall_site_health_score|default:0 }}; --size:3rem; --thickness: 4px;">
+                        <span class="text-sm font-bold">{{ item.audit.overall_site_health_score|default:0|floatformat:0 }}</span>
+                    </div>
+                </div>
+                
+                <!-- Pages Crawled -->
+                <div class="text-center">
+                    <p class="text-xs text-base-content/60 mb-1">Pages</p>
+                    <p class="text-lg font-semibold text-base-content">{{ item.audit.total_pages_crawled|default:0 }}</p>
+                </div>
+                
+                <!-- Total Issues -->
+                <div class="text-center">
+                    <p class="text-xs text-base-content/60 mb-1">Issues</p>
+                    <p class="text-lg font-semibold {% if item.audit.get_total_issues_count > 50 %}text-error{% elif item.audit.get_total_issues_count > 20 %}text-warning{% else %}text-success{% endif %}">
+                        {{ item.audit.get_total_issues_count|default:0 }}
+                    </p>
+                </div>
+                
+                <!-- Desktop Performance -->
+                <div class="text-center">
+                    <p class="text-xs text-base-content/60 mb-1">Desktop</p>
+                    <div class="flex items-center justify-center">
+                        <i class="fas fa-desktop text-base-content/40 mr-2"></i>
+                        <span class="text-lg font-semibold {% if item.audit.performance_score_desktop >= 90 %}text-success{% elif item.audit.performance_score_desktop >= 50 %}text-warning{% else %}text-error{% endif %}">
+                            {{ item.audit.performance_score_desktop|default:"--" }}
+                        </span>
+                    </div>
+                </div>
+                {% elif item.audit and item.audit.status == 'running' %}
+                <!-- Loading State -->
+                <div class="flex items-center gap-4 text-base-content/40">
+                    <div class="skeleton h-12 w-12 rounded-full"></div>
+                    <div class="skeleton h-8 w-16"></div>
+                    <div class="skeleton h-8 w-16"></div>
+                    <div class="skeleton h-8 w-16"></div>
+                </div>
+                {% else %}
+                <!-- No Data State -->
+                <div class="text-center text-base-content/40">
+                    <p class="text-sm">No audit data available</p>
+                </div>
+                {% endif %}
+                
+                <!-- Action Button -->
+                <div class="ml-4">
+                    {% if not item.audit or item.audit.status == 'completed' or item.audit.status == 'failed' %}
+                    <button 
+                        class="btn btn-circle btn-ghost"
+                        hx-post="{% url 'site_audit:trigger_audit' item.project.id %}"
+                        hx-trigger="click"
+                        hx-target="#project-card-{{ item.project.id }}"
+                        hx-swap="outerHTML"
+                        hx-indicator="#audit-spinner-{{ item.project.id }}"
+                        title="Run Audit"
+                    >
+                        <i class="fas fa-play text-primary"></i>
+                        <span id="audit-spinner-{{ item.project.id }}" class="htmx-indicator absolute">
+                            <i class="fas fa-spinner loading-spinner text-primary"></i>
+                        </span>
+                    </button>
+                    {% elif item.audit.status == 'running' or item.audit.status == 'pending' %}
+                    <button class="btn btn-circle btn-ghost" disabled>
+                        <i class="fas fa-spinner loading-spinner text-base-content/40"></i>
+                    </button>
+                    {% endif %}
+                    
+                    {% if item.audit and item.audit.status == 'completed' %}
+                    <a href="{% url 'site_audit:detail' item.audit.id %}" class="btn btn-circle btn-ghost" title="View Details">
+                        <i class="fas fa-arrow-right"></i>
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <!-- Progress Bar for Health Score -->
+        {% if item.audit and item.audit.overall_site_health_score %}
+        <div class="mt-4">
+            <div class="w-full bg-base-200 rounded-full h-2 overflow-hidden">
+                <div class="health-bar h-full rounded-full {% if item.audit.overall_site_health_score >= 80 %}bg-success{% elif item.audit.overall_site_health_score >= 60 %}bg-warning{% else %}bg-error{% endif %}"
+                     style="width: {{ item.audit.overall_site_health_score }}%"></div>
+            </div>
+        </div>
+        {% endif %}
+        
+        <!-- Issues Breakdown (if available) -->
+        {% if item.audit and item.audit.status == 'completed' and item.audit.get_total_issues_count > 0 %}
+        <div class="mt-4 flex items-center gap-4 text-xs">
+            {% with issues=item.audit.get_issues_by_priority %}
+            {% if issues.High > 0 %}
+            <span class="badge badge-error badge-sm">
+                <i class="fas fa-exclamation-circle mr-1"></i>
+                {{ issues.High }} High
+            </span>
+            {% endif %}
+            {% if issues.Medium > 0 %}
+            <span class="badge badge-warning badge-sm">
+                <i class="fas fa-exclamation-triangle mr-1"></i>
+                {{ issues.Medium }} Medium
+            </span>
+            {% endif %}
+            {% if issues.Low > 0 %}
+            <span class="badge badge-info badge-sm">
+                <i class="fas fa-info-circle mr-1"></i>
+                {{ issues.Low }} Low
+            </span>
+            {% endif %}
+            {% endwith %}
+        </div>
+        {% endif %}
+    </div>
+</div>

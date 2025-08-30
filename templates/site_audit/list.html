@@ -1,0 +1,276 @@
+{% extends "dashboard_base.html" %}
+{% load static %}
+
+{% block title %}Site Audits - LimeClicks{% endblock %}
+{% block page_title %}Site Audits{% endblock %}
+
+{% block extra_head %}
+<style>
+    .audit-card {
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .audit-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+    }
+    
+    .loading-spinner {
+        animation: spin 1s linear infinite;
+    }
+    
+    @keyframes spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+    }
+    
+    .pulse-dot {
+        animation: pulse 2s infinite;
+    }
+    
+    @keyframes pulse {
+        0% {
+            box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7);
+        }
+        70% {
+            box-shadow: 0 0 0 10px rgba(34, 197, 94, 0);
+        }
+        100% {
+            box-shadow: 0 0 0 0 rgba(34, 197, 94, 0);
+        }
+    }
+    
+    .health-bar {
+        transition: width 1s ease-out;
+    }
+    
+    .skeleton {
+        background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+        background-size: 200% 100%;
+        animation: shimmer 1.5s infinite;
+    }
+    
+    @keyframes shimmer {
+        0% { background-position: 200% 0; }
+        100% { background-position: -200% 0; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto">
+    <!-- Header Section -->
+    <div class="mb-8">
+        <div class="flex items-center justify-between mb-6">
+            <div>
+                <h1 class="text-3xl font-bold text-base-content">Site Audits</h1>
+                <p class="text-base-content/60 mt-1">Monitor and analyze your website's SEO health</p>
+            </div>
+            <button onclick="location.reload()" class="btn btn-circle btn-ghost">
+                <i class="fas fa-sync-alt"></i>
+            </button>
+        </div>
+        
+        <!-- Search Bar -->
+        <div class="relative">
+            <input 
+                type="text" 
+                id="search-input"
+                placeholder="Search by domain or project name..." 
+                class="input input-bordered w-full pl-12 pr-4 h-12"
+                value="{{ search_query }}"
+                hx-get="{% url 'site_audit:list' %}"
+                hx-trigger="keyup changed delay:500ms"
+                hx-target="#audit-list"
+                hx-select="#audit-list"
+                hx-swap="innerHTML"
+                hx-indicator="#search-spinner"
+            >
+            <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-base-content/40"></i>
+            <span id="search-spinner" class="htmx-indicator absolute right-4 top-1/2 -translate-y-1/2">
+                <i class="fas fa-spinner loading-spinner text-primary"></i>
+            </span>
+        </div>
+    </div>
+    
+    <!-- Statistics Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+        <!-- Total Projects Card -->
+        <div class="card bg-base-100 shadow-sm border border-base-300">
+            <div class="card-body p-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-base-content/60 text-sm">Total Projects</p>
+                        <p class="text-2xl font-bold text-base-content">{{ total_projects }}</p>
+                    </div>
+                    <div class="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-folder text-primary text-lg"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Healthy Sites Card -->
+        <div class="card bg-base-100 shadow-sm border border-base-300">
+            <div class="card-body p-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-base-content/60 text-sm">Healthy Sites</p>
+                        <p class="text-2xl font-bold text-success">{{ healthy_count }}</p>
+                    </div>
+                    <div class="w-12 h-12 bg-success/10 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-check-circle text-success text-lg"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Need Attention Card -->
+        <div class="card bg-base-100 shadow-sm border border-base-300">
+            <div class="card-body p-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-base-content/60 text-sm">Need Attention</p>
+                        <p class="text-2xl font-bold text-warning">{{ attention_count }}</p>
+                    </div>
+                    <div class="w-12 h-12 bg-warning/10 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-exclamation-triangle text-warning text-lg"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Critical Sites Card -->
+        <div class="card bg-base-100 shadow-sm border border-base-300">
+            <div class="card-body p-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-base-content/60 text-sm">Critical Sites</p>
+                        <p class="text-2xl font-bold text-error">{{ critical_count }}</p>
+                    </div>
+                    <div class="w-12 h-12 bg-error/10 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-times-circle text-error text-lg"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Audit List -->
+    <div id="audit-list">
+        <div class="grid grid-cols-1 gap-4" id="audit-cards-container">
+            {% for item in projects_with_audits %}
+                {% include "site_audit/partials/audit_card.html" %}
+            {% endfor %}
+        </div>
+        
+        {% if has_next %}
+        <!-- Load More Button -->
+        <div class="text-center mt-8" id="load-more-container">
+            <button 
+                class="btn btn-primary btn-outline"
+                hx-get="{% url 'site_audit:list' %}?page={{ next_page }}"
+                hx-trigger="click"
+                hx-target="#audit-cards-container"
+                hx-select=".audit-card"
+                hx-swap="beforeend"
+                hx-indicator="#load-more-spinner"
+            >
+                <span id="load-more-text">Load More</span>
+                <span id="load-more-spinner" class="htmx-indicator">
+                    <i class="fas fa-spinner loading-spinner ml-2"></i>
+                </span>
+            </button>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Server-Sent Events for Real-time Updates -->
+<script>
+    // Initialize Server-Sent Events for real-time updates
+    let eventSource;
+    
+    function initSSE() {
+        if (eventSource) {
+            eventSource.close();
+        }
+        
+        eventSource = new EventSource("{% url 'site_audit:status_stream' %}");
+        
+        eventSource.onmessage = function(event) {
+            const data = JSON.parse(event.data);
+            
+            // Update the specific project card when audit completes
+            if (data.status === 'completed' || data.status === 'failed') {
+                // Fetch updated card HTML via HTMX
+                htmx.ajax('GET', `/site-audit/card/${data.project_id}/`, {
+                    target: `#project-card-${data.project_id}`,
+                    swap: 'outerHTML'
+                });
+                
+                // Show notification
+                showNotification(data.status, data.project_id);
+            }
+        };
+        
+        eventSource.onerror = function(error) {
+            console.error('SSE Error:', error);
+            // Reconnect after 5 seconds
+            setTimeout(initSSE, 5000);
+        };
+    }
+    
+    function showNotification(status, projectId) {
+        const message = status === 'completed' 
+            ? 'Site audit completed successfully!' 
+            : 'Site audit failed. Please try again.';
+        
+        const alertClass = status === 'completed' ? 'alert-success' : 'alert-error';
+        
+        // Create notification element
+        const notification = document.createElement('div');
+        notification.className = `alert ${alertClass} fixed top-20 right-4 z-50 shadow-lg max-w-sm`;
+        notification.innerHTML = `
+            <i class="fas fa-${status === 'completed' ? 'check' : 'times'}-circle"></i>
+            <span>${message}</span>
+        `;
+        
+        document.body.appendChild(notification);
+        
+        // Remove after 5 seconds
+        setTimeout(() => {
+            notification.remove();
+        }, 5000);
+    }
+    
+    // Initialize on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        initSSE();
+        
+        // Handle search input
+        const searchInput = document.getElementById('search-input');
+        if (searchInput) {
+            searchInput.addEventListener('input', function(e) {
+                // Update URL parameter without reload
+                const url = new URL(window.location);
+                if (e.target.value) {
+                    url.searchParams.set('search', e.target.value);
+                } else {
+                    url.searchParams.delete('search');
+                }
+                window.history.replaceState({}, '', url);
+            });
+        }
+    });
+    
+    // Clean up on page unload
+    window.addEventListener('beforeunload', function() {
+        if (eventSource) {
+            eventSource.close();
+        }
+    });
+</script>
+{% endblock %}

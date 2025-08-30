@@ -1,0 +1,26 @@
+{% for item in projects_with_audits %}
+    {% include "site_audit/partials/audit_card.html" %}
+{% endfor %}
+
+{% if has_next %}
+<div class="text-center mt-8" id="load-more-container" hx-swap-oob="true">
+    <button 
+        class="btn btn-primary btn-outline"
+        hx-get="{% url 'site_audit:list' %}?page={{ next_page }}"
+        hx-trigger="click"
+        hx-target="#audit-cards-container"
+        hx-select=".audit-card"
+        hx-swap="beforeend"
+        hx-indicator="#load-more-spinner"
+    >
+        <span id="load-more-text">Load More</span>
+        <span id="load-more-spinner" class="htmx-indicator">
+            <i class="fas fa-spinner loading-spinner ml-2"></i>
+        </span>
+    </button>
+</div>
+{% else %}
+<div class="text-center mt-8 text-base-content/60" id="load-more-container" hx-swap-oob="true">
+    <p>All projects loaded</p>
+</div>
+{% endif %}
