@@ -443,35 +443,22 @@
                         </a>
                     </li>
                     <li>
-                        <a href="#" class="flex items-center gap-3">
-                            <i class="fas fa-chart-line w-4"></i>
-                            <span>Analytics</span>
-                            <div class="badge badge-primary badge-sm ml-auto">New</div>
-                        </a>
-                    </li>
-                    <li>
                         <a href="{% url 'project:list' %}" class="flex items-center gap-3 {% if request.resolver_match.app_name == 'project' %}active{% endif %}">
                             <i class="fas fa-folder w-4"></i>
                             <span>Projects</span>
-                        </a>
-                    </li>
-                    <li>
-                        <a href="#" class="flex items-center gap-3">
-                            <i class="fas fa-link w-4"></i>
-                            <span>Links</span>
-                            <div class="badge badge-outline badge-sm ml-auto">12</div>
-                        </a>
-                    </li>
-                    <li>
-                        <a href="#" class="flex items-center gap-3">
-                            <i class="fas fa-qrcode w-4"></i>
-                            <span>QR Codes</span>
                         </a>
                     </li>
                     
                     <!-- On Page & Tech SEO -->
                     <li class="menu-title pt-4">
                         <span class="text-xs uppercase font-semibold text-base-content/60">On Page & Tech SEO</span>
+                    </li>
+                    <li>
+                        <a href="{% url 'site_audit:list' %}" class="flex items-center gap-3 {% if request.resolver_match.app_name == 'site_audit' %}active{% endif %}">
+                            <i class="fas fa-search-location w-4"></i>
+                            <span>Site Audits</span>
+                            <div class="badge badge-primary badge-sm ml-auto">New</div>
+                        </a>
                     </li>
                     
                     <!-- Collaboration -->
