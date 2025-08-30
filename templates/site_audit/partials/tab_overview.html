@@ -35,7 +35,10 @@
                             <p class="text-xs text-base-content/60">Completed successfully</p>
                         </div>
                     </div>
-                    <p class="text-sm font-medium text-base-content">{{ audit.last_audit_date|date:"M d, Y g:i A" }}</p>
+                    <div class="text-right">
+                        <p class="text-lg font-bold text-base-content">{{ audit.last_audit_date|date:"M d, Y" }}</p>
+                        <p class="text-xs text-base-content/60">{{ audit.last_audit_date|date:"g:i A" }}</p>
+                    </div>
                 </div>
                 
                 <!-- Crawl Status -->
@@ -49,7 +52,7 @@
                             <p class="text-xs text-base-content/60">Current audit status</p>
                         </div>
                     </div>
-                    <span class="badge badge-success">{{ audit.status|title }}</span>
+                    <span class="badge badge-success badge-lg">{{ audit.status|title }}</span>
                 </div>
                 
                 <!-- Next Scheduled Audit -->
@@ -64,7 +67,10 @@
                             <p class="text-xs text-base-content/60">Scheduled automatically</p>
                         </div>
                     </div>
-                    <p class="text-sm font-medium text-base-content">In {{ audit.audit_frequency_days }} days</p>
+                    <div class="text-right">
+                        <p class="text-lg font-bold text-base-content">{{ audit.audit_frequency_days }}</p>
+                        <p class="text-xs text-base-content/60">days</p>
+                    </div>
                 </div>
                 {% endif %}
             </div>
@@ -94,7 +100,9 @@
                                 <p class="text-xs text-base-content/60">Must fix immediately</p>
                             </div>
                         </div>
-                        <p class="text-2xl font-bold text-error">{{ issues.Critical|default:0 }}</p>
+                        <div class="text-right">
+                            <p class="text-2xl font-bold text-error">{{ issues.Critical|default:0 }}</p>
+                        </div>
                     </div>
                     <div class="mt-2">
                         <div class="w-full bg-error/20 rounded-full h-2">
@@ -116,7 +124,9 @@
                                 <p class="text-xs text-base-content/60">Important to fix</p>
                             </div>
                         </div>
-                        <p class="text-2xl font-bold text-error">{{ issues.High|default:0 }}</p>
+                        <div class="text-right">
+                            <p class="text-2xl font-bold text-error">{{ issues.High|default:0 }}</p>
+                        </div>
                     </div>
                     {% if issues.High > 0 %}
                     <div class="mt-2">
@@ -139,7 +149,9 @@
                                 <p class="text-xs text-base-content/60">Should be addressed</p>
                             </div>
                         </div>
-                        <p class="text-2xl font-bold text-warning">{{ issues.Medium|default:0 }}</p>
+                        <div class="text-right">
+                            <p class="text-2xl font-bold text-warning">{{ issues.Medium|default:0 }}</p>
+                        </div>
                     </div>
                     {% if issues.Medium > 0 %}
                     <div class="mt-2">
@@ -162,7 +174,9 @@
                                 <p class="text-xs text-base-content/60">Minor improvements</p>
                             </div>
                         </div>
-                        <p class="text-2xl font-bold text-info">{{ issues.Low|default:0 }}</p>
+                        <div class="text-right">
+                            <p class="text-2xl font-bold text-info">{{ issues.Low|default:0 }}</p>
+                        </div>
                     </div>
                     {% if issues.Low > 0 %}
                     <div class="mt-2">
@@ -173,13 +187,6 @@
                     {% endif %}
                 </div>
                 {% endwith %}
-                
-                <!-- Total Issues -->
-                <div class="divider"></div>
-                <div class="flex justify-between items-center">
-                    <p class="text-sm font-semibold text-base-content">Total Issues Found</p>
-                    <p class="text-xl font-bold text-base-content">{{ audit.get_total_issues_count|default:0 }}</p>
-                </div>
             </div>
         </div>
     </div>
