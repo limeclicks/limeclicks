@@ -127,14 +127,25 @@ class IssuesOverviewParser:
         if self.site_audit and issues_data:
             try:
                 self.site_audit.issues_overview = issues_data
+                print(f"📊 Issues overview set: {issues_data.get('issues_by_priority', {})}")
                 
-                # The total issues count can be calculated from the issues_overview JSON
-                # using the get_total_issues_count() method on the model
+                # Calculate the overall health score immediately after parsing issues
+                print(f"📊 Calculating health score...")
+                self.site_audit.calculate_overall_score()
+                print(f"📊 Health score calculated: {self.site_audit.overall_site_health_score}")
                 
-                self.site_audit.save()
-                logger.info(f"Saved issues overview data to SiteAudit {self.site_audit.id}")
+                # Need to update status too since it needs to be completed
+                self.site_audit.status = 'completed'
+                
+                # Explicitly save all fields including the health score and status
+                self.site_audit.save(update_fields=['issues_overview', 'overall_site_health_score', 'status'])
+                print(f"📊 Saved to DB with health score: {self.site_audit.overall_site_health_score} and status: {self.site_audit.status}")
+                logger.info(f"Saved issues overview data to SiteAudit {self.site_audit.id} with health score: {self.site_audit.overall_site_health_score}")
                 
             except Exception as e:
                 logger.error(f"Error saving issues overview to SiteAudit: {e}")
+                print(f"❌ Error in issues_overview parser: {e}")
+                import traceback
+                traceback.print_exc()
         
         return issues_data

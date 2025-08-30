@@ -81,12 +81,11 @@ class CrawlOverviewParser:
                     self.site_audit.total_pages_crawled = crawl_data['total_urls_crawled']
                     print(f"📊 Updated pages crawled: {self.site_audit.total_pages_crawled}")
                 
-                # Update audit status and timestamp
+                # Update timestamp but NOT status (let issues_overview handle that)
                 self.site_audit.last_audit_date = timezone.now()
-                self.site_audit.status = 'completed'
                 
-                # Save all updates
-                self.site_audit.save()
+                # Save only the fields we've updated (not health score or status)
+                self.site_audit.save(update_fields=['crawl_overview', 'total_pages_crawled', 'last_audit_date'])
                 logger.info(f"Saved crawl overview data to site_audit: {self.site_audit.id}")
             
             return crawl_data

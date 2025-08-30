@@ -162,8 +162,8 @@ class SiteAudit(models.Model):
                 self.average_load_time_ms = summary.get('average_load_time_ms')
                 self.total_pages_crawled = summary.get('total_pages_crawled', 0)
             
-            # Update overall score based on overview data
-            self.calculate_overall_score()
+            # Don't calculate score here - it will be done after issues are parsed
+            # self.calculate_overall_score()
             self.save()
     
     @classmethod
@@ -176,38 +176,58 @@ class SiteAudit(models.Model):
                 audit.delete()
     
     def calculate_overall_score(self):
-        """Calculate overall site health score based on overview issues"""
-        if not self.issues_overview or not self.total_pages_crawled:
+        """Calculate overall site health score based on SEO issues only (no PageSpeed scores)"""
+        if not self.issues_overview:
             self.overall_site_health_score = 100
             return
         
-        # Count issues by priority from the issues list
+        # Get issues from issues_overview
         issues_list = self.issues_overview.get('issues', [])
+        
+        # Count issues by priority
         high_issues = len([i for i in issues_list if i.get('issue_priority') == 'High'])
         medium_issues = len([i for i in issues_list if i.get('issue_priority') == 'Medium'])
         low_issues = len([i for i in issues_list if i.get('issue_priority') == 'Low'])
         
-        # Calculate weighted issue score (High=3, Medium=2, Low=1)
-        weighted_issues = (high_issues * 3) + (medium_issues * 2) + (low_issues * 1)
+        # Calculate weighted issue score with stronger penalties
+        # High = 5 points, Medium = 2 points, Low = 1 point
+        weighted_issues = (high_issues * 5) + (medium_issues * 2) + (low_issues * 1)
         
-        # Calculate technical health based on issues per page
-        if self.total_pages_crawled > 0:
+        # Calculate health score based on weighted issues
+        if self.total_pages_crawled and self.total_pages_crawled > 0:
+            # Normalize by pages crawled
             issues_per_page = weighted_issues / self.total_pages_crawled
-            technical_health = max(0, min(100, 100 - (issues_per_page * 10)))
+            
+            # More aggressive deduction: each weighted issue point per page reduces score by 20 points
+            deduction = issues_per_page * 20
+            self.overall_site_health_score = max(0, min(100, 100 - deduction))
         else:
-            technical_health = 100 if weighted_issues == 0 else 0
+            # If no pages crawled, base on absolute issues
+            if weighted_issues == 0:
+                self.overall_site_health_score = 100
+            elif weighted_issues <= 5:
+                self.overall_site_health_score = 90
+            elif weighted_issues <= 10:
+                self.overall_site_health_score = 75
+            elif weighted_issues <= 20:
+                self.overall_site_health_score = 60
+            else:
+                self.overall_site_health_score = max(0, 100 - (weighted_issues * 2))
         
-        # Get average performance score
-        performance_scores = []
-        if self.performance_score_mobile is not None:
-            performance_scores.append(self.performance_score_mobile)
-        if self.performance_score_desktop is not None:
-            performance_scores.append(self.performance_score_desktop)
+        # Special handling: If there are high priority issues, cap the score
+        if high_issues > 0:
+            if high_issues >= 5:
+                # 5+ high issues = critical (max 40%)
+                self.overall_site_health_score = min(self.overall_site_health_score, 40)
+            elif high_issues >= 2:
+                # 2-4 high issues = needs attention (max 60%)  
+                self.overall_site_health_score = min(self.overall_site_health_score, 60)
+            else:
+                # 1 high issue = slight penalty (max 75%)
+                self.overall_site_health_score = min(self.overall_site_health_score, 75)
         
-        avg_performance = sum(performance_scores) / len(performance_scores) if performance_scores else 50
-        
-        # Calculate combined score (60% technical SEO + 40% performance)
-        self.overall_site_health_score = (technical_health * 0.6) + (avg_performance * 0.4)
+        # Round to 1 decimal place
+        self.overall_site_health_score = round(self.overall_site_health_score, 1)
     
     def get_total_issues_count(self):
         """Get total number of issues from overview"""
@@ -275,7 +295,13 @@ class SiteAudit(models.Model):
                     "low_priority_issues": issues_data.get('issues_by_priority', {}).get('Low', 0)
                 })
             
-            if not crawl_data and not issues_data:
+            # Mark as completed if we have any data
+            if crawl_data or issues_data:
+                self.status = 'completed'
+                self.last_audit_date = timezone.now()
+                # Don't save here - let the parsers save with the correct health score
+                # The IssuesOverviewParser already saves with the health score
+            elif not crawl_data and not issues_data:
                 print("⚠️ No overview data parsed")
                 # Still mark as completed even if no overview data
                 self.status = 'completed'

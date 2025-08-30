@@ -45,13 +45,13 @@ def site_audit_list(request):
     # Calculate statistics
     total_projects = len(projects_with_audits)
     
-    # Categorize projects by health
+    # Categorize projects by health (only count completed audits)
     healthy_count = 0
     attention_count = 0
     critical_count = 0
     
     for item in projects_with_audits:
-        if item['audit'] and item['audit'].overall_site_health_score:
+        if item['audit'] and item['audit'].status == 'completed' and item['audit'].overall_site_health_score is not None:
             score = item['audit'].overall_site_health_score
             if score >= 80:
                 healthy_count += 1
@@ -167,7 +167,7 @@ def audit_status_stream(request):
     """Server-sent events stream for real-time audit status updates"""
     def event_stream():
         """Generate server-sent events"""
-        # Track previous states to detect changes
+        # Track previous states and scores to detect changes
         audit_states = {}
         
         while True:
@@ -177,31 +177,42 @@ def audit_status_stream(request):
                 project_id__in=user_projects
             ).select_related('project')
             
-            # Check for status changes
+            # Check for status or score changes
             for audit in audits:
                 audit_key = f"audit_{audit.id}"
-                current_status = audit.status
-                previous_status = audit_states.get(audit_key)
                 
-                # Detect status change or new audit
-                if previous_status != current_status:
-                    # Send update for any status change
+                # Create a state tuple to track all changes
+                current_state = (
+                    audit.status,
+                    audit.overall_site_health_score,
+                    audit.performance_score_mobile,
+                    audit.performance_score_desktop,
+                    audit.total_pages_crawled
+                )
+                
+                previous_state = audit_states.get(audit_key)
+                
+                # Detect any change (status, scores, or pages)
+                if previous_state != current_state:
+                    # Send update for any change
                     data = {
                         'project_id': audit.project.id,
                         'audit_id': audit.id,
-                        'status': current_status,
-                        'previous_status': previous_status,
+                        'status': audit.status,
+                        'previous_status': previous_state[0] if previous_state else None,
                         'health_score': audit.overall_site_health_score,
                         'pages_crawled': audit.total_pages_crawled,
                         'issues_count': audit.get_total_issues_count(),
                         'performance_mobile': audit.performance_score_mobile,
-                        'performance_desktop': audit.performance_score_desktop
+                        'performance_desktop': audit.performance_score_desktop,
+                        'update_type': 'score_update' if previous_state and previous_state[0] == audit.status else 'status_update'
                     }
                     
-                    yield f"data: {json.dumps(data)}\n\n"
+                    # Send as named event for HTMX SSE
+                    yield f"event: audit_update\ndata: {json.dumps(data)}\n\n"
                     
                     # Update tracked state
-                    audit_states[audit_key] = current_status
+                    audit_states[audit_key] = current_state
             
             # Also send heartbeat to keep connection alive
             yield f": heartbeat\n\n"
@@ -325,13 +336,29 @@ def add_project(request):
                 # Don't fail project creation if audit trigger fails
                 pass
         
-        # Return the new project card HTML
-        html = render_to_string('site_audit/partials/audit_card.html', {
-            'item': {
-                'project': project,
-                'audit': site_audit
-            }
-        })
+        # Check if this is the user's first project
+        user_project_count = Project.objects.filter(user=request.user).count()
+        
+        # Prepare the response HTML
+        if user_project_count == 1:
+            # First project - include both the project card and the "Add New Project" card
+            project_html = render_to_string('site_audit/partials/audit_card.html', {
+                'item': {
+                    'project': project,
+                    'audit': site_audit
+                }
+            })
+            add_card_html = render_to_string('site_audit/partials/add_project_card.html')
+            # Combine both cards
+            html = project_html + add_card_html
+        else:
+            # Not the first project - just return the project card
+            html = render_to_string('site_audit/partials/audit_card.html', {
+                'item': {
+                    'project': project,
+                    'audit': site_audit
+                }
+            })
         
         # Add HX-Trigger header to close modal
         response = HttpResponse(html)

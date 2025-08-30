@@ -15,6 +15,7 @@
         <form hx-post="{% url 'site_audit:add_project' %}"
               hx-target="#audit-cards-container"
               hx-swap="beforeend"
+              hx-on::before-request="checkEmptyState()"
               hx-on::after-swap="handleProjectAdded()"
               class="space-y-4">
             {% csrf_token %}
@@ -271,6 +272,22 @@
     });
 })();
 
+// Check and remove empty state before adding project
+window.checkEmptyState = function() {
+    const container = document.querySelector('#audit-cards-container');
+    if (container) {
+        // Check if empty state exists
+        const emptyState = Array.from(container.children).find(child => {
+            return child.textContent.includes('No Projects Yet');
+        });
+        
+        if (emptyState) {
+            console.log('Empty state detected, clearing container');
+            container.innerHTML = ''; // Clear the container completely
+        }
+    }
+}
+
 // Global function to close modal (make it available globally)
 window.closeModal = function() {
     const modal = document.querySelector('.modal');
@@ -285,26 +302,8 @@ window.closeModal = function() {
     }, 200);
 }
 
-// Handle project added - remove empty state and close modal
+// Handle project added - close modal and update UI
 window.handleProjectAdded = function() {
-    // Remove empty state card if it exists
-    const emptyState = document.querySelector('#audit-cards-container > div:has(.fa-folder-plus)');
-    if (emptyState && emptyState.querySelector('h3')?.textContent?.includes('No Projects Yet')) {
-        emptyState.remove();
-    }
-    
-    // Add the "Add New Project" card if it doesn't exist
-    const addProjectCard = document.querySelector('[hx-get*="add_project_modal"]');
-    if (!addProjectCard) {
-        // Fetch and append the add project card
-        fetch("{% url 'site_audit:add_project_modal' %}")
-            .then(response => response.text())
-            .then(html => {
-                // This would need the add project card HTML
-                // For now, we'll skip this as it should be handled by the view
-            });
-    }
-    
     // Close the modal
     closeModal();
     
@@ -314,5 +313,9 @@ window.handleProjectAdded = function() {
         const current = parseInt(totalElement.textContent) || 0;
         totalElement.textContent = current + 1;
     }
+    
+    // The empty state should already be removed by checkEmptyState()
+    // and the server should have added both cards if it was the first project
+    console.log('Project added successfully');
 }
 </script>

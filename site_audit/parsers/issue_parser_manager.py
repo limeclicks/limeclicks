@@ -193,13 +193,9 @@ class IssueParserManager:
         # Get total issue count
         total_issues = SiteIssue.objects.filter(site_audit=self.site_audit).count()
         
-        # Calculate and update health score (100 - (issues per page * 10))
-        if self.site_audit.total_pages_crawled > 0:
-            issues_per_page = total_issues / self.site_audit.total_pages_crawled
-            health_score = max(0, min(100, 100 - (issues_per_page * 10)))
-            self.site_audit.overall_site_health_score = int(health_score)
-        else:
-            self.site_audit.overall_site_health_score = 100 if total_issues == 0 else 0
+        # Don't calculate health score here - it's calculated from issues_overview.csv
+        # The overview-based calculation considers issue priority (High/Medium/Low)
+        # which is more accurate than just counting individual issue instances
         
         # Set audit as completed
         self.site_audit.status = 'completed'

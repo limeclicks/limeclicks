@@ -431,9 +431,8 @@ def collect_pagespeed_insights(self, site_audit_id: int) -> dict:
             site_audit.save(update_fields=update_fields)
             logger.info(f"Updated site audit with PageSpeed Insights data: {update_fields}")
         
-        # Recalculate overall score to include performance data
-        site_audit.calculate_overall_score()
-        site_audit.save(update_fields=['overall_site_health_score'])
+        # Don't recalculate score here - it's based on SEO issues only, not PageSpeed
+        # The score was already calculated when processing issues_overview.csv
         
         return {
             "status": "success",

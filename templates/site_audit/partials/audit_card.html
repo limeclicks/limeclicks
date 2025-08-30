@@ -1,4 +1,8 @@
-<div class="audit-card card bg-base-100 shadow-sm border border-base-300 hover:shadow-lg" id="project-card-{{ item.project.id }}">
+<div class="audit-card card bg-base-100 shadow-sm border border-base-300 hover:shadow-lg cursor-pointer" 
+     id="project-card-{{ item.project.id }}"
+     {% if item.audit and item.audit.status == 'completed' %}
+     onclick="window.location.href='{% url 'site_audit:detail' item.audit.id %}'"
+     {% endif %}>
     <div class="card-body p-6">
         <div class="flex items-start justify-between">
             <!-- Left Section: Project Info -->
@@ -69,37 +73,37 @@
             </div>
             
             <!-- Right Section: Metrics -->
-            <div class="flex items-center gap-6">
+            <div class="flex items-center gap-6 lg:gap-10">
                 {% if item.audit and item.audit.status == 'completed' %}
                 <!-- Health Score -->
-                <div class="text-center">
-                    <p class="text-xs text-base-content/60 mb-1">Health Score</p>
+                <div class="text-center min-w-[70px]">
+                    <p class="text-xs text-base-content/60 mb-2 font-medium">Health Score</p>
                     <div class="radial-progress {% if item.audit.overall_site_health_score >= 80 %}text-success{% elif item.audit.overall_site_health_score >= 60 %}text-warning{% else %}text-error{% endif %}" 
-                         style="--value:{{ item.audit.overall_site_health_score|default:0 }}; --size:3rem; --thickness: 4px;">
+                         style="--value:{{ item.audit.overall_site_health_score|default:0 }}; --size:3.5rem; --thickness: 4px;">
                         <span class="text-sm font-bold">{{ item.audit.overall_site_health_score|default:0|floatformat:0 }}</span>
                     </div>
                 </div>
                 
                 <!-- Pages Crawled -->
-                <div class="text-center">
-                    <p class="text-xs text-base-content/60 mb-1">Pages</p>
-                    <p class="text-lg font-semibold text-base-content">{{ item.audit.total_pages_crawled|default:0 }}</p>
+                <div class="text-center min-w-[60px]">
+                    <p class="text-xs text-base-content/60 mb-2 font-medium">Pages</p>
+                    <p class="text-xl font-semibold text-base-content">{{ item.audit.total_pages_crawled|default:0 }}</p>
                 </div>
                 
                 <!-- Total Issues -->
-                <div class="text-center">
-                    <p class="text-xs text-base-content/60 mb-1">Issues</p>
-                    <p class="text-lg font-semibold {% if item.audit.get_total_issues_count > 50 %}text-error{% elif item.audit.get_total_issues_count > 20 %}text-warning{% else %}text-success{% endif %}">
+                <div class="text-center min-w-[60px]">
+                    <p class="text-xs text-base-content/60 mb-2 font-medium">Issues</p>
+                    <p class="text-xl font-semibold {% if item.audit.get_total_issues_count > 50 %}text-error{% elif item.audit.get_total_issues_count > 20 %}text-warning{% else %}text-success{% endif %}">
                         {{ item.audit.get_total_issues_count|default:0 }}
                     </p>
                 </div>
                 
                 <!-- Desktop Performance -->
-                <div class="text-center">
-                    <p class="text-xs text-base-content/60 mb-1">Desktop</p>
+                <div class="text-center min-w-[70px]">
+                    <p class="text-xs text-base-content/60 mb-2 font-medium">Desktop</p>
                     <div class="flex items-center justify-center">
-                        <i class="fas fa-desktop text-base-content/40 mr-2"></i>
-                        <span class="text-lg font-semibold {% if item.audit.performance_score_desktop >= 90 %}text-success{% elif item.audit.performance_score_desktop >= 50 %}text-warning{% else %}text-error{% endif %}">
+                        <i class="fas fa-desktop text-base-content/40 mr-2 text-sm"></i>
+                        <span class="text-xl font-semibold {% if item.audit.performance_score_desktop >= 90 %}text-success{% elif item.audit.performance_score_desktop >= 50 %}text-warning{% else %}text-error{% endif %}">
                             {{ item.audit.performance_score_desktop|default:"--" }}
                         </span>
                     </div>
@@ -119,35 +123,6 @@
                 </div>
                 {% endif %}
                 
-                <!-- Action Button -->
-                <div class="ml-4">
-                    {% if not item.audit or item.audit.status == 'completed' or item.audit.status == 'failed' %}
-                    <button 
-                        class="btn btn-circle btn-ghost"
-                        hx-post="{% url 'site_audit:trigger_audit' item.project.id %}"
-                        hx-trigger="click"
-                        hx-target="#project-card-{{ item.project.id }}"
-                        hx-swap="outerHTML"
-                        hx-indicator="#audit-spinner-{{ item.project.id }}"
-                        title="Run Audit"
-                    >
-                        <i class="fas fa-play text-primary"></i>
-                        <span id="audit-spinner-{{ item.project.id }}" class="htmx-indicator absolute">
-                            <i class="fas fa-spinner loading-spinner text-primary"></i>
-                        </span>
-                    </button>
-                    {% elif item.audit.status == 'running' or item.audit.status == 'pending' %}
-                    <button class="btn btn-circle btn-ghost" disabled>
-                        <i class="fas fa-spinner loading-spinner text-base-content/40"></i>
-                    </button>
-                    {% endif %}
-                    
-                    {% if item.audit and item.audit.status == 'completed' %}
-                    <a href="{% url 'site_audit:detail' item.audit.id %}" class="btn btn-circle btn-ghost" title="View Details">
-                        <i class="fas fa-arrow-right"></i>
-                    </a>
-                    {% endif %}
-                </div>
             </div>
         </div>
         
