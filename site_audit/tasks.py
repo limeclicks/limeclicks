@@ -378,6 +378,11 @@ def collect_pagespeed_insights(self, site_audit_id: int) -> dict:
     Returns:
         dict: Results of the PageSpeed Insights collection
     """
+    import json
+    import io
+    from datetime import datetime
+    from limeclicks.storage_backends import CloudflareR2Storage
+    
     try:
         # Fetch site audit
         try:
@@ -391,12 +396,62 @@ def collect_pagespeed_insights(self, site_audit_id: int) -> dict:
         
         logger.info(f"Collecting PageSpeed Insights data for {url}")
         
-        # Collect PageSpeed data for both mobile and desktop
-        psi_data = collect_pagespeed_data(url)
+        # Collect PageSpeed data for both mobile and desktop (with raw responses)
+        psi_data_with_raw = collect_pagespeed_data(url, return_raw=True)
+        psi_data = psi_data_with_raw['parsed'] if psi_data_with_raw else {}
+        raw_responses = psi_data_with_raw.get('raw', {}) if psi_data_with_raw else {}
         
         if not psi_data:
             logger.warning(f"No PageSpeed Insights data collected for {url}")
             return {"status": "no_data", "message": "No PageSpeed data available"}
+        
+        # Save raw API responses to R2 if we have data
+        if raw_responses:
+            try:
+                storage = CloudflareR2Storage()
+                timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                
+                # Save mobile response if available
+                if raw_responses.get('mobile'):
+                    try:
+                        mobile_file_name = f"pagespeed_insights/{project.domain}/mobile_psi_{timestamp}.json"
+                        mobile_response = {
+                            'url': url,
+                            'strategy': 'mobile',
+                            'timestamp': timestamp,
+                            'data': raw_responses['mobile']
+                        }
+                        mobile_json = json.dumps(mobile_response, indent=2)
+                        mobile_file = io.BytesIO(mobile_json.encode('utf-8'))
+                        
+                        mobile_path = storage.save(mobile_file_name, mobile_file)
+                        site_audit.pagespeed_mobile_response_r2_path = mobile_path
+                        logger.info(f"Saved mobile PageSpeed Insights raw response to R2: {mobile_path}")
+                    except Exception as e:
+                        logger.error(f"Failed to save mobile PageSpeed response to R2: {e}")
+                
+                # Save desktop response if available
+                if raw_responses.get('desktop'):
+                    try:
+                        desktop_file_name = f"pagespeed_insights/{project.domain}/desktop_psi_{timestamp}.json"
+                        desktop_response = {
+                            'url': url,
+                            'strategy': 'desktop',
+                            'timestamp': timestamp,
+                            'data': raw_responses['desktop']
+                        }
+                        desktop_json = json.dumps(desktop_response, indent=2)
+                        desktop_file = io.BytesIO(desktop_json.encode('utf-8'))
+                        
+                        desktop_path = storage.save(desktop_file_name, desktop_file)
+                        site_audit.pagespeed_desktop_response_r2_path = desktop_path
+                        logger.info(f"Saved desktop PageSpeed Insights raw response to R2: {desktop_path}")
+                    except Exception as e:
+                        logger.error(f"Failed to save desktop PageSpeed response to R2: {e}")
+                        
+            except Exception as e:
+                logger.error(f"Failed to initialize R2 storage: {e}")
+                # Continue processing even if R2 save fails
         
         # Update site audit with collected data
         updates = []
@@ -425,6 +480,12 @@ def collect_pagespeed_insights(self, site_audit_id: int) -> dict:
             updates.append('desktop_performance')
             logger.info(f"Desktop PageSpeed score: {desktop_score}, Full scores: {desktop_scores}")
         
+        # Add R2 paths to updates if they were saved
+        if hasattr(site_audit, 'pagespeed_mobile_response_r2_path') and site_audit.pagespeed_mobile_response_r2_path:
+            updates.append('pagespeed_mobile_response_r2_path')
+        if hasattr(site_audit, 'pagespeed_desktop_response_r2_path') and site_audit.pagespeed_desktop_response_r2_path:
+            updates.append('pagespeed_desktop_response_r2_path')
+        
         # Save the updates
         if updates:
             update_fields = list(set(updates))  # Remove duplicates
@@ -442,6 +503,10 @@ def collect_pagespeed_insights(self, site_audit_id: int) -> dict:
             "data_collected": {
                 "mobile": bool(psi_data.get('mobile')),
                 "desktop": bool(psi_data.get('desktop'))
+            },
+            "raw_response_paths": {
+                "mobile": site_audit.pagespeed_mobile_response_r2_path if hasattr(site_audit, 'pagespeed_mobile_response_r2_path') else None,
+                "desktop": site_audit.pagespeed_desktop_response_r2_path if hasattr(site_audit, 'pagespeed_desktop_response_r2_path') else None
             }
         }
         

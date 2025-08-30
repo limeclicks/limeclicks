@@ -101,6 +101,20 @@ class SiteAudit(models.Model):
         help_text="Mobile PageSpeed Insights data including scores, core web vitals, and lab metrics"
     )
     
+    # PageSpeed API response storage paths (separate for mobile and desktop)
+    pagespeed_mobile_response_r2_path = models.CharField(
+        max_length=500,
+        blank=True,
+        null=True,
+        help_text="R2 storage path for the raw mobile PageSpeed Insights API response"
+    )
+    pagespeed_desktop_response_r2_path = models.CharField(
+        max_length=500,
+        blank=True,
+        null=True,
+        help_text="R2 storage path for the raw desktop PageSpeed Insights API response"
+    )
+    
     # Combined scores
     performance_score_mobile = models.IntegerField(
         null=True, blank=True,

@@ -26,7 +26,7 @@ class PageSpeedInsightsClient:
         if not self.api_key:
             logger.warning("No Google PageSpeed Insights API key found. Some features may be limited.")
     
-    def analyze_url(self, url: str, strategy: str = 'mobile', locale: str = 'en') -> Optional[Dict]:
+    def analyze_url(self, url: str, strategy: str = 'mobile', locale: str = 'en', return_raw: bool = False) -> Optional[Dict]:
         """
         Analyze a URL using PageSpeed Insights API
         
@@ -34,6 +34,7 @@ class PageSpeedInsightsClient:
             url: The URL to analyze
             strategy: 'mobile' or 'desktop'
             locale: Language code for the results
+            return_raw: If True, return raw API response alongside parsed data
             
         Returns:
             Dict containing the analysis results, or None if failed
@@ -54,7 +55,11 @@ class PageSpeedInsightsClient:
             response.raise_for_status()
             
             data = response.json()
-            return self._parse_pagespeed_data(data, strategy)
+            parsed_data = self._parse_pagespeed_data(data, strategy)
+            
+            if return_raw:
+                return {'parsed': parsed_data, 'raw': data}
+            return parsed_data
             
         except requests.exceptions.RequestException as e:
             logger.error(f"PageSpeed Insights API error for {url} ({strategy}): {e}")
@@ -226,41 +231,57 @@ class PageSpeedInsightsClient:
         return audit_data.get('score') if audit_data else None
 
 
-def collect_pagespeed_data(url: str) -> Dict[str, Dict]:
+def collect_pagespeed_data(url: str, return_raw: bool = False) -> Dict[str, Dict]:
     """
     Collect PageSpeed Insights data for both mobile and desktop
     
     Args:
         url: The URL to analyze
+        return_raw: If True, return raw API responses alongside parsed data
         
     Returns:
         Dict with 'mobile' and 'desktop' keys containing performance data
     """
     client = PageSpeedInsightsClient()
     results = {}
+    raw_responses = {} if return_raw else None
     
     logger.info(f"Starting PageSpeed Insights collection for {url}")
     
     # Collect mobile data
     logger.info(f"Collecting mobile PageSpeed data for {url}")
-    mobile_data = client.analyze_url(url, strategy='mobile')
+    mobile_data = client.analyze_url(url, strategy='mobile', return_raw=return_raw)
     if mobile_data:
-        results['mobile'] = mobile_data
-        logger.info(f"Mobile data collected successfully. Scores: {mobile_data.get('scores', {})}")
+        if return_raw:
+            results['mobile'] = mobile_data['parsed']
+            raw_responses['mobile'] = mobile_data['raw']
+        else:
+            results['mobile'] = mobile_data
+        logger.info(f"Mobile data collected successfully. Scores: {results['mobile'].get('scores', {})}")
     else:
         logger.error(f"Failed to collect mobile PageSpeed data for {url}")
         results['mobile'] = {}
+        if return_raw:
+            raw_responses['mobile'] = {}
     
     # Collect desktop data
     logger.info(f"Collecting desktop PageSpeed data for {url}")
-    desktop_data = client.analyze_url(url, strategy='desktop')
+    desktop_data = client.analyze_url(url, strategy='desktop', return_raw=return_raw)
     if desktop_data:
-        results['desktop'] = desktop_data
-        logger.info(f"Desktop data collected successfully. Scores: {desktop_data.get('scores', {})}")
+        if return_raw:
+            results['desktop'] = desktop_data['parsed']
+            raw_responses['desktop'] = desktop_data['raw']
+        else:
+            results['desktop'] = desktop_data
+        logger.info(f"Desktop data collected successfully. Scores: {results['desktop'].get('scores', {})}")
     else:
         logger.error(f"Failed to collect desktop PageSpeed data for {url}")
         results['desktop'] = {}
+        if return_raw:
+            raw_responses['desktop'] = {}
     
     logger.info(f"PageSpeed collection complete. Mobile: {bool(results.get('mobile'))}, Desktop: {bool(results.get('desktop'))}")
     
+    if return_raw:
+        return {'parsed': results, 'raw': raw_responses}
     return results
