@@ -3,545 +3,369 @@ from django.utils.html import format_html
 from django.urls import reverse
 from django.utils.safestring import mark_safe
 from django.db import models
+from django.db.models import Count, Q
 from unfold.admin import ModelAdmin, TabularInline
 from unfold.contrib.filters.admin import RangeNumericFilter, RangeDateFilter, ChoicesDropdownFilter
 from unfold.decorators import display
-from unfold.widgets import UnfoldAdminTextareaWidget, UnfoldAdminSelectWidget
 from .models import SiteAudit, SiteIssue
 import json
 
 
-class SiteIssueInline(TabularInline):
-    """Inline for Site Issues"""
+class IssuesFromJSONInline(TabularInline):
+    """Display issues from JSON field as inline (read-only)"""
     model = SiteIssue
     extra = 0
-    readonly_fields = ('url', 'issue_type', 'severity', 'issue_category', 'created_at')
-    fields = ('url', 'issue_type', 'severity', 'issue_category', 'inlinks_count', 'created_at')
-    ordering = ('severity', 'issue_type')
-    show_change_link = True
-    max_num = 10  # Limit inline display
+    max_num = 0
+    can_delete = False
     
     def has_add_permission(self, request, obj=None):
-        return False  # Issues are created automatically
+        return False
+    
+    def has_change_permission(self, request, obj=None):
+        return False
+    
+    # Override to show JSON issues if no DB issues exist
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        if qs.count() == 0:
+            # Return empty queryset but we'll show JSON data in the template
+            return qs
+        return qs
 
 
 @admin.register(SiteAudit)
 class SiteAuditAdmin(ModelAdmin):
     list_display = (
-        'project_with_favicon',
-        'status_display',
-        'audit_score',
-        'performance_scores',
-        'pages_crawled_display',
-        'issues_summary',
-        'last_audit_date',
-        'audit_actions'
+        'id',
+        'project_display',
+        'status_badge',
+        'health_score_display',
+        'pages_display',
+        'issues_display',
+        'performance_display',
+        'last_audit_display',
+        'view_details_link'
     )
     
     list_filter = (
         'status',
         'is_audit_enabled',
-        ('last_audit_date', RangeDateFilter),
-        ('created_at', RangeDateFilter),
-        ('total_pages_crawled', RangeNumericFilter),
         ('overall_site_health_score', RangeNumericFilter),
-        'project__active'
+        ('total_pages_crawled', RangeNumericFilter),
+        ('last_audit_date', RangeDateFilter),
     )
     
-    search_fields = (
-        'project__domain',
-        'project__title',
-        'project__user__email',
-        'project__user__first_name',
-        'project__user__last_name'
-    )
+    search_fields = ('project__domain', 'project__title')
+    ordering = ('-last_audit_date',)
+    list_per_page = 25
     
     readonly_fields = (
-        'created_at',
-        'updated_at',
-        'last_audit_date',
+        'project',
+        'status',
+        'overall_site_health_score',
         'total_pages_crawled',
-        'crawl_overview_display',
+        'performance_score_mobile',
+        'performance_score_desktop',
+        'last_audit_date',
         'issues_overview_display',
-        'performance_data_display',
-        'audit_statistics'
+        'crawl_overview_display',
     )
-    
-    ordering = ('-last_audit_date', '-created_at')
-    list_per_page = 25
-    list_select_related = ('project', 'project__user')
     
     fieldsets = (
-        ('Audit Information', {
-            'fields': (
-                'project',
-                'status',
-                'last_audit_date',
-                'is_audit_enabled',
-                'temp_audit_dir'
-            ),
-            'description': 'Basic audit information and current status'
+        ('Project Information', {
+            'fields': ('project', 'status', 'last_audit_date')
         }),
-        ('Audit Settings', {
+        ('Audit Configuration', {
             'fields': (
+                'is_audit_enabled',
                 'audit_frequency_days',
                 'manual_audit_frequency_days',
-                'max_pages_to_crawl',
-                'next_scheduled_audit'
-            ),
-            'classes': ('collapse',),
-            'description': 'Audit frequency and scheduling settings'
+                'max_pages_to_crawl'
+            )
         }),
-        ('Performance Metrics', {
+        ('Audit Results', {
             'fields': (
+                'overall_site_health_score',
+                'total_pages_crawled',
                 'performance_score_mobile',
                 'performance_score_desktop',
-                'overall_site_health_score',
-                'average_page_size_kb',
-                'average_load_time_ms'
-            ),
-            'classes': ('collapse',),
-            'description': 'Performance scores and technical metrics'
+            )
         }),
-        ('Crawl Data', {
-            'fields': (
-                'total_pages_crawled',
-                'crawl_overview_display',
-                'issues_overview_display'
-            ),
-            'classes': ('collapse',),
-            'description': 'Detailed crawl results and issues found'
+        ('Issues Overview', {
+            'fields': ('issues_overview_display',),
+            'classes': ('wide',)
         }),
-        ('PageSpeed Insights Data', {
-            'fields': ('performance_data_display',),
-            'classes': ('collapse',),
-            'description': 'Detailed PageSpeed Insights performance data'
-        }),
-        ('Statistics', {
-            'fields': ('audit_statistics',),
-            'classes': ('collapse',),
-            'description': 'Comprehensive audit statistics'
-        }),
-        ('Timestamps', {
-            'fields': (
-                'created_at',
-                'updated_at',
-                'last_automatic_audit',
-                'last_manual_audit'
-            ),
-            'classes': ('collapse',)
+        ('Crawl Overview', {
+            'fields': ('crawl_overview_display',),
+            'classes': ('wide',)
         }),
     )
     
-    actions = ['trigger_manual_audit', 'enable_audits', 'disable_audits', 'recalculate_scores']
-    inlines = [SiteIssueInline]
-    
-    # Custom widget overrides for better UI
-    formfield_overrides = {
-        models.TextField: {'widget': UnfoldAdminTextareaWidget},
-        models.CharField: {'widget': UnfoldAdminSelectWidget},
-    }
-    
-    @display(description="Project", ordering="project__domain")
-    def project_with_favicon(self, obj):
+    @display(description="Project")
+    def project_display(self, obj):
         """Display project with favicon"""
+        if not obj.project:
+            return "-"
+        
         favicon_url = obj.project.get_cached_favicon_url(size=32)
-        project_url = reverse('admin:project_project_change', args=[obj.project.id])
         return format_html(
             '<div style="display: flex; align-items: center; gap: 8px;">'
-            '<img src="{}" alt="Favicon" style="width: 16px; height: 16px; border-radius: 2px;"/>'
-            '<a href="{}" style="text-decoration: none; color: #3b82f6; font-weight: 500;">{}</a>'
+            '<img src="{}" style="width: 20px; height: 20px; border-radius: 4px;">'
+            '<div>'
+            '<strong>{}</strong><br>'
+            '<small style="color: #6b7280;">{}</small>'
+            '</div>'
             '</div>',
             favicon_url,
-            project_url,
-            obj.project.domain
+            obj.project.domain,
+            obj.project.title or 'No title'
         )
     
-    @display(description="Status", ordering="status")
-    def status_display(self, obj):
-        """Display status with colored badge and icon"""
-        status_config = {
-            'completed': {'color': '#10b981', 'icon': '✅'},
-            'running': {'color': '#f59e0b', 'icon': '🔄'},
-            'pending': {'color': '#6b7280', 'icon': '⏳'},
-            'failed': {'color': '#ef4444', 'icon': '❌'}
+    @display(description="Status")
+    def status_badge(self, obj):
+        """Display status as badge"""
+        colors = {
+            'completed': '#10b981',
+            'running': '#f59e0b',
+            'pending': '#3b82f6',
+            'failed': '#ef4444'
         }
-        config = status_config.get(obj.status, {'color': '#6b7280', 'icon': '❓'})
-        
+        color = colors.get(obj.status, '#6b7280')
         return format_html(
-            '<div style="display: flex; align-items: center; gap: 6px;">'
-            '<span>{}</span>'
-            '<span style="background: {}; color: white; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 500;">{}</span>'
-            '</div>',
-            config['icon'],
-            config['color'],
+            '<span style="background: {}; color: white; padding: 4px 8px; '
+            'border-radius: 4px; font-size: 12px; font-weight: 500;">{}</span>',
+            color,
             obj.status.upper()
         )
     
     @display(description="Health Score", ordering="overall_site_health_score")
-    def audit_score(self, obj):
-        """Display overall site health score with progress bar"""
-        if obj.overall_site_health_score is None:
-            return format_html('<span style="color: #9ca3af;">N/A</span>')
-        
+    def health_score_display(self, obj):
+        """Display health score with color coding"""
         score = obj.overall_site_health_score
+        if score is None:
+            return "-"
+        
         if score >= 80:
-            color = '#10b981'  # Green
+            color = '#10b981'
+            icon = '✅'
         elif score >= 60:
-            color = '#f59e0b'  # Yellow
+            color = '#f59e0b'
+            icon = '⚠️'
         else:
-            color = '#ef4444'  # Red
-        
-        return format_html(
-            '<div style="display: flex; align-items: center; gap: 8px; min-width: 120px;">'
-            '<div style="width: 60px; height: 8px; background: #e5e7eb; border-radius: 4px; overflow: hidden;">'
-            '<div style="width: {}%; height: 100%; background: {}; transition: width 0.3s;"></div>'
-            '</div>'
-            '<strong style="color: {}; font-size: 13px;">{}</strong>'
-            '</div>',
-            score,
-            color,
-            color,
-            f'{score:.1f}'
-        )
-    
-    @display(description="Performance", ordering="performance_score_mobile")
-    def performance_scores(self, obj):
-        """Display mobile and desktop performance scores"""
-        mobile = obj.performance_score_mobile
-        desktop = obj.performance_score_desktop
-        
-        def score_badge(score, label):
-            if score is None:
-                return f'<span style="color: #9ca3af; font-size: 11px;">{label}: N/A</span>'
-            
-            if score >= 90:
-                color = '#10b981'
-            elif score >= 50:
-                color = '#f59e0b'
-            else:
-                color = '#ef4444'
-            
-            return f'<span style="background: {color}; color: white; padding: 1px 6px; border-radius: 8px; font-size: 11px; margin-right: 4px;">{label}: {score}</span>'
-        
-        return format_html(
-            '<div style="display: flex; flex-direction: column; gap: 2px;">'
-            '{}'
-            '{}'
-            '</div>',
-            score_badge(mobile, '📱'),
-            score_badge(desktop, '🖥️')
-        )
-    
-    @display(description="Pages", ordering="total_pages_crawled")
-    def pages_crawled_display(self, obj):
-        """Display pages crawled with visual indicator"""
-        if obj.total_pages_crawled == 0:
-            return format_html('<span style="color: #9ca3af;">0 pages</span>')
+            color = '#ef4444'
+            icon = '❌'
         
         return format_html(
             '<div style="display: flex; align-items: center; gap: 4px;">'
-            '<span style="color: #059669; font-size: 12px;">📄</span>'
-            '<strong style="color: #059669;">{:,}</strong>'
+            '<span>{}</span>'
+            '<strong style="color: {}; font-size: 16px;">{}</strong>'
             '</div>',
-            obj.total_pages_crawled
+            icon, color, int(score)
         )
     
-    @display(description="Issues", ordering="issues_overview")
-    def issues_summary(self, obj):
-        """Display issues summary with priority breakdown"""
-        issues_breakdown = obj.get_issues_by_priority()
-        total_issues = obj.get_total_issues_count()
+    @display(description="Pages", ordering="total_pages_crawled")
+    def pages_display(self, obj):
+        """Display pages crawled"""
+        if obj.total_pages_crawled == 0:
+            return format_html('<span style="color: #9ca3af;">0</span>')
         
-        if total_issues == 0:
-            return format_html('<span style="color: #10b981; font-weight: 500;">✅ No issues</span>')
+        formatted_number = f"{obj.total_pages_crawled:,}"
+        return format_html(
+            '<strong style="color: #059669;">{}</strong>',
+            formatted_number
+        )
+    
+    @display(description="Issues")
+    def issues_display(self, obj):
+        """Display issues summary from JSON"""
+        issues_by_priority = obj.get_issues_by_priority()
+        total = obj.get_total_issues_count()
+        
+        if total == 0:
+            return format_html('<span style="color: #10b981;">✅ No issues</span>')
+        
+        badges = []
+        if issues_by_priority.get('High', 0) > 0:
+            badges.append(format_html(
+                '<span style="background: #fee2e2; color: #dc2626; padding: 2px 6px; '
+                'border-radius: 3px; font-size: 11px; margin-right: 4px;">'
+                '{} High</span>',
+                issues_by_priority['High']
+            ))
+        if issues_by_priority.get('Medium', 0) > 0:
+            badges.append(format_html(
+                '<span style="background: #fef3c7; color: #d97706; padding: 2px 6px; '
+                'border-radius: 3px; font-size: 11px; margin-right: 4px;">'
+                '{} Med</span>',
+                issues_by_priority['Medium']
+            ))
+        if issues_by_priority.get('Low', 0) > 0:
+            badges.append(format_html(
+                '<span style="background: #dbeafe; color: #2563eb; padding: 2px 6px; '
+                'border-radius: 3px; font-size: 11px;">'
+                '{} Low</span>',
+                issues_by_priority['Low']
+            ))
         
         return format_html(
-            '<div style="font-size: 11px;">'
-            '<div style="margin-bottom: 2px;"><strong>Total: {}</strong></div>'
-            '<div style="display: flex; gap: 4px;">'
-            '<span style="background: #ef4444; color: white; padding: 1px 4px; border-radius: 4px;">H: {}</span>'
-            '<span style="background: #f59e0b; color: white; padding: 1px 4px; border-radius: 4px;">M: {}</span>'
-            '<span style="background: #6b7280; color: white; padding: 1px 4px; border-radius: 4px;">L: {}</span>'
-            '</div>'
+            '<div style="display: flex; flex-direction: column; gap: 4px;">'
+            '<strong>Total: {}</strong>'
+            '<div>{}</div>'
             '</div>',
-            total_issues,
-            issues_breakdown['High'],
-            issues_breakdown['Medium'],
-            issues_breakdown['Low']
+            total,
+            ''.join(badges)
+        )
+    
+    @display(description="Performance")
+    def performance_display(self, obj):
+        """Display performance scores"""
+        mobile = obj.performance_score_mobile or 0
+        desktop = obj.performance_score_desktop or 0
+        
+        def get_color(score):
+            if score >= 90:
+                return '#10b981'
+            elif score >= 50:
+                return '#f59e0b'
+            else:
+                return '#ef4444'
+        
+        return format_html(
+            '<div style="display: flex; gap: 8px;">'
+            '<span style="color: {};">📱 {}</span>'
+            '<span style="color: {};">💻 {}</span>'
+            '</div>',
+            get_color(mobile), mobile,
+            get_color(desktop), desktop
+        )
+    
+    @display(description="Last Audit")
+    def last_audit_display(self, obj):
+        """Display last audit date"""
+        if not obj.last_audit_date:
+            return "-"
+        
+        from django.utils import timezone
+        from django.utils.timesince import timesince
+        
+        time_ago = timesince(obj.last_audit_date, timezone.now())
+        return format_html(
+            '<span title="{}">{} ago</span>',
+            obj.last_audit_date.strftime('%Y-%m-%d %H:%M'),
+            time_ago
         )
     
     @display(description="Actions")
-    def audit_actions(self, obj):
-        """Display quick action buttons"""
-        actions = []
+    def view_details_link(self, obj):
+        """Link to view audit details"""
+        detail_url = reverse('site_audit:detail', args=[obj.id])
+        issues_url = reverse('admin:site_audit_siteissue_changelist') + f'?site_audit__id__exact={obj.id}'
         
-        if obj.status in ['completed', 'failed', 'pending']:
-            actions.append(
-                f'<button onclick="triggerAudit({obj.project.id})" '
-                f'style="background: #3b82f6; color: white; border: none; padding: 4px 8px; '
-                f'border-radius: 4px; font-size: 11px; cursor: pointer; margin-right: 4px;">'
-                f'🔄 Run Audit</button>'
-            )
+        return format_html(
+            '<a href="{}" target="_blank" style="color: #3b82f6; text-decoration: none; '
+            'padding: 4px 8px; background: #eff6ff; border-radius: 4px; '
+            'display: inline-block; margin-right: 4px;">View Report</a>'
+            '<a href="{}" style="color: #7c3aed; text-decoration: none; '
+            'padding: 4px 8px; background: #f3f4f6; border-radius: 4px; '
+            'display: inline-block;">Issues ({})</a>',
+            detail_url,
+            issues_url,
+            obj.get_total_issues_count()
+        )
+    
+    @display(description="Issues Overview (from JSON)")
+    def issues_overview_display(self, obj):
+        """Display issues from JSON in a formatted way"""
+        if not obj.issues_overview:
+            return "No issues data"
         
-        if obj.issues.exists():
-            issues_url = reverse('admin:site_audit_siteissue_changelist') + f'?site_audit__id__exact={obj.id}'
-            actions.append(
-                f'<a href="{issues_url}" style="background: #f59e0b; color: white; text-decoration: none; '
-                f'padding: 4px 8px; border-radius: 4px; font-size: 11px; display: inline-block;">'
-                f'⚠️ Issues</a>'
-            )
+        issues_list = obj.issues_overview.get('issues', [])
+        if not issues_list:
+            return "No issues found"
         
-        return format_html('<div style="display: flex; gap: 4px;">{}</div>', ''.join(actions))
+        # Group issues by priority
+        by_priority = {'High': [], 'Medium': [], 'Low': []}
+        for issue in issues_list[:20]:  # Show first 20
+            priority = issue.get('issue_priority', 'Low')
+            by_priority[priority].append(issue)
+        
+        html_parts = ['<div style="max-height: 400px; overflow-y: auto;">']
+        
+        for priority, priority_issues in by_priority.items():
+            if not priority_issues:
+                continue
+            
+            color = {'High': '#dc2626', 'Medium': '#d97706', 'Low': '#2563eb'}[priority]
+            html_parts.append(f'<h4 style="color: {color}; margin: 10px 0;">{priority} Priority ({len(priority_issues)})</h4>')
+            html_parts.append('<ul style="margin: 0; padding-left: 20px;">')
+            
+            for issue in priority_issues:
+                html_parts.append(format_html(
+                    '<li style="margin: 5px 0;">'
+                    '<strong>{}</strong> - {} URLs affected<br>'
+                    '<small style="color: #6b7280;">{}</small>'
+                    '</li>',
+                    issue.get('issue_name', 'Unknown'),
+                    issue.get('urls', 0),
+                    issue.get('description', '')[:100] + '...' if issue.get('description') else ''
+                ))
+            
+            html_parts.append('</ul>')
+        
+        html_parts.append('</div>')
+        return mark_safe(''.join(html_parts))
     
     @display(description="Crawl Overview")
     def crawl_overview_display(self, obj):
-        """Display formatted crawl overview data"""
+        """Display crawl overview data"""
         if not obj.crawl_overview:
-            return format_html('<p style="color: #9ca3af;">No crawl data available</p>')
+            return "No crawl data"
         
-        data = obj.crawl_overview
-        html = ['<div style="font-family: monospace; font-size: 12px;">']
-        
-        # Basic stats
-        html.append('<div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-bottom: 12px;">')
-        html.append(f'<div><strong>URLs Encountered:</strong> {data.get("total_urls_encountered", "N/A"):,}</div>')
-        html.append(f'<div><strong>URLs Crawled:</strong> {data.get("total_urls_crawled", "N/A"):,}</div>')
-        html.append('</div>')
-        
-        # Top inlinks
-        inlinks = data.get('top_20_inlinks', [])
-        if inlinks:
-            html.append('<div><strong>Top Inlinks:</strong></div>')
-            html.append('<ul style="margin: 4px 0 0 16px; padding: 0;">')
-            for link in inlinks[:5]:  # Show only first 5
-                html.append(f'<li style="margin: 2px 0; color: #3b82f6;">{link}</li>')
-            html.append('</ul>')
-            if len(inlinks) > 5:
-                html.append(f'<p style="margin: 4px 0; color: #6b7280; font-style: italic;">... and {len(inlinks) - 5} more</p>')
-        
-        html.append('</div>')
-        return format_html(''.join(html))
-    
-    @display(description="Issues Overview")
-    def issues_overview_display(self, obj):
-        """Display formatted issues overview"""
-        if not obj.issues_overview:
-            return format_html('<p style="color: #9ca3af;">No issues data available</p>')
-        
-        data = obj.issues_overview
-        html = ['<div style="font-family: monospace; font-size: 12px;">']
-        
-        # Issues by priority
-        issues_by_priority = data.get('issues_by_priority', {})
-        if issues_by_priority:
-            html.append('<div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 12px;">')
-            for priority, count in issues_by_priority.items():
-                color = {'High': '#ef4444', 'Medium': '#f59e0b', 'Low': '#6b7280'}.get(priority, '#9ca3af')
-                html.append(f'<div style="color: {color};"><strong>{priority}:</strong> {count}</div>')
-            html.append('</div>')
-        
-        # Issues by type (top 5)
-        issues_by_type = data.get('issues_by_type', {})
-        if issues_by_type:
-            html.append('<div><strong>Top Issue Types:</strong></div>')
-            html.append('<ul style="margin: 4px 0 0 16px; padding: 0;">')
-            sorted_issues = sorted(issues_by_type.items(), key=lambda x: x[1], reverse=True)
-            for issue_type, count in sorted_issues[:5]:
-                html.append(f'<li style="margin: 2px 0;">{issue_type}: <strong>{count}</strong></li>')
-            html.append('</ul>')
-        
-        html.append('</div>')
-        return format_html(''.join(html))
-    
-    @display(description="Performance Data")
-    def performance_data_display(self, obj):
-        """Display formatted PageSpeed Insights data"""
-        html = ['<div style="font-size: 12px;">']
-        
-        # Mobile performance
-        if obj.mobile_performance:
-            html.append('<h4 style="color: #3b82f6; margin: 0 0 8px 0;">📱 Mobile Performance</h4>')
-            mobile_data = obj.mobile_performance
-            
-            # Scores
-            scores = mobile_data.get('scores', {})
-            html.append('<div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 8px;">')
-            for score_type, score in scores.items():
-                if isinstance(score, dict):  # Skip PWA which is dict
-                    continue
-                color = '#10b981' if score >= 90 else '#f59e0b' if score >= 50 else '#ef4444'
-                html.append(f'<div style="color: {color};"><strong>{score_type.title()}:</strong> {score}</div>')
-            html.append('</div>')
-            
-            # Core Web Vitals
-            lab_metrics = mobile_data.get('lab_metrics', {})
-            if lab_metrics:
-                html.append('<div><strong>Core Web Vitals:</strong></div>')
-                html.append('<ul style="margin: 4px 0 0 16px; padding: 0; font-family: monospace;">')
-                for metric, data_dict in lab_metrics.items():
-                    if isinstance(data_dict, dict) and 'display_value' in data_dict:
-                        html.append(f'<li>{metric.upper()}: {data_dict["display_value"]}</li>')
-                html.append('</ul>')
-        
-        # Desktop performance
-        if obj.desktop_performance:
-            html.append('<h4 style="color: #3b82f6; margin: 16px 0 8px 0;">🖥️ Desktop Performance</h4>')
-            desktop_data = obj.desktop_performance
-            
-            # Scores
-            scores = desktop_data.get('scores', {})
-            html.append('<div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 8px;">')
-            for score_type, score in scores.items():
-                if isinstance(score, dict):  # Skip PWA which is dict
-                    continue
-                color = '#10b981' if score >= 90 else '#f59e0b' if score >= 50 else '#ef4444'
-                html.append(f'<div style="color: {color};"><strong>{score_type.title()}:</strong> {score}</div>')
-            html.append('</div>')
-            
-            # Core Web Vitals
-            lab_metrics = desktop_data.get('lab_metrics', {})
-            if lab_metrics:
-                html.append('<div><strong>Core Web Vitals:</strong></div>')
-                html.append('<ul style="margin: 4px 0 0 16px; padding: 0; font-family: monospace;">')
-                for metric, data_dict in lab_metrics.items():
-                    if isinstance(data_dict, dict) and 'display_value' in data_dict:
-                        html.append(f'<li>{metric.upper()}: {data_dict["display_value"]}</li>')
-                html.append('</ul>')
-        
-        if not obj.mobile_performance and not obj.desktop_performance:
-            html.append('<p style="color: #9ca3af; font-style: italic;">No PageSpeed Insights data available</p>')
-        
-        html.append('</div>')
-        return format_html(''.join(html))
-    
-    @display(description="Audit Statistics")
-    def audit_statistics(self, obj):
-        """Display comprehensive audit statistics"""
-        html = ['<div style="font-size: 12px; font-family: monospace;">']
-        
-        # Basic stats
-        html.append('<div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 16px;">')
-        html.append(f'<div><strong>Total Pages:</strong> {obj.total_pages_crawled:,}</div>')
-        html.append(f'<div><strong>Total Issues:</strong> {obj.get_total_issues_count():,}</div>')
-        html.append(f'<div><strong>Health Score:</strong> {obj.overall_site_health_score:.1f if obj.overall_site_health_score else "N/A"}</div>')
-        html.append('</div>')
-        
-        # Performance metrics
-        if obj.average_page_size_kb or obj.average_load_time_ms:
-            html.append('<div style="margin-bottom: 16px;">')
-            html.append('<strong>Technical Metrics:</strong>')
-            html.append('<ul style="margin: 4px 0 0 16px;">')
-            if obj.average_page_size_kb:
-                html.append(f'<li>Avg Page Size: {obj.average_page_size_kb:.1f} KB</li>')
-            if obj.average_load_time_ms:
-                html.append(f'<li>Avg Load Time: {obj.average_load_time_ms:.0f} ms</li>')
-            html.append('</ul>')
-            html.append('</div>')
-        
-        # Audit frequency info
-        html.append('<div>')
-        html.append('<strong>Audit Schedule:</strong>')
-        html.append('<ul style="margin: 4px 0 0 16px;">')
-        html.append(f'<li>Auto Frequency: {obj.audit_frequency_days} days</li>')
-        html.append(f'<li>Manual Frequency: {obj.manual_audit_frequency_days} days</li>')
-        html.append(f'<li>Max Pages: {obj.max_pages_to_crawl:,}</li>')
-        html.append(f'<li>Auto Audits: {"Enabled" if obj.is_audit_enabled else "Disabled"}</li>')
-        html.append('</ul>')
-        html.append('</div>')
-        
-        html.append('</div>')
-        return format_html(''.join(html))
-    
-    def trigger_manual_audit(self, request, queryset):
-        """Trigger manual audits for selected site audits"""
-        from .tasks import trigger_manual_site_audit
-        
-        triggered_count = 0
-        for site_audit in queryset:
-            try:
-                trigger_manual_site_audit.apply_async(args=[site_audit.project.id])
-                triggered_count += 1
-            except Exception as e:
-                self.message_user(request, f'Failed to trigger audit for {site_audit.project.domain}: {e}', level='ERROR')
-        
-        if triggered_count > 0:
-            self.message_user(request, f'{triggered_count} audit(s) triggered successfully.')
-        else:
-            self.message_user(request, 'No audits were triggered.', level='WARNING')
-    trigger_manual_audit.short_description = "🔄 Trigger manual audits"
-    
-    def enable_audits(self, request, queryset):
-        """Enable automatic audits for selected site audits"""
-        count = queryset.update(is_audit_enabled=True)
-        self.message_user(request, f'{count} audit(s) enabled successfully.')
-    enable_audits.short_description = "✅ Enable automatic audits"
-    
-    def disable_audits(self, request, queryset):
-        """Disable automatic audits for selected site audits"""
-        count = queryset.update(is_audit_enabled=False)
-        self.message_user(request, f'{count} audit(s) disabled successfully.')
-    disable_audits.short_description = "❌ Disable automatic audits"
-    
-    def recalculate_scores(self, request, queryset):
-        """Recalculate overall scores for selected audits"""
-        updated_count = 0
-        for audit in queryset:
-            audit.calculate_overall_score()
-            audit.save(update_fields=['overall_site_health_score'])
-            updated_count += 1
-        
-        self.message_user(request, f'{updated_count} score(s) recalculated successfully.')
-    recalculate_scores.short_description = "🔢 Recalculate overall scores"
+        return format_html(
+            '<pre style="background: #f9fafb; padding: 10px; border-radius: 4px; '
+            'overflow-x: auto; max-width: 600px;">{}</pre>',
+            json.dumps(obj.crawl_overview, indent=2)[:1000] + '...' if len(json.dumps(obj.crawl_overview)) > 1000 else json.dumps(obj.crawl_overview, indent=2)
+        )
 
 
 @admin.register(SiteIssue)
 class SiteIssueAdmin(ModelAdmin):
     list_display = (
-        'url_display',
-        'issue_type_display',
-        'severity_badge',
-        'issue_category',
+        'id',
         'site_audit_link',
+        'severity_badge',
+        'issue_type_display',
+        'url_display',
+        'issue_category',
         'inlinks_count',
         'created_at'
     )
     
     list_filter = (
-        ('severity', ChoicesDropdownFilter),
-        ('issue_category', ChoicesDropdownFilter),
+        'severity',
+        'issue_category',
+        'issue_type',
         ('created_at', RangeDateFilter),
         ('inlinks_count', RangeNumericFilter),
-        'site_audit__status',
-        'site_audit__project__active'
     )
     
-    search_fields = (
-        'url',
-        'issue_type',
-        'site_audit__project__domain',
-        'site_audit__project__title'
-    )
-    
-    readonly_fields = ('created_at', 'updated_at', 'issue_data_display')
-    ordering = ('severity', '-inlinks_count', 'issue_type')
+    search_fields = ('url', 'issue_type', 'description')
+    ordering = ('severity', '-created_at')
     list_per_page = 50
-    list_select_related = ('site_audit', 'site_audit__project')
+    
+    readonly_fields = ('created_at', 'updated_at')
     
     fieldsets = (
         ('Issue Information', {
-            'fields': ('site_audit', 'url', 'issue_type', 'issue_category', 'severity'),
-            'description': 'Basic issue identification and classification'
-        }),
-        ('SEO Metadata', {
-            'fields': ('indexability', 'indexability_status', 'inlinks_count'),
-            'classes': ('collapse',),
-            'description': 'Search engine optimization related data'
+            'fields': ('site_audit', 'url', 'severity', 'issue_type', 'issue_category')
         }),
         ('Issue Details', {
-            'fields': ('issue_data_display',),
-            'classes': ('collapse',),
-            'description': 'Detailed issue data and context'
+            'fields': ('description', 'recommendation', 'inlinks_count'),
+            'classes': ('wide',)
+        }),
+        ('Technical Details', {
+            'fields': ('technical_details', 'indexability', 'indexability_status'),
+            'classes': ('collapse',)
         }),
         ('Timestamps', {
             'fields': ('created_at', 'updated_at'),
@@ -549,82 +373,74 @@ class SiteIssueAdmin(ModelAdmin):
         }),
     )
     
-    actions = ['mark_as_resolved', 'export_issues']
-    
-    @display(description="URL", ordering="url")
-    def url_display(self, obj):
-        """Display URL with truncation and external link"""
-        url = obj.url
-        display_url = url if len(url) <= 50 else url[:47] + '...'
+    @display(description="Audit")
+    def site_audit_link(self, obj):
+        """Link to parent audit"""
+        if not obj.site_audit:
+            return "-"
+        
+        audit_url = reverse('admin:site_audit_siteaudit_change', args=[obj.site_audit.id])
         return format_html(
-            '<div style="display: flex; align-items: center; gap: 6px;">'
-            '<a href="{}" target="_blank" style="color: #3b82f6; text-decoration: none;" title="{}">{}</a>'
-            '<span style="font-size: 10px; color: #9ca3af;">🔗</span>'
-            '</div>',
-            url,
-            url,
-            display_url
-        )
-    
-    @display(description="Issue Type", ordering="issue_type")
-    def issue_type_display(self, obj):
-        """Display issue type with formatting"""
-        return format_html(
-            '<span style="font-family: monospace; background: #f3f4f6; padding: 2px 6px; border-radius: 4px; font-size: 11px;">{}</span>',
-            obj.issue_type
+            '<a href="{}" style="color: #3b82f6;">{}</a>',
+            audit_url,
+            obj.site_audit.project.domain if obj.site_audit.project else f'Audit #{obj.site_audit.id}'
         )
     
     @display(description="Severity", ordering="severity")
     def severity_badge(self, obj):
-        """Display severity with colored badge"""
-        severity_colors = {
+        """Display severity as colored badge"""
+        colors = {
             'critical': '#dc2626',
             'high': '#ef4444',
             'medium': '#f59e0b',
-            'low': '#6b7280',
-            'info': '#3b82f6'
+            'low': '#3b82f6',
+            'info': '#6b7280'
         }
-        color = severity_colors.get(obj.severity, '#9ca3af')
+        
+        display_names = {
+            'critical': 'CRITICAL',
+            'high': 'HIGH',
+            'medium': 'MEDIUM',
+            'low': 'LOW',
+            'info': 'INFO'
+        }
+        
+        color = colors.get(obj.severity, '#6b7280')
+        name = display_names.get(obj.severity, obj.severity.upper())
         
         return format_html(
-            '<span style="background: {}; color: white; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 500;">{}</span>',
-            color,
-            obj.get_severity_display()
+            '<span style="background: {}; color: white; padding: 3px 8px; '
+            'border-radius: 3px; font-size: 11px; font-weight: 600;">{}</span>',
+            color, name
         )
     
-    @display(description="Site Audit")
-    def site_audit_link(self, obj):
-        """Display link to related site audit"""
-        audit_url = reverse('admin:site_audit_siteaudit_change', args=[obj.site_audit.id])
+    @display(description="Issue Type")
+    def issue_type_display(self, obj):
+        """Display issue type with formatting"""
         return format_html(
-            '<a href="{}" style="color: #3b82f6; text-decoration: none; font-size: 12px;">Audit #{} - {}</a>',
-            audit_url,
-            obj.site_audit.id,
-            obj.site_audit.project.domain
+            '<strong>{}</strong>',
+            obj.issue_type.replace('_', ' ').title()
         )
     
-    @display(description="Issue Data")
-    def issue_data_display(self, obj):
-        """Display formatted issue data"""
-        if not obj.issue_data:
-            return format_html('<p style="color: #9ca3af;">No additional data</p>')
+    @display(description="URL")
+    def url_display(self, obj):
+        """Display URL with truncation"""
+        if not obj.url:
+            return "-"
         
-        html = ['<div style="font-family: monospace; font-size: 12px;">']
-        html.append('<pre style="background: #f8f9fa; padding: 12px; border-radius: 6px; overflow-x: auto; margin: 0;">')
-        html.append(json.dumps(obj.issue_data, indent=2))
-        html.append('</pre>')
-        html.append('</div>')
-        
-        return format_html(''.join(html))
+        truncated = obj.url[:50] + '...' if len(obj.url) > 50 else obj.url
+        return format_html(
+            '<a href="{}" target="_blank" style="color: #6b7280;">{}</a>',
+            obj.url if obj.url.startswith('http') else f'http://{obj.url}',
+            truncated
+        )
     
-    def mark_as_resolved(self, request, queryset):
-        """Mark selected issues as resolved (for future enhancement)"""
-        # This is a placeholder action - you can implement resolution tracking
-        self.message_user(request, f'{queryset.count()} issues marked for review.')
-    mark_as_resolved.short_description = "✅ Mark as reviewed"
+    def get_queryset(self, request):
+        """Optimize queryset with select_related"""
+        qs = super().get_queryset(request)
+        return qs.select_related('site_audit', 'site_audit__project')
     
-    def export_issues(self, request, queryset):
-        """Export selected issues (placeholder for CSV export)"""
-        # Placeholder for CSV export functionality
-        self.message_user(request, f'Export functionality coming soon for {queryset.count()} issues.')
-    export_issues.short_description = "📄 Export issues"
+    class Media:
+        css = {
+            'all': ('admin/css/site_audit_admin.css',)
+        }

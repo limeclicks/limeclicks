@@ -257,6 +257,7 @@ class SiteAudit(models.Model):
         """
         from .parsers.crawl_overview import CrawlOverviewParser
         from .parsers.issues_overview import IssuesOverviewParser
+        from .parsers.issue_parser_manager import IssueParserManager
         
         # Print the output directory path from temp_audit_dir
         if self.temp_audit_dir:
@@ -273,6 +274,13 @@ class SiteAudit(models.Model):
             # Parse issues overview data
             issues_parser = IssuesOverviewParser(self.temp_audit_dir, self)
             issues_data = issues_parser.parse()
+            
+            # Parse and save individual issues to database
+            print("\n📊 Parsing individual issues...")
+            issue_manager = IssueParserManager(self.temp_audit_dir, self)
+            detailed_issues = issue_manager.parse_all_issues()
+            issues_saved = issue_manager.save_all_issues()
+            print(f"✅ Saved {issues_saved} issues to database")
             
             # Prepare response data
             response = {
@@ -293,6 +301,14 @@ class SiteAudit(models.Model):
                     "high_priority_issues": issues_data.get('issues_by_priority', {}).get('High', 0),
                     "medium_priority_issues": issues_data.get('issues_by_priority', {}).get('Medium', 0),
                     "low_priority_issues": issues_data.get('issues_by_priority', {}).get('Low', 0)
+                })
+            
+            # Add detailed issues info
+            if detailed_issues:
+                response.update({
+                    "detailed_issues_saved": issues_saved,
+                    "detailed_issues_by_category": detailed_issues.get('issues_by_category', {}),
+                    "detailed_issues_by_severity": detailed_issues.get('issues_by_severity', {})
                 })
             
             # Mark as completed if we have any data

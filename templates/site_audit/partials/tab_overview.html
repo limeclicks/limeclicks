@@ -1,0 +1,207 @@
+<!-- Overview Tab Content -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <!-- Crawl Overview Section -->
+    <div class="card bg-base-100 shadow-sm border border-base-300">
+        <div class="card-body">
+            <h3 class="text-lg font-semibold text-base-content mb-4">
+                <i class="fas fa-spider mr-2 text-primary"></i>
+                Crawl Overview
+            </h3>
+            
+            <div class="space-y-4">
+                <!-- Pages Analyzed -->
+                <div class="flex justify-between items-center p-3 rounded-lg bg-base-200/50">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-file-alt text-primary"></i>
+                        </div>
+                        <div>
+                            <p class="text-sm font-medium text-base-content">Total Pages</p>
+                            <p class="text-xs text-base-content/60">Successfully crawled</p>
+                        </div>
+                    </div>
+                    <p class="text-2xl font-bold text-base-content">{{ audit.total_pages_crawled|default:0 }}</p>
+                </div>
+                
+                <!-- Crawl Date -->
+                <div class="flex justify-between items-center p-3 rounded-lg bg-base-200/50">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 bg-info/10 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-calendar-check text-info"></i>
+                        </div>
+                        <div>
+                            <p class="text-sm font-medium text-base-content">Last Crawl</p>
+                            <p class="text-xs text-base-content/60">Completed successfully</p>
+                        </div>
+                    </div>
+                    <p class="text-sm font-medium text-base-content">{{ audit.last_audit_date|date:"M d, Y g:i A" }}</p>
+                </div>
+                
+                <!-- Crawl Status -->
+                <div class="flex justify-between items-center p-3 rounded-lg bg-base-200/50">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 bg-success/10 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-check-circle text-success"></i>
+                        </div>
+                        <div>
+                            <p class="text-sm font-medium text-base-content">Status</p>
+                            <p class="text-xs text-base-content/60">Current audit status</p>
+                        </div>
+                    </div>
+                    <span class="badge badge-success">{{ audit.status|title }}</span>
+                </div>
+                
+                <!-- Next Scheduled Audit -->
+                {% if audit.is_audit_enabled %}
+                <div class="flex justify-between items-center p-3 rounded-lg bg-base-200/50">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 bg-warning/10 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-clock text-warning"></i>
+                        </div>
+                        <div>
+                            <p class="text-sm font-medium text-base-content">Next Audit</p>
+                            <p class="text-xs text-base-content/60">Scheduled automatically</p>
+                        </div>
+                    </div>
+                    <p class="text-sm font-medium text-base-content">In {{ audit.audit_frequency_days }} days</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <!-- Issues Summary Section -->
+    <div class="card bg-base-100 shadow-sm border border-base-300">
+        <div class="card-body">
+            <h3 class="text-lg font-semibold text-base-content mb-4">
+                <i class="fas fa-chart-pie mr-2 text-warning"></i>
+                Issues Summary
+            </h3>
+            
+            <div class="space-y-4">
+                {% with issues=audit.get_issues_by_priority %}
+                <!-- High Priority Issues -->
+                <div class="stat-card p-3 rounded-lg bg-base-200/50 {% if issues.High > 0 %}error{% endif %}">
+                    <div class="flex justify-between items-center">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 bg-error/10 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-exclamation-circle text-error"></i>
+                            </div>
+                            <div>
+                                <p class="text-sm font-medium text-base-content">High Priority</p>
+                                <p class="text-xs text-base-content/60">Critical issues to fix</p>
+                            </div>
+                        </div>
+                        <p class="text-2xl font-bold text-error">{{ issues.High|default:0 }}</p>
+                    </div>
+                    {% if issues.High > 0 %}
+                    <div class="mt-2">
+                        <div class="w-full bg-error/20 rounded-full h-2">
+                            <div class="bg-error h-2 rounded-full" style="width: {% widthratio issues.High audit.get_total_issues_count 100 %}%"></div>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+                
+                <!-- Medium Priority Issues -->
+                <div class="stat-card p-3 rounded-lg bg-base-200/50 {% if issues.Medium > 0 %}warning{% endif %}">
+                    <div class="flex justify-between items-center">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 bg-warning/10 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-exclamation-triangle text-warning"></i>
+                            </div>
+                            <div>
+                                <p class="text-sm font-medium text-base-content">Medium Priority</p>
+                                <p class="text-xs text-base-content/60">Should be addressed</p>
+                            </div>
+                        </div>
+                        <p class="text-2xl font-bold text-warning">{{ issues.Medium|default:0 }}</p>
+                    </div>
+                    {% if issues.Medium > 0 %}
+                    <div class="mt-2">
+                        <div class="w-full bg-warning/20 rounded-full h-2">
+                            <div class="bg-warning h-2 rounded-full" style="width: {% widthratio issues.Medium audit.get_total_issues_count 100 %}%"></div>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+                
+                <!-- Low Priority Issues -->
+                <div class="stat-card p-3 rounded-lg bg-base-200/50 {% if issues.Low > 0 %}success{% endif %}">
+                    <div class="flex justify-between items-center">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 bg-info/10 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-info-circle text-info"></i>
+                            </div>
+                            <div>
+                                <p class="text-sm font-medium text-base-content">Low Priority</p>
+                                <p class="text-xs text-base-content/60">Minor improvements</p>
+                            </div>
+                        </div>
+                        <p class="text-2xl font-bold text-info">{{ issues.Low|default:0 }}</p>
+                    </div>
+                    {% if issues.Low > 0 %}
+                    <div class="mt-2">
+                        <div class="w-full bg-info/20 rounded-full h-2">
+                            <div class="bg-info h-2 rounded-full" style="width: {% widthratio issues.Low audit.get_total_issues_count 100 %}%"></div>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+                {% endwith %}
+                
+                <!-- Total Issues -->
+                <div class="divider"></div>
+                <div class="flex justify-between items-center">
+                    <p class="text-sm font-semibold text-base-content">Total Issues Found</p>
+                    <p class="text-xl font-bold text-base-content">{{ audit.get_total_issues_count|default:0 }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Issue Categories Breakdown -->
+<div class="card bg-base-100 shadow-sm border border-base-300 mt-6">
+    <div class="card-body">
+        <h3 class="text-lg font-semibold text-base-content mb-4">
+            <i class="fas fa-tags mr-2 text-info"></i>
+            Issues by Category
+        </h3>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {% for category in issues_by_category %}
+            <div class="p-4 rounded-lg bg-base-200/30 hover:bg-base-200/50 transition-colors">
+                <div class="flex items-center justify-between mb-2">
+                    <p class="text-sm font-medium text-base-content">{{ category.issue_category|title }}</p>
+                    <span class="badge badge-sm">{{ category.count }}</span>
+                </div>
+                <div class="w-full bg-base-300 rounded-full h-1.5">
+                    <div class="bg-primary h-1.5 rounded-full" style="width: {% widthratio category.count total_issues 100 %}%"></div>
+                </div>
+            </div>
+            {% empty %}
+            <div class="col-span-full text-center py-8">
+                <i class="fas fa-check-circle text-4xl text-success mb-2"></i>
+                <p class="text-base-content/60">No issues found</p>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<!-- Quick Actions -->
+<div class="card bg-gradient-to-r from-primary/10 to-secondary/10 border border-primary/20 mt-6">
+    <div class="card-body">
+        <div class="flex items-center justify-between">
+            <div>
+                <h3 class="text-lg font-semibold text-base-content mb-2">Ready to improve your site?</h3>
+                <p class="text-sm text-base-content/60">View detailed issues and get actionable recommendations</p>
+            </div>
+            <button class="btn btn-primary" onclick="showTab('issues', document.querySelectorAll('.tab')[1])">
+                View All Issues
+                <i class="fas fa-arrow-right ml-2"></i>
+            </button>
+        </div>
+    </div>
+</div>

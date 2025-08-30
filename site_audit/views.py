@@ -34,10 +34,14 @@ def site_audit_list(request):
             Q(title__icontains=search_query)
         )
     
-    # Get latest audit for each project
+    # Get latest completed audit for each project (or most recent if none completed)
     all_projects_with_audits = []
     for project in projects:
-        latest_audit = project.site_audits.order_by('-created_at').first()
+        # Try to get the most recent completed audit first
+        latest_audit = project.site_audits.filter(status='completed').order_by('-last_audit_date', '-created_at').first()
+        # If no completed audit, get the most recent audit regardless of status
+        if not latest_audit:
+            latest_audit = project.site_audits.order_by('-created_at').first()
         all_projects_with_audits.append({
             'project': project,
             'audit': latest_audit
@@ -390,30 +394,107 @@ def add_project(request):
 
 @login_required
 def audit_detail(request, audit_id):
-    """View detailed audit results"""
+    """View detailed audit results with tabbed interface"""
     audit = get_object_or_404(
         SiteAudit,
         id=audit_id,
         project__user=request.user
     )
     
-    # Get issues breakdown
-    issues = audit.issues.all()
-    issues_by_category = issues.values('issue_category').annotate(
-        count=Count('id')
-    ).order_by('-count')
+    # Get the requested tab (default to overview)
+    tab = request.GET.get('tab', 'overview')
     
-    issues_by_severity = issues.values('severity').annotate(
-        count=Count('id')
-    ).order_by('severity')
+    # First try to get issues from database (new approach)
+    from site_audit.models import SiteIssue
+    from django.db.models import Count
+    
+    # Get issues from database
+    issues_qs = SiteIssue.objects.filter(site_audit=audit).select_related('site_audit')
+    
+    # Apply filters if on issues tab
+    if tab == 'issues':
+        search_query = request.GET.get('search', '')
+        severity_filter = request.GET.get('severity', '')
+        category_filter = request.GET.get('category', '')
+        
+        if search_query:
+            from django.db.models import Q
+            issues_qs = issues_qs.filter(
+                Q(issue_type__icontains=search_query) |
+                Q(url__icontains=search_query)
+            )
+        
+        if severity_filter:
+            issues_qs = issues_qs.filter(severity=severity_filter.lower())
+        
+        if category_filter:
+            issues_qs = issues_qs.filter(issue_category=category_filter)
+    
+    # Get issues list
+    issues = list(issues_qs[:50])  # Show first 50 issues
+    
+    # If no database issues, fall back to JSON (for backward compatibility)
+    if not issues and audit.issues_overview:
+        issues_list = audit.issues_overview.get('issues', [])
+        
+        # Convert JSON issues to a format similar to model objects
+        issues = []
+        for issue_data in issues_list[:50]:
+            issues.append({
+                'severity': issue_data.get('issue_priority', 'Low').lower(),
+                'issue_category': issue_data.get('issue_type', 'Other'),
+                'issue_type': issue_data.get('issue_name', ''),
+                'url': '',  # No URL in overview
+                'description': issue_data.get('description', ''),
+                'affected_url': f"{issue_data.get('urls', 0)} URLs affected",
+                'recommendation': issue_data.get('how_to_fix', ''),
+                'inlinks_count': issue_data.get('urls', 0),
+                'issue_data': {}
+            })
+    
+    # Calculate issues by category from database
+    if issues_qs.exists():
+        category_counts = issues_qs.values('issue_category').annotate(
+            count=Count('id')
+        ).order_by('-count')
+        issues_by_category = list(category_counts)
+    else:
+        # Fall back to JSON for category counts
+        issues_list = audit.issues_overview.get('issues', []) if audit.issues_overview else []
+        category_counts = {}
+        for issue in issues_list:
+            cat = issue.get('issue_type', 'Other')
+            category_counts[cat] = category_counts.get(cat, 0) + 1
+        issues_by_category = [{'issue_category': k, 'count': v} for k, v in category_counts.items()]
+        issues_by_category.sort(key=lambda x: x['count'], reverse=True)
+    
+    # Get issues by severity using the existing model method
+    issues_by_severity = audit.get_issues_by_priority()
+    
+    # Get total count from database or JSON
+    if issues_qs.exists():
+        total_issues = SiteIssue.objects.filter(site_audit=audit).count()
+    else:
+        total_issues = audit.get_total_issues_count()  # From JSON
     
     context = {
         'audit': audit,
         'project': audit.project,
-        'issues': issues[:50],  # Show first 50 issues
+        'issues': issues,  # Already limited to 50
         'issues_by_category': issues_by_category,
         'issues_by_severity': issues_by_severity,
-        'total_issues': issues.count()
+        'total_issues': total_issues,
+        'tab': tab
     }
+    
+    # Handle HTMX requests for tab switching
+    if request.headers.get('HX-Request'):
+        template_map = {
+            'overview': 'site_audit/partials/tab_overview.html',
+            'issues': 'site_audit/partials/tab_issues.html',
+            'performance': 'site_audit/partials/tab_performance.html'
+        }
+        template = template_map.get(tab, 'site_audit/partials/tab_overview.html')
+        return render(request, template, context)
     
     return render(request, 'site_audit/detail.html', context)

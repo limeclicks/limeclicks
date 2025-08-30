@@ -1,0 +1,253 @@
+{% extends "dashboard_base.html" %}
+{% load static %}
+
+{% block title %}Site Audit - {{ project.domain }} - LimeClicks{% endblock %}
+{% block page_title %}Site Audit Report{% endblock %}
+
+{% block extra_head %}
+<style>
+    .stat-card {
+        transition: all 0.3s ease;
+        border-left: 4px solid transparent;
+    }
+    
+    .stat-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+    
+    .stat-card.success {
+        border-left-color: #10b981;
+    }
+    
+    .stat-card.warning {
+        border-left-color: #f59e0b;
+    }
+    
+    .stat-card.error {
+        border-left-color: #ef4444;
+    }
+    
+    .tab-content {
+        /* Remove animation that might be causing issues */
+        opacity: 1 !important;
+        visibility: visible !important;
+        display: block !important;
+    }
+    
+    .issue-row:hover {
+        background-color: rgba(0, 0, 0, 0.02);
+    }
+    
+    .progress-ring {
+        transform: rotate(-90deg);
+    }
+    
+    .progress-ring-circle {
+        transition: stroke-dashoffset 0.5s ease-in-out;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto">
+    <!-- Header Section -->
+    <div class="mb-6">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center gap-4">
+                <button onclick="window.location.href='{% url 'site_audit:list' %}'" class="btn btn-circle btn-ghost">
+                    <i class="fas fa-arrow-left"></i>
+                </button>
+                <div>
+                    <h1 class="text-2xl font-bold text-base-content flex items-center gap-3">
+                        <img src="{{ project.get_cached_favicon_url }}" alt="{{ project.domain }}" 
+                             class="w-8 h-8 rounded object-contain">
+                        {{ project.domain }}
+                    </h1>
+                    <p class="text-base-content/60 text-sm mt-1">
+                        Audit completed {{ audit.last_audit_date|timesince }} ago
+                    </p>
+                </div>
+            </div>
+            <div class="flex gap-2">
+                <button class="btn btn-primary btn-sm">
+                    <i class="fas fa-download mr-2"></i>
+                    Export Report
+                </button>
+                <button class="btn btn-ghost btn-sm">
+                    <i class="fas fa-sync-alt mr-2"></i>
+                    Re-run Audit
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Metrics Cards Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <!-- Overall Health Score Card -->
+        <div class="card bg-base-100 shadow-sm border border-base-300">
+            <div class="card-body p-6 text-center">
+                <div class="flex justify-center mb-3">
+                    <div class="w-14 h-14 rounded-full {% if audit.overall_site_health_score >= 80 %}bg-success/10{% elif audit.overall_site_health_score >= 60 %}bg-warning/10{% else %}bg-error/10{% endif %} flex items-center justify-center">
+                        <i class="fas fa-heartbeat text-2xl {% if audit.overall_site_health_score >= 80 %}text-success{% elif audit.overall_site_health_score >= 60 %}text-warning{% else %}text-error{% endif %}"></i>
+                    </div>
+                </div>
+                <p class="text-sm text-base-content/60 mb-3">Overall Health Score</p>
+                <div class="radial-progress {% if audit.overall_site_health_score >= 80 %}text-success{% elif audit.overall_site_health_score >= 60 %}text-warning{% else %}text-error{% endif %}" 
+                     style="--value:{{ audit.overall_site_health_score|default:0 }}; --size:5rem; --thickness: 4px;">
+                    <span class="text-xl font-bold">{{ audit.overall_site_health_score|default:0|floatformat:0 }}</span>
+                </div>
+                <p class="text-xs mt-3 font-medium {% if audit.overall_site_health_score >= 80 %}text-success{% elif audit.overall_site_health_score >= 60 %}text-warning{% else %}text-error{% endif %}">
+                    {% if audit.overall_site_health_score >= 80 %}Healthy{% elif audit.overall_site_health_score >= 60 %}Needs Attention{% else %}Critical{% endif %}
+                </p>
+            </div>
+        </div>
+        
+        <!-- Pages Crawled Card -->
+        <div class="card bg-base-100 shadow-sm border border-base-300">
+            <div class="card-body p-6 text-center">
+                <div class="flex justify-center mb-3">
+                    <div class="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center">
+                        <i class="fas fa-file-alt text-2xl text-primary"></i>
+                    </div>
+                </div>
+                <p class="text-sm text-base-content/60 mb-3">Pages Crawled</p>
+                <p class="text-4xl font-bold text-base-content">{{ audit.total_pages_crawled|default:0 }}</p>
+                <p class="text-xs text-base-content/40 mt-3">Total pages analyzed</p>
+            </div>
+        </div>
+        
+        <!-- Total Issues Card -->
+        <div class="card bg-base-100 shadow-sm border border-base-300">
+            <div class="card-body p-6 text-center">
+                <div class="flex justify-center mb-3">
+                    <div class="w-14 h-14 rounded-full {% if audit.get_total_issues_count > 50 %}bg-error/10{% elif audit.get_total_issues_count > 20 %}bg-warning/10{% else %}bg-success/10{% endif %} flex items-center justify-center">
+                        <i class="fas fa-exclamation-triangle text-2xl {% if audit.get_total_issues_count > 50 %}text-error{% elif audit.get_total_issues_count > 20 %}text-warning{% else %}text-success{% endif %}"></i>
+                    </div>
+                </div>
+                <p class="text-sm text-base-content/60 mb-3">Total Issues</p>
+                <p class="text-4xl font-bold {% if audit.get_total_issues_count > 50 %}text-error{% elif audit.get_total_issues_count > 20 %}text-warning{% else %}text-success{% endif %}">
+                    {{ audit.get_total_issues_count|default:0 }}
+                </p>
+                <div class="flex gap-1 justify-center mt-3">
+                    {% with issues=audit.get_issues_by_priority %}
+                    {% if issues.High > 0 %}
+                    <span class="badge badge-error badge-xs">{{ issues.High }} High</span>
+                    {% endif %}
+                    {% if issues.Medium > 0 %}
+                    <span class="badge badge-warning badge-xs">{{ issues.Medium }} Med</span>
+                    {% endif %}
+                    {% if issues.Low > 0 %}
+                    <span class="badge badge-info badge-xs">{{ issues.Low }} Low</span>
+                    {% endif %}
+                    {% endwith %}
+                </div>
+            </div>
+        </div>
+        
+        <!-- Performance Card -->
+        <div class="card bg-base-100 shadow-sm border border-base-300">
+            <div class="card-body p-6 text-center">
+                <div class="flex justify-center mb-3">
+                    <div class="w-14 h-14 rounded-full bg-info/10 flex items-center justify-center">
+                        <i class="fas fa-tachometer-alt text-2xl text-info"></i>
+                    </div>
+                </div>
+                <p class="text-sm text-base-content/60 mb-3">Performance</p>
+                <div class="flex justify-center gap-3">
+                    <div>
+                        <i class="fas fa-mobile-alt text-base-content/40 text-xs"></i>
+                        <p class="text-2xl font-bold {% if audit.performance_score_mobile >= 90 %}text-success{% elif audit.performance_score_mobile >= 50 %}text-warning{% else %}text-error{% endif %}">
+                            {{ audit.performance_score_mobile|default:"-" }}
+                        </p>
+                    </div>
+                    <div class="text-base-content/20">|</div>
+                    <div>
+                        <i class="fas fa-desktop text-base-content/40 text-xs"></i>
+                        <p class="text-2xl font-bold {% if audit.performance_score_desktop >= 90 %}text-success{% elif audit.performance_score_desktop >= 50 %}text-warning{% else %}text-error{% endif %}">
+                            {{ audit.performance_score_desktop|default:"-" }}
+                        </p>
+                    </div>
+                </div>
+                <p class="text-xs text-base-content/40 mt-3">Mobile / Desktop</p>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Tabs Navigation -->
+    <div class="tabs tabs-boxed bg-base-200 mb-6">
+        <button class="tab tab-active" 
+                onclick="showTab('overview', this)"
+                hx-get="{% url 'site_audit:detail' audit.id %}?tab=overview"
+                hx-target="#tab-content"
+                hx-swap="innerHTML"
+                hx-push-url="false">
+            <i class="fas fa-chart-line mr-2"></i>
+            Overview
+        </button>
+        <button class="tab" 
+                onclick="showTab('issues', this)"
+                hx-get="{% url 'site_audit:detail' audit.id %}?tab=issues"
+                hx-target="#tab-content"
+                hx-swap="innerHTML"
+                hx-push-url="false">
+            <i class="fas fa-exclamation-triangle mr-2"></i>
+            Issues
+            <span class="badge badge-sm ml-2">{{ audit.get_total_issues_count }}</span>
+        </button>
+        <button class="tab" 
+                onclick="showTab('performance', this)"
+                hx-get="{% url 'site_audit:detail' audit.id %}?tab=performance"
+                hx-target="#tab-content"
+                hx-swap="innerHTML"
+                hx-push-url="false">
+            <i class="fas fa-tachometer-alt mr-2"></i>
+            Performance
+        </button>
+    </div>
+    
+    <!-- Tab Content -->
+    <div id="tab-content" class="tab-content">
+        <!-- Debug: Audit exists: {{ audit|yesno:"Yes,No" }}, Tab: {{ tab }}, Issues count: {{ total_issues }} -->
+        {% if tab == 'issues' %}
+            {% include "site_audit/partials/tab_issues.html" with audit=audit issues=issues issues_by_category=issues_by_category issues_by_severity=issues_by_severity total_issues=total_issues %}
+        {% elif tab == 'performance' %}
+            {% include "site_audit/partials/tab_performance.html" with audit=audit %}
+        {% else %}
+            {% include "site_audit/partials/tab_overview.html" with audit=audit issues_by_category=issues_by_category issues_by_severity=issues_by_severity total_issues=total_issues %}
+        {% endif %}
+    </div>
+</div>
+
+<script>
+    function showTab(tabName, element) {
+        // Update active tab styling
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.classList.remove('tab-active');
+        });
+        element.classList.add('tab-active');
+        
+        // Debug: Log what's happening
+        console.log('Switching to tab:', tabName);
+    }
+    
+    // Initialize on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('Page loaded, HTMX available:', typeof htmx !== 'undefined');
+        
+        // Process HTMX on initial content
+        if (typeof htmx !== 'undefined') {
+            htmx.process(document.getElementById('tab-content'));
+        }
+    });
+    
+    // Listen for HTMX events for debugging
+    document.addEventListener('htmx:afterRequest', function(evt) {
+        console.log('HTMX request completed:', evt.detail);
+    });
+    
+    document.addEventListener('htmx:responseError', function(evt) {
+        console.error('HTMX error:', evt.detail);
+    });
+</script>
+{% endblock %}
