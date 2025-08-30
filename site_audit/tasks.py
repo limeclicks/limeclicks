@@ -151,16 +151,21 @@ def run_site_audit(self, site_audit_id: int) -> dict:
                 "message": f"Failed to process results: {str(e)}"
             }
         finally:
-            # Clean up temporary directory (disabled for debugging)
-            # Note: We clean up the original output_dir (parent), not the timestamped subdir
+            # Clean up temporary directory after successful processing
             if output_dir and Path(output_dir).exists():
                 try:
-                    # DEBUGGING: Don't delete directory, just log the path
-                    logger.error(f"🔍 DEBUG: Output directory preserved for debugging: {output_dir}")
-                    print(f"🔍 DEBUG: Output files preserved at: {site_audit.temp_audit_dir}")
-                    # shutil.rmtree(output_dir)  # Commented out for debugging
+                    logger.info(f"Cleaning up temporary audit directory: {output_dir}")
+                    shutil.rmtree(output_dir)
+                    logger.info(f"Successfully cleaned up {output_dir}")
                 except Exception as e:
                     logger.warning(f"Failed to clean up {output_dir}: {e}")
+            
+            # Clear the temp_audit_dir field after cleanup
+            try:
+                site_audit.temp_audit_dir = None
+                site_audit.save(update_fields=['temp_audit_dir'])
+            except:
+                pass
             
     except Exception as e:
         logger.error(f"Site audit task error for id={site_audit_id}: {e}")
@@ -358,6 +363,131 @@ def cleanup_old_site_audits(days_to_keep=90):
         "deleted_count": deleted_count,
         "cutoff_date": cutoff_date.isoformat()
     }
+
+
+@shared_task(
+    time_limit=600,  # 10 minutes for comprehensive cleanup
+    soft_time_limit=540
+)
+def cleanup_screaming_frog_data(hours_old=24):
+    """
+    Clean up temporary Screaming Frog crawl data and application cache.
+    
+    This task:
+    1. Removes orphaned temporary crawl directories in /tmp
+    2. Cleans up old ProjectInstanceData in Screaming Frog home directory
+    3. Clears any temporary audit directories referenced by completed audits
+    
+    Args:
+        hours_old: Clean up data older than this many hours
+        
+    Returns:
+        dict: Cleanup statistics
+    """
+    import os
+    import glob
+    from datetime import datetime
+    
+    cleanup_stats = {
+        "temp_dirs_removed": 0,
+        "temp_dirs_size_freed": 0,
+        "sf_instances_removed": 0,
+        "sf_instances_size_freed": 0,
+        "errors": []
+    }
+    
+    cutoff_time = timezone.now() - timedelta(hours=hours_old)
+    
+    # 1. Clean up orphaned /tmp/sf_crawl_* directories
+    logger.info(f"Cleaning up temporary crawl directories older than {hours_old} hours")
+    
+    temp_dirs = glob.glob('/tmp/sf_crawl_*')
+    for temp_dir in temp_dirs:
+        try:
+            # Check directory age
+            dir_path = Path(temp_dir)
+            if not dir_path.exists():
+                continue
+                
+            # Get directory modification time
+            mtime = datetime.fromtimestamp(dir_path.stat().st_mtime, tz=timezone.utc)
+            
+            if mtime < cutoff_time:
+                # Calculate size before deletion
+                dir_size = sum(f.stat().st_size for f in dir_path.rglob('*') if f.is_file())
+                cleanup_stats["temp_dirs_size_freed"] += dir_size
+                
+                # Remove directory
+                shutil.rmtree(temp_dir)
+                cleanup_stats["temp_dirs_removed"] += 1
+                logger.info(f"Removed old temporary directory: {temp_dir} (freed {dir_size/1024/1024:.2f} MB)")
+                
+        except Exception as e:
+            error_msg = f"Failed to clean up {temp_dir}: {e}"
+            logger.warning(error_msg)
+            cleanup_stats["errors"].append(error_msg)
+    
+    # 2. Clean up Screaming Frog ProjectInstanceData
+    sf_home = Path.home() / '.ScreamingFrogSEOSpider'
+    project_data_dir = sf_home / 'ProjectInstanceData'
+    
+    if project_data_dir.exists():
+        logger.info("Cleaning up Screaming Frog ProjectInstanceData")
+        
+        for instance_dir in project_data_dir.iterdir():
+            if not instance_dir.is_dir():
+                continue
+                
+            try:
+                # Check directory age
+                mtime = datetime.fromtimestamp(instance_dir.stat().st_mtime, tz=timezone.utc)
+                
+                if mtime < cutoff_time:
+                    # Calculate size before deletion
+                    dir_size = sum(f.stat().st_size for f in instance_dir.rglob('*') if f.is_file())
+                    cleanup_stats["sf_instances_size_freed"] += dir_size
+                    
+                    # Remove directory
+                    shutil.rmtree(instance_dir)
+                    cleanup_stats["sf_instances_removed"] += 1
+                    logger.info(f"Removed old SF instance: {instance_dir.name} (freed {dir_size/1024/1024:.2f} MB)")
+                    
+            except Exception as e:
+                error_msg = f"Failed to clean up SF instance {instance_dir}: {e}"
+                logger.warning(error_msg)
+                cleanup_stats["errors"].append(error_msg)
+    
+    # 3. Clean up any temp directories still referenced by completed audits
+    completed_audits = SiteAudit.objects.filter(
+        status='completed',
+        temp_audit_dir__isnull=False
+    ).exclude(temp_audit_dir='')
+    
+    for audit in completed_audits:
+        if audit.temp_audit_dir and Path(audit.temp_audit_dir).exists():
+            try:
+                # Get the parent directory (the actual temp dir)
+                temp_dir = Path(audit.temp_audit_dir).parent
+                if temp_dir.exists() and str(temp_dir).startswith('/tmp/sf_crawl_'):
+                    shutil.rmtree(temp_dir)
+                    logger.info(f"Cleaned up audit temp directory: {temp_dir}")
+                    cleanup_stats["temp_dirs_removed"] += 1
+            except Exception as e:
+                logger.warning(f"Failed to clean up audit temp dir {audit.temp_audit_dir}: {e}")
+        
+        # Clear the reference
+        audit.temp_audit_dir = None
+        audit.save(update_fields=['temp_audit_dir'])
+    
+    # Log summary
+    logger.info(
+        f"Cleanup complete: Removed {cleanup_stats['temp_dirs_removed']} temp dirs "
+        f"({cleanup_stats['temp_dirs_size_freed']/1024/1024:.2f} MB), "
+        f"{cleanup_stats['sf_instances_removed']} SF instances "
+        f"({cleanup_stats['sf_instances_size_freed']/1024/1024:.2f} MB)"
+    )
+    
+    return cleanup_stats
 
 
 @shared_task(

@@ -17,39 +17,123 @@
     </div>
 
     <!-- Mobile Performance Content -->
-    <div id="mobile-performance-content" class="performance-content">
-        {% if mobile_pagespeed_data %}
-            {% include "site_audit/partials/performance_detail.html" with pagespeed_data=mobile_pagespeed_data device_type="mobile" %}
-        {% else %}
-            <div class="card bg-base-100 shadow-sm border border-base-300">
-                <div class="card-body text-center py-12">
-                    <i class="fas fa-mobile-alt text-5xl text-base-content/20 mb-4"></i>
-                    <h3 class="text-xl font-semibold text-base-content mb-2">Mobile Performance Data Not Available</h3>
-                    <p class="text-base-content/60">PageSpeed Insights data for mobile is not available for this audit.</p>
-                    <p class="text-sm text-base-content/50 mt-2">Run a new audit to collect performance metrics.</p>
-                </div>
-            </div>
-        {% endif %}
+    <div id="mobile-performance-content" class="performance-content" data-url="{{ mobile_pagespeed_url }}">
+        <div class="loading-spinner text-center py-12">
+            <div class="loading loading-spinner loading-lg text-primary"></div>
+            <p class="text-base-content/60 mt-4">Loading mobile performance data...</p>
+        </div>
     </div>
 
     <!-- Desktop Performance Content -->
-    <div id="desktop-performance-content" class="performance-content hidden">
-        {% if desktop_pagespeed_data %}
-            {% include "site_audit/partials/performance_detail.html" with pagespeed_data=desktop_pagespeed_data device_type="desktop" %}
-        {% else %}
-            <div class="card bg-base-100 shadow-sm border border-base-300">
-                <div class="card-body text-center py-12">
-                    <i class="fas fa-desktop text-5xl text-base-content/20 mb-4"></i>
-                    <h3 class="text-xl font-semibold text-base-content mb-2">Desktop Performance Data Not Available</h3>
-                    <p class="text-base-content/60">PageSpeed Insights data for desktop is not available for this audit.</p>
-                    <p class="text-sm text-base-content/50 mt-2">Run a new audit to collect performance metrics.</p>
-                </div>
-            </div>
-        {% endif %}
+    <div id="desktop-performance-content" class="performance-content hidden" data-url="{{ desktop_pagespeed_url }}">
+        <div class="loading-spinner text-center py-12">
+            <div class="loading loading-spinner loading-lg text-primary"></div>
+            <p class="text-base-content/60 mt-4">Loading desktop performance data...</p>
+        </div>
     </div>
 </div>
 
+<style>
+    .metric-card {
+        background: white;
+        border-radius: 8px;
+        padding: 20px;
+        border: 1px solid #e5e7eb;
+        transition: all 0.3s ease;
+    }
+    
+    .metric-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+    
+    .score-circle {
+        width: 100px;
+        height: 100px;
+        position: relative;
+    }
+    
+    .score-circle svg {
+        transform: rotate(-90deg);
+    }
+    
+    .score-circle .score-text {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        font-size: 28px;
+        font-weight: bold;
+    }
+    
+    .audit-item {
+        padding: 12px;
+        border-radius: 6px;
+        margin-bottom: 8px;
+        border: 1px solid #e5e7eb;
+        background: white;
+    }
+    
+    .audit-item.passed {
+        background: #f0fdf4;
+        border-color: #86efac;
+    }
+    
+    .audit-item.failed {
+        background: #fef2f2;
+        border-color: #fca5a5;
+    }
+    
+    .audit-item.warning {
+        background: #fefce8;
+        border-color: #fde047;
+    }
+    
+    .opportunity-card {
+        background: white;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        padding: 16px;
+        margin-bottom: 12px;
+    }
+    
+    .opportunity-card.high-impact {
+        border-left: 4px solid #ef4444;
+    }
+    
+    .opportunity-card.medium-impact {
+        border-left: 4px solid #f59e0b;
+    }
+    
+    .opportunity-card.low-impact {
+        border-left: 4px solid #3b82f6;
+    }
+    
+    .diagnostic-item {
+        display: flex;
+        justify-content: space-between;
+        padding: 8px 12px;
+        border-bottom: 1px solid #f3f4f6;
+    }
+    
+    .diagnostic-item:last-child {
+        border-bottom: none;
+    }
+</style>
+
 <script>
+    // Performance data cache
+    let performanceDataCache = {
+        mobile: null,
+        desktop: null
+    };
+
+    // Load performance data when tab is opened
+    document.addEventListener('DOMContentLoaded', function() {
+        // Load mobile data initially
+        loadPerformanceData('mobile');
+    });
+
     function showPerformanceTab(tabName, element) {
         // Update active tab styling
         document.querySelectorAll('#mobile-tab-btn, #desktop-tab-btn').forEach(tab => {
@@ -63,6 +147,261 @@
         });
         
         // Show selected content
-        document.getElementById(`${tabName}-performance-content`).classList.remove('hidden');
+        const contentElement = document.getElementById(`${tabName}-performance-content`);
+        contentElement.classList.remove('hidden');
+        
+        // Load data if not already loaded
+        if (!performanceDataCache[tabName]) {
+            loadPerformanceData(tabName);
+        }
+    }
+
+    async function loadPerformanceData(device) {
+        const contentElement = document.getElementById(`${device}-performance-content`);
+        const url = contentElement.dataset.url;
+        
+        if (!url) {
+            contentElement.innerHTML = `
+                <div class="card bg-base-100 shadow-sm border border-base-300">
+                    <div class="card-body text-center py-12">
+                        <i class="fas fa-${device === 'mobile' ? 'mobile-alt' : 'desktop'} text-5xl text-base-content/20 mb-4"></i>
+                        <h3 class="text-xl font-semibold text-base-content mb-2">${device.charAt(0).toUpperCase() + device.slice(1)} Performance Data Not Available</h3>
+                        <p class="text-base-content/60">PageSpeed Insights data for ${device} is not available for this audit.</p>
+                        <p class="text-sm text-base-content/50 mt-2">Run a new audit to collect performance metrics.</p>
+                    </div>
+                </div>
+            `;
+            return;
+        }
+        
+        try {
+            const response = await fetch(url);
+            const data = await response.json();
+            performanceDataCache[device] = data;
+            renderPerformanceData(device, data);
+        } catch (error) {
+            console.error(`Error loading ${device} performance data:`, error);
+            contentElement.innerHTML = `
+                <div class="alert alert-error">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <span>Failed to load performance data. Please try again later.</span>
+                </div>
+            `;
+        }
+    }
+
+    function renderPerformanceData(device, data) {
+        const contentElement = document.getElementById(`${device}-performance-content`);
+        
+        if (!data || !data.lighthouseResult) {
+            contentElement.innerHTML = `
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <span>Invalid performance data format.</span>
+                </div>
+            `;
+            return;
+        }
+
+        const lighthouse = data.lighthouseResult;
+        const categories = lighthouse.categories || {};
+        const audits = lighthouse.audits || {};
+        
+        // Extract scores
+        const performanceScore = Math.round((categories.performance?.score || 0) * 100);
+        const accessibilityScore = Math.round((categories.accessibility?.score || 0) * 100);
+        const bestPracticesScore = Math.round((categories['best-practices']?.score || 0) * 100);
+        const seoScore = Math.round((categories.seo?.score || 0) * 100);
+        
+        // Extract metrics
+        const metrics = {
+            fcp: audits['first-contentful-paint']?.displayValue || 'N/A',
+            lcp: audits['largest-contentful-paint']?.displayValue || 'N/A',
+            cls: audits['cumulative-layout-shift']?.displayValue || 'N/A',
+            si: audits['speed-index']?.displayValue || 'N/A',
+            tti: audits['interactive']?.displayValue || 'N/A',
+            tbt: audits['total-blocking-time']?.displayValue || 'N/A'
+        };
+
+        // Extract opportunities
+        const opportunities = [];
+        const diagnostics = [];
+        
+        Object.entries(audits).forEach(([key, audit]) => {
+            if (audit.details && audit.details.type === 'opportunity' && audit.score !== null && audit.score < 1) {
+                opportunities.push({
+                    title: audit.title,
+                    description: audit.description,
+                    displayValue: audit.displayValue || '',
+                    score: audit.score,
+                    impact: audit.details.overallSavingsMs || 0
+                });
+            } else if (audit.score !== null && audit.score < 1 && !key.startsWith('screenshot')) {
+                diagnostics.push({
+                    title: audit.title,
+                    description: audit.description,
+                    displayValue: audit.displayValue || '',
+                    score: audit.score
+                });
+            }
+        });
+
+        // Sort opportunities by impact
+        opportunities.sort((a, b) => b.impact - a.impact);
+
+        contentElement.innerHTML = `
+            <div class="space-y-6">
+                <!-- Scores Overview -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    ${renderScoreCard('Performance', performanceScore, 'fa-tachometer-alt')}
+                    ${renderScoreCard('Accessibility', accessibilityScore, 'fa-universal-access')}
+                    ${renderScoreCard('Best Practices', bestPracticesScore, 'fa-shield-alt')}
+                    ${renderScoreCard('SEO', seoScore, 'fa-search')}
+                </div>
+
+                <!-- Web Vitals -->
+                <div class="card bg-base-100 shadow-sm border border-base-300">
+                    <div class="card-body">
+                        <h3 class="text-lg font-semibold mb-4">Core Web Vitals</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            ${renderMetric('First Contentful Paint', metrics.fcp, getMetricStatus(audits['first-contentful-paint']))}
+                            ${renderMetric('Largest Contentful Paint', metrics.lcp, getMetricStatus(audits['largest-contentful-paint']))}
+                            ${renderMetric('Cumulative Layout Shift', metrics.cls, getMetricStatus(audits['cumulative-layout-shift']))}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Other Metrics -->
+                <div class="card bg-base-100 shadow-sm border border-base-300">
+                    <div class="card-body">
+                        <h3 class="text-lg font-semibold mb-4">Performance Metrics</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            ${renderMetric('Speed Index', metrics.si, getMetricStatus(audits['speed-index']))}
+                            ${renderMetric('Time to Interactive', metrics.tti, getMetricStatus(audits['interactive']))}
+                            ${renderMetric('Total Blocking Time', metrics.tbt, getMetricStatus(audits['total-blocking-time']))}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Opportunities -->
+                ${opportunities.length > 0 ? `
+                <div class="card bg-base-100 shadow-sm border border-base-300">
+                    <div class="card-body">
+                        <h3 class="text-lg font-semibold mb-4">
+                            <i class="fas fa-lightbulb text-warning mr-2"></i>
+                            Opportunities
+                        </h3>
+                        <p class="text-sm text-base-content/60 mb-4">These suggestions can help your page load faster.</p>
+                        <div class="space-y-3">
+                            ${opportunities.map(opp => renderOpportunity(opp)).join('')}
+                        </div>
+                    </div>
+                </div>
+                ` : ''}
+
+                <!-- Diagnostics -->
+                ${diagnostics.length > 0 ? `
+                <div class="card bg-base-100 shadow-sm border border-base-300">
+                    <div class="card-body">
+                        <h3 class="text-lg font-semibold mb-4">
+                            <i class="fas fa-stethoscope text-info mr-2"></i>
+                            Diagnostics
+                        </h3>
+                        <p class="text-sm text-base-content/60 mb-4">Additional items to check.</p>
+                        <div class="space-y-2">
+                            ${diagnostics.slice(0, 10).map(diag => renderDiagnostic(diag)).join('')}
+                        </div>
+                    </div>
+                </div>
+                ` : ''}
+            </div>
+        `;
+    }
+
+    function renderScoreCard(title, score, icon) {
+        const color = getScoreColor(score);
+        return `
+            <div class="metric-card">
+                <div class="flex flex-col items-center">
+                    <div class="score-circle mb-3">
+                        <svg width="100" height="100">
+                            <circle cx="50" cy="50" r="45" fill="none" stroke="#e5e7eb" stroke-width="6"/>
+                            <circle cx="50" cy="50" r="45" fill="none" stroke="${color}" stroke-width="6"
+                                    stroke-dasharray="${score * 2.83} 283"
+                                    stroke-linecap="round"/>
+                        </svg>
+                        <div class="score-text" style="color: ${color}">${score}</div>
+                    </div>
+                    <div class="text-center">
+                        <i class="fas ${icon} text-xl mb-2" style="color: ${color}"></i>
+                        <h4 class="font-medium text-base-content">${title}</h4>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    function renderMetric(title, value, status) {
+        const statusColors = {
+            'good': 'text-success',
+            'needs-improvement': 'text-warning',
+            'poor': 'text-error'
+        };
+        const statusIcons = {
+            'good': 'fa-check-circle',
+            'needs-improvement': 'fa-exclamation-circle',
+            'poor': 'fa-times-circle'
+        };
+        
+        return `
+            <div class="flex items-center justify-between p-4 bg-base-200/50 rounded-lg">
+                <div>
+                    <p class="text-sm text-base-content/60">${title}</p>
+                    <p class="text-xl font-semibold ${statusColors[status] || ''}">${value}</p>
+                </div>
+                <i class="fas ${statusIcons[status] || 'fa-question-circle'} text-2xl ${statusColors[status] || 'text-base-content/40'}"></i>
+            </div>
+        `;
+    }
+
+    function renderOpportunity(opp) {
+        const impactClass = opp.impact > 1000 ? 'high-impact' : opp.impact > 500 ? 'medium-impact' : 'low-impact';
+        return `
+            <div class="opportunity-card ${impactClass}">
+                <div class="flex justify-between items-start">
+                    <div class="flex-1">
+                        <h4 class="font-medium text-base-content mb-1">${opp.title}</h4>
+                        <p class="text-sm text-base-content/60">${opp.description}</p>
+                    </div>
+                    ${opp.displayValue ? `
+                    <div class="ml-4 text-right">
+                        <span class="text-sm font-medium text-base-content">${opp.displayValue}</span>
+                    </div>
+                    ` : ''}
+                </div>
+            </div>
+        `;
+    }
+
+    function renderDiagnostic(diag) {
+        return `
+            <div class="diagnostic-item">
+                <span class="text-sm text-base-content">${diag.title}</span>
+                ${diag.displayValue ? `<span class="text-sm text-base-content/60">${diag.displayValue}</span>` : ''}
+            </div>
+        `;
+    }
+
+    function getScoreColor(score) {
+        if (score >= 90) return '#10b981';
+        if (score >= 50) return '#f59e0b';
+        return '#ef4444';
+    }
+
+    function getMetricStatus(audit) {
+        if (!audit || audit.score === null) return 'unknown';
+        if (audit.score >= 0.9) return 'good';
+        if (audit.score >= 0.5) return 'needs-improvement';
+        return 'poor';
     }
 </script>

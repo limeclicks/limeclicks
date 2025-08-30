@@ -47,6 +47,37 @@ def fetch_pagespeed_data_from_r2(r2_path):
         return None
 
 
+def get_r2_presigned_url(r2_path):
+    """Generate a presigned URL for R2 storage"""
+    if not r2_path:
+        return None
+    
+    try:
+        # Initialize R2 client using AWS settings
+        s3_client = boto3.client(
+            's3',
+            endpoint_url=settings.AWS_S3_ENDPOINT_URL,
+            aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+            aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+            region_name='auto'
+        )
+        
+        # Generate presigned URL (valid for 1 hour)
+        url = s3_client.generate_presigned_url(
+            'get_object',
+            Params={
+                'Bucket': settings.AWS_STORAGE_BUCKET_NAME,
+                'Key': r2_path
+            },
+            ExpiresIn=3600  # 1 hour
+        )
+        
+        return url
+    except Exception as e:
+        print(f"Error generating presigned URL for R2: {e}")
+        return None
+
+
 @login_required
 def site_audit_list(request):
     """List all site audits for the current user"""
@@ -350,6 +381,15 @@ def clean_domain_input(domain_input):
 @login_required
 def add_project_modal(request):
     """Render the add project modal via HTMX"""
+    # Debug logging
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info(f"add_project_modal called - HTMX: {request.headers.get('HX-Request')}, User: {request.user}")
+    
+    # Check if it's an HTMX request
+    if not request.headers.get('HX-Request'):
+        logger.warning("Not an HTMX request, might cause issues")
+    
     return render(request, 'site_audit/partials/add_project_modal.html')
 
 
@@ -556,18 +596,18 @@ def audit_detail(request, audit_id):
     
     page_range = get_page_range(page, total_pages)
     
-    # Fetch PageSpeed data from R2 if on performance tab
-    mobile_pagespeed_data = None
-    desktop_pagespeed_data = None
+    # Generate presigned URLs for PageSpeed data if on performance tab
+    mobile_pagespeed_url = None
+    desktop_pagespeed_url = None
     
     if tab == 'performance':
-        # Fetch mobile PageSpeed data
+        # Generate presigned URL for mobile PageSpeed data
         if audit.pagespeed_mobile_response_r2_path:
-            mobile_pagespeed_data = fetch_pagespeed_data_from_r2(audit.pagespeed_mobile_response_r2_path)
+            mobile_pagespeed_url = get_r2_presigned_url(audit.pagespeed_mobile_response_r2_path)
         
-        # Fetch desktop PageSpeed data
+        # Generate presigned URL for desktop PageSpeed data
         if audit.pagespeed_desktop_response_r2_path:
-            desktop_pagespeed_data = fetch_pagespeed_data_from_r2(audit.pagespeed_desktop_response_r2_path)
+            desktop_pagespeed_url = get_r2_presigned_url(audit.pagespeed_desktop_response_r2_path)
     
     context = {
         'audit': audit,
@@ -585,8 +625,8 @@ def audit_detail(request, audit_id):
         'issues_start': issues_start,
         'issues_end': issues_end,
         'page_range': page_range,
-        'mobile_pagespeed_data': mobile_pagespeed_data,
-        'desktop_pagespeed_data': desktop_pagespeed_data
+        'mobile_pagespeed_url': mobile_pagespeed_url,
+        'desktop_pagespeed_url': desktop_pagespeed_url
     }
     
     # Handle HTMX requests for tab switching and pagination

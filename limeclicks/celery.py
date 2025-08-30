@@ -92,6 +92,11 @@ app.conf.beat_schedule = {
         'schedule': crontab(hour=3, minute=0),  # Run daily at 3 AM
         'kwargs': {'days_to_keep': 90}
     },
+    'cleanup-screaming-frog-data': {
+        'task': 'site_audit.tasks.cleanup_screaming_frog_data',
+        'schedule': crontab(hour='*/6'),  # Run every 6 hours
+        'kwargs': {'hours_old': 24}  # Clean up data older than 24 hours
+    },
     'validate-screaming-frog-license': {
         'task': 'site_audit.tasks.validate_screaming_frog_license',
         'schedule': crontab(day_of_week=1, hour=0, minute=0),  # Run weekly on Monday

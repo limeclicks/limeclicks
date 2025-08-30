@@ -8,14 +8,14 @@
 
 # Core Services
 # =============
-web: PYTHONUNBUFFERED=1 python manage.py runserver 0.0.0.0:8000 --nothreading
+web: PYTHONUNBUFFERED=1 python manage.py runserver 0.0.0.0:8000
 css: npx tailwindcss -i ./static/src/input.css -o ./static/dist/tailwind.css --watch
 
 # Background Processing
 # ====================
 worker: celery -A limeclicks worker --loglevel=info --pool=threads --concurrency=4 -Q celery,serp_high,serp_default,accounts,default
 beat: celery -A limeclicks beat --loglevel=info
-flower: celery -A limeclicks flower --port=5555
+flower: sleep 5 && celery -A limeclicks flower --port=5555
 
 # Optional Services (uncomment if needed)
 # =======================================
