@@ -134,7 +134,7 @@ case "$1" in
         
         echo ""
         print_info "Starting services:"
-        echo "  • Django server on http://localhost:$DJANGO_PORT"
+        echo "  • Django server on http://localhost:$DJANGO_PORT (with SSE support)"
         echo "  • Tailwind CSS watcher"
         echo "  • Celery worker (4 threads)"
         echo "  • Celery beat scheduler"
@@ -143,6 +143,9 @@ case "$1" in
         echo "Press Ctrl+C to stop all services"
         echo ""
         
+        # Set environment for SSE support (disable output buffering)
+        export PYTHONUNBUFFERED=1
+        
         # Start all services
         honcho start
         ;;
@@ -150,6 +153,8 @@ case "$1" in
     fast)
         echo -e "${GREEN}⚡ Fast Start (skip setup)${NC}"
         check_redis || exit 1
+        # Set environment for SSE support (disable output buffering)
+        export PYTHONUNBUFFERED=1
         honcho start
         ;;
     
@@ -160,6 +165,9 @@ case "$1" in
         if [ "$2" != "--skip-setup" ]; then
             run_migrations
         fi
+        
+        # Set environment for SSE support (disable output buffering)
+        export PYTHONUNBUFFERED=1
         
         honcho start web css
         ;;

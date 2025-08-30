@@ -8,7 +8,7 @@
 
 # Core Services
 # =============
-web: python manage.py runserver 0.0.0.0:8000
+web: PYTHONUNBUFFERED=1 python manage.py runserver 0.0.0.0:8000 --nothreading
 css: npx tailwindcss -i ./static/src/input.css -o ./static/dist/tailwind.css --watch
 
 # Background Processing

@@ -61,9 +61,9 @@
                 {% endif %}
 
                 <!-- Best Practices Score -->
-                {% if lighthouse.categories.best-practices %}
+                {% with bp=lighthouse.categories|get_item:"best-practices" %}
+                {% if bp %}
                 <div class="text-center">
-                    {% with bp=lighthouse.categories|get_item:"best-practices" %}
                     {% with score=bp.score|score_to_percent %}
                     <div class="radial-progress {% if score >= 90 %}text-success{% elif score >= 50 %}text-warning{% else %}text-error{% endif %}" 
                          style="--value:{{ score|default:0 }}; --size:5rem; --thickness: 4px;">
@@ -71,9 +71,9 @@
                     </div>
                     <p class="text-xs text-base-content/60 mt-2">Best Practices</p>
                     {% endwith %}
-                    {% endwith %}
                 </div>
                 {% endif %}
+                {% endwith %}
 
                 <!-- SEO Score -->
                 {% if lighthouse.categories.seo %}
@@ -390,7 +390,15 @@
                                 <tbody>
                                     {% for item in audit.details.items|slice:":5" %}
                                     <tr>
-                                        <td class="text-xs">{{ item.url|default:item.source|default:item }}</td>
+                                        <td class="text-xs">
+                                            {% if item.url %}
+                                                {{ item.url }}
+                                            {% elif item %}
+                                                {{ item }}
+                                            {% else %}
+                                                -
+                                            {% endif %}
+                                        </td>
                                     </tr>
                                     {% endfor %}
                                 </tbody>
