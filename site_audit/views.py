@@ -23,8 +23,9 @@ def site_audit_list(request):
     # Get all projects for the current user
     projects = Project.objects.filter(user=request.user).select_related()
     
-    # Get search query
+    # Get search query and filter
     search_query = request.GET.get('search', '').strip()
+    filter_status = request.GET.get('filter', 'all')
     
     # Filter projects based on search
     if search_query:
@@ -34,23 +35,23 @@ def site_audit_list(request):
         )
     
     # Get latest audit for each project
-    projects_with_audits = []
+    all_projects_with_audits = []
     for project in projects:
         latest_audit = project.site_audits.order_by('-created_at').first()
-        projects_with_audits.append({
+        all_projects_with_audits.append({
             'project': project,
             'audit': latest_audit
         })
     
-    # Calculate statistics
-    total_projects = len(projects_with_audits)
+    # Calculate statistics from ALL projects (before filtering)
+    total_projects = len(all_projects_with_audits)
     
     # Categorize projects by health (only count completed audits)
     healthy_count = 0
     attention_count = 0
     critical_count = 0
     
-    for item in projects_with_audits:
+    for item in all_projects_with_audits:
         if item['audit'] and item['audit'].status == 'completed' and item['audit'].overall_site_health_score is not None:
             score = item['audit'].overall_site_health_score
             if score >= 80:
@@ -60,7 +61,22 @@ def site_audit_list(request):
             else:
                 critical_count += 1
     
-    # Handle HTMX requests for pagination
+    # Apply health score filter to get filtered list for display
+    projects_with_audits = all_projects_with_audits
+    if filter_status != 'all':
+        filtered_projects = []
+        for item in all_projects_with_audits:
+            if item['audit'] and item['audit'].status == 'completed' and item['audit'].overall_site_health_score is not None:
+                score = item['audit'].overall_site_health_score
+                if filter_status == 'healthy' and score >= 80:
+                    filtered_projects.append(item)
+                elif filter_status == 'attention' and 60 <= score < 80:
+                    filtered_projects.append(item)
+                elif filter_status == 'critical' and score < 60:
+                    filtered_projects.append(item)
+        projects_with_audits = filtered_projects
+    
+    # Handle HTMX requests for filtering and pagination
     if request.headers.get('HX-Request'):
         page_number = request.GET.get('page', 1)
         per_page = 25
@@ -71,7 +87,9 @@ def site_audit_list(request):
         html = render_to_string('site_audit/partials/audit_list_items.html', {
             'projects_with_audits': page_obj.object_list,
             'has_next': page_obj.has_next(),
-            'next_page': page_obj.next_page_number() if page_obj.has_next() else None
+            'next_page': page_obj.next_page_number() if page_obj.has_next() else None,
+            'filter_status': filter_status,
+            'search_query': search_query
         })
         
         return HttpResponse(html)
@@ -89,7 +107,8 @@ def site_audit_list(request):
         'critical_count': critical_count,
         'has_next': page_obj.has_next(),
         'next_page': page_obj.next_page_number() if page_obj.has_next() else None,
-        'search_query': search_query
+        'search_query': search_query,
+        'filter_status': filter_status
     }
     
     return render(request, 'site_audit/list.html', context)

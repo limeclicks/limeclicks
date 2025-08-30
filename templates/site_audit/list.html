@@ -73,25 +73,111 @@
             </button>
         </div>
         
-        <!-- Search Bar -->
-        <div class="relative">
-            <input 
-                type="text" 
-                id="search-input"
-                placeholder="Search by domain or project name..." 
-                class="input input-bordered w-full pl-12 pr-4 h-12"
-                value="{{ search_query }}"
-                hx-get="{% url 'site_audit:list' %}"
-                hx-trigger="keyup changed delay:500ms"
-                hx-target="#audit-list"
-                hx-select="#audit-list"
-                hx-swap="innerHTML"
-                hx-indicator="#search-spinner"
-            >
-            <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-base-content/40"></i>
-            <span id="search-spinner" class="htmx-indicator absolute right-4 top-1/2 -translate-y-1/2">
-                <i class="fas fa-spinner loading-spinner text-primary"></i>
-            </span>
+        <!-- Search and Filter Card -->
+        <div class="card bg-base-100 shadow-sm border border-base-300">
+            <div class="card-body p-4">
+                <!-- Search Bar -->
+                <div class="relative mb-4">
+                    <input 
+                        type="text" 
+                        id="search-input"
+                        name="search"
+                        placeholder="Search by domain or project name..." 
+                        class="input input-bordered w-full pl-12 pr-4 h-12"
+                        value="{{ search_query }}"
+                        hx-get="{% url 'site_audit:list' %}"
+                        hx-trigger="keyup changed delay:500ms"
+                        hx-target="#audit-list"
+                        hx-swap="innerHTML"
+                        hx-vals='{"filter": "{{ filter_status|default:"all" }}"}'
+                        hx-indicator="#search-spinner"
+                    >
+                    <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-base-content/40"></i>
+                    <span id="search-spinner" class="htmx-indicator absolute right-4 top-1/2 -translate-y-1/2">
+                        <i class="fas fa-spinner loading-spinner text-primary"></i>
+                    </span>
+                </div>
+                
+                <!-- Filter Buttons -->
+                <div class="flex items-center gap-2">
+                    <span class="text-sm text-base-content/60 mr-2">Filter:</span>
+                    
+                    <!-- All Filter (default) -->
+                    <button 
+                        type="button"
+                        name="filter"
+                        value="all"
+                        class="btn btn-sm {% if filter_status == 'all' or not filter_status %}btn-primary{% else %}btn-outline{% endif %}"
+                        hx-get="{% url 'site_audit:list' %}"
+                        hx-trigger="click"
+                        hx-target="#audit-list"
+                        hx-swap="innerHTML"
+                        hx-include="#search-input"
+                        hx-vals='{"filter": "all"}'
+                        onclick="updateFilterButtons(this)"
+                    >
+                        All
+                        <span class="badge badge-sm ml-1">{{ total_projects }}</span>
+                    </button>
+                    
+                    <!-- Healthy Filter -->
+                    <button 
+                        type="button"
+                        name="filter"
+                        value="healthy"
+                        class="btn btn-sm {% if filter_status == 'healthy' %}btn-success{% else %}btn-outline btn-success{% endif %}"
+                        hx-get="{% url 'site_audit:list' %}"
+                        hx-trigger="click"
+                        hx-target="#audit-list"
+                        hx-swap="innerHTML"
+                        hx-include="#search-input"
+                        hx-vals='{"filter": "healthy"}'
+                        onclick="updateFilterButtons(this)"
+                    >
+                        <i class="fas fa-check-circle mr-1"></i>
+                        Healthy
+                        <span class="badge badge-sm ml-1">{{ healthy_count }}</span>
+                    </button>
+                    
+                    <!-- Need Attention Filter -->
+                    <button 
+                        type="button"
+                        name="filter"
+                        value="attention"
+                        class="btn btn-sm {% if filter_status == 'attention' %}btn-warning{% else %}btn-outline btn-warning{% endif %}"
+                        hx-get="{% url 'site_audit:list' %}"
+                        hx-trigger="click"
+                        hx-target="#audit-list"
+                        hx-swap="innerHTML"
+                        hx-include="#search-input"
+                        hx-vals='{"filter": "attention"}'
+                        onclick="updateFilterButtons(this)"
+                    >
+                        <i class="fas fa-exclamation-triangle mr-1"></i>
+                        Need Attention
+                        <span class="badge badge-sm ml-1">{{ attention_count }}</span>
+                    </button>
+                    
+                    <!-- Critical Filter -->
+                    <button 
+                        type="button"
+                        name="filter"
+                        value="critical"
+                        class="btn btn-sm {% if filter_status == 'critical' %}btn-error{% else %}btn-outline btn-error{% endif %}"
+                        hx-get="{% url 'site_audit:list' %}"
+                        hx-trigger="click"
+                        hx-target="#audit-list"
+                        hx-swap="innerHTML"
+                        hx-include="#search-input"
+                        hx-vals='{"filter": "critical"}'
+                        onclick="updateFilterButtons(this)"
+                    >
+                        <i class="fas fa-times-circle mr-1"></i>
+                        Critical
+                        <span class="badge badge-sm ml-1">{{ critical_count }}</span>
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
     
@@ -201,6 +287,37 @@
 
 <!-- Minimal JavaScript for real-time updates using native EventSource -->
 <script>
+    // Function to update filter button styles
+    function updateFilterButtons(clickedBtn) {
+        // Remove filled state from all filter buttons
+        document.querySelectorAll('[name="filter"]').forEach(btn => {
+            btn.classList.remove('btn-primary', 'btn-success', 'btn-warning', 'btn-error');
+            
+            // Add outline style based on button type
+            if (btn.textContent.includes('Healthy')) {
+                btn.classList.add('btn-outline', 'btn-success');
+            } else if (btn.textContent.includes('Need Attention')) {
+                btn.classList.add('btn-outline', 'btn-warning');
+            } else if (btn.textContent.includes('Critical')) {
+                btn.classList.add('btn-outline', 'btn-error');
+            } else if (btn.textContent.includes('All')) {
+                btn.classList.add('btn-outline');
+            }
+        });
+        
+        // Add filled state to clicked button
+        clickedBtn.classList.remove('btn-outline');
+        if (clickedBtn.value === 'healthy') {
+            clickedBtn.classList.add('btn-success');
+        } else if (clickedBtn.value === 'attention') {
+            clickedBtn.classList.add('btn-warning');
+        } else if (clickedBtn.value === 'critical') {
+            clickedBtn.classList.add('btn-error');
+        } else {
+            clickedBtn.classList.add('btn-primary');
+        }
+    }
+    
     // Use native EventSource for better compatibility
     let eventSource;
     

@@ -67,10 +67,13 @@ def favicon_proxy(request, domain):
     
     # If not in cache, fetch from Google
     try:
-        google_url = f"https://www.google.com/s2/favicons?domain={domain}&sz={size}"
+        # Use the new Google favicon API v2
+        google_url = f"https://t1.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=http://{domain}&size={size}"
         response = requests.get(google_url, timeout=10)
         
-        if response.status_code == 200:
+        # Google returns 404 with a default PNG icon for domains without favicons
+        # We treat both 200 and 404 as success if we get image content
+        if response.status_code in [200, 404] and response.headers.get('Content-Type', '').startswith('image/'):
             # Cache the response for 6 hours
             cache.set(cache_key, {
                 'content': response.content,

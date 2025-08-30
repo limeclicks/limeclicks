@@ -1,12 +1,43 @@
-{% for item in projects_with_audits %}
-    {% include "site_audit/partials/audit_card.html" %}
-{% endfor %}
+<div class="grid grid-cols-1 gap-4" id="audit-cards-container">
+    {% if projects_with_audits %}
+        {% for item in projects_with_audits %}
+            {% include "site_audit/partials/audit_card.html" %}
+        {% endfor %}
+        
+        <!-- Add New Project Card -->
+        {% include "site_audit/partials/add_project_card.html" %}
+    {% else %}
+        <!-- Empty State or No Results -->
+        <div class="card bg-base-100 shadow-sm border border-base-300">
+            <div class="card-body text-center py-12">
+                <i class="fas fa-search text-5xl text-base-content/20 mb-4"></i>
+                <h3 class="text-xl font-semibold text-base-content mb-2">No projects found</h3>
+                <p class="text-base-content/60">
+                    {% if filter_status and filter_status != 'all' %}
+                        No projects match the selected filter.
+                    {% else %}
+                        No projects match your search criteria.
+                    {% endif %}
+                </p>
+                <div class="mt-4">
+                    <button 
+                        class="btn btn-sm btn-ghost"
+                        onclick="document.getElementById('search-input').value=''; htmx.trigger('#search-input', 'keyup');"
+                    >
+                        Clear filters
+                    </button>
+                </div>
+            </div>
+        </div>
+    {% endif %}
+</div>
 
 {% if has_next %}
-<div class="text-center mt-8" id="load-more-container" hx-swap-oob="true">
+<!-- Load More Button -->
+<div class="text-center mt-8" id="load-more-container">
     <button 
         class="btn btn-primary btn-outline"
-        hx-get="{% url 'site_audit:list' %}?page={{ next_page }}"
+        hx-get="{% url 'site_audit:list' %}?page={{ next_page }}&filter={{ filter_status }}"
         hx-trigger="click"
         hx-target="#audit-cards-container"
         hx-select=".audit-card"
@@ -18,9 +49,5 @@
             <i class="fas fa-spinner loading-spinner ml-2"></i>
         </span>
     </button>
-</div>
-{% else %}
-<div class="text-center mt-8 text-base-content/60" id="load-more-container" hx-swap-oob="true">
-    <p>All projects loaded</p>
 </div>
 {% endif %}
