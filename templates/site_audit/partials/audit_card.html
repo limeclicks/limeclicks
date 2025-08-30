@@ -102,10 +102,15 @@
                 <div class="text-center min-w-[70px]">
                     <p class="text-xs text-base-content/60 mb-2 font-medium">Desktop</p>
                     <div class="flex items-center justify-center">
+                        {% if item.audit.performance_score_desktop is None %}
+                        <!-- Loading spinner when score is not yet available -->
+                        <i class="fas fa-spinner loading-spinner text-base-content/40 text-xl"></i>
+                        {% else %}
                         <i class="fas fa-desktop text-base-content/40 mr-2 text-sm"></i>
                         <span class="text-xl font-semibold {% if item.audit.performance_score_desktop >= 90 %}text-success{% elif item.audit.performance_score_desktop >= 50 %}text-warning{% else %}text-error{% endif %}">
-                            {{ item.audit.performance_score_desktop|default:"--" }}
+                            {{ item.audit.performance_score_desktop }}
                         </span>
+                        {% endif %}
                     </div>
                 </div>
                 {% elif item.audit and item.audit.status == 'running' %}
