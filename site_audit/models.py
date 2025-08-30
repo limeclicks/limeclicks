@@ -282,3 +282,132 @@ class SiteAudit(models.Model):
             self.status = 'failed'
             self.save()
             return {"status": "error", "message": f"Failed to process results: {str(e)}"}
+
+
+class SiteIssue(models.Model):
+    """Model to store individual SEO issues found during site audit"""
+    
+    # Severity choices
+    SEVERITY_CHOICES = [
+        ('critical', 'Critical'),
+        ('high', 'High'),
+        ('medium', 'Medium'),
+        ('low', 'Low'),
+        ('info', 'Info'),
+    ]
+    
+    # Issue category choices
+    CATEGORY_CHOICES = [
+        ('meta_content', 'Meta Content'),
+        ('response_code', 'Response Code'),
+        ('image', 'Image'),
+        ('technical_seo', 'Technical SEO'),
+        ('content_quality', 'Content Quality'),
+        ('security', 'Security'),
+    ]
+    
+    # Core relationships
+    site_audit = models.ForeignKey(
+        SiteAudit, 
+        on_delete=models.CASCADE, 
+        related_name='issues'
+    )
+    
+    # Issue identification
+    url = models.URLField(max_length=2048)
+    issue_type = models.CharField(max_length=100, db_index=True)
+    issue_category = models.CharField(max_length=50, choices=CATEGORY_CHOICES, db_index=True)
+    severity = models.CharField(max_length=20, choices=SEVERITY_CHOICES, db_index=True)
+    
+    # Issue details
+    issue_data = models.JSONField(default=dict)
+    """
+    Dynamic storage for parser-specific data. Examples:
+    
+    MetaContent: {
+        'content': 'actual title/meta/h1 text',
+        'length': 45,
+        'pixel_width': 320,
+        'occurrences': 1,
+        'duplicates': ['url1', 'url2']
+    }
+    
+    ResponseCode: {
+        'status_code': 404,
+        'status_text': 'Not Found',
+        'response_time': 0.234,
+        'redirect_url': 'https://...',
+        'redirect_type': 'HTTP Redirect'
+    }
+    """
+    
+    # SEO metadata
+    indexability = models.CharField(max_length=50, blank=True)
+    indexability_status = models.CharField(max_length=100, blank=True)
+    inlinks_count = models.IntegerField(default=0)
+    
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ['severity', 'issue_type', 'url']
+        indexes = [
+            models.Index(fields=['site_audit', 'severity']),
+            models.Index(fields=['site_audit', 'issue_category']),
+            models.Index(fields=['site_audit', 'issue_type']),
+        ]
+    
+    def __str__(self):
+        return f"{self.get_severity_display()} - {self.issue_type} - {self.url[:50]}"
+    
+    @classmethod
+    def get_severity_for_issue_type(cls, issue_type):
+        """Map issue types to severity levels"""
+        severity_mapping = {
+            # Critical
+            'missing_title': 'critical',
+            'internal_client_error_4xx': 'critical',
+            'internal_server_error_5xx': 'critical',
+            'mixed_content': 'critical',
+            'missing_hsts_header': 'critical',
+            
+            # High
+            'duplicate_title': 'high',
+            'missing_meta_description': 'high',
+            'duplicate_meta_description': 'high',
+            'missing_h1': 'high',
+            'internal_redirection_3xx': 'high',
+            'missing_canonical': 'high',
+            
+            # Medium
+            'title_too_long': 'medium',
+            'title_too_short': 'medium',
+            'meta_too_long': 'medium',
+            'meta_too_short': 'medium',
+            'low_content_pages': 'medium',
+            'missing_alt_text': 'medium',
+            'url_underscores': 'medium',
+            'url_uppercase': 'medium',
+            
+            # Low
+            'missing_h2': 'low',
+            'duplicate_h2': 'low',
+            'readability_difficult': 'low',
+            'pagination_sequence_error': 'low',
+            
+            # Info
+            'noindex': 'info',
+            'url_parameters': 'info',
+        }
+        
+        # Try exact match first
+        if issue_type in severity_mapping:
+            return severity_mapping[issue_type]
+        
+        # Try partial matches
+        for key, severity in severity_mapping.items():
+            if key in issue_type.lower():
+                return severity
+        
+        return 'medium'  # Default severity
