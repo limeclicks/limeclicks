@@ -821,6 +821,11 @@ def keyword_detail(request, keyword_id):
         keyword=keyword
     ).order_by('-created_at')[:30])
     
+    # Get the most recent rank with search results
+    latest_rank = Rank.objects.filter(
+        keyword=keyword
+    ).order_by('-created_at').first()
+    
     # Calculate rank changes
     for i, history in enumerate(ranking_history):
         if i < len(ranking_history) - 1:
@@ -848,17 +853,106 @@ def keyword_detail(request, keyword_id):
         chart_dates = [datetime.now().strftime('%b %d')]
         chart_ranks = [keyword.rank if keyword.rank > 0 else 101]
     
-    # Get SERP results if available
+    # Get SERP results from R2 storage if available
     serp_results = []
-    if hasattr(keyword, 'ranking_pages') and keyword.ranking_pages and isinstance(keyword.ranking_pages, list):
-        # Process ranking pages to add missing fields
+    local_pack_results = []
+    
+    if latest_rank and latest_rank.search_results_file:
+        try:
+            from services.r2_storage import get_r2_service
+            r2_service = get_r2_service()
+            
+            # Download the JSON results from R2
+            search_data = r2_service.download_json(latest_rank.search_results_file)
+            
+            if search_data:
+                # Handle nested structure - results might be under 'results' key
+                if 'results' in search_data and isinstance(search_data['results'], dict):
+                    results_data = search_data['results']
+                else:
+                    results_data = search_data
+                
+                # Process ALL organic results (not limited to 10)
+                organic_results = results_data.get('organic_results', [])
+                for i, result in enumerate(organic_results):
+                    # Check if this result is from our project domain
+                    is_own_site = False
+                    url = result.get('url') or result.get('link', '#')
+                    if url and url != '#':
+                        from urllib.parse import urlparse
+                        result_domain = urlparse(url).netloc
+                        is_own_site = (result_domain == keyword.project.domain or 
+                                     result_domain == f'www.{keyword.project.domain}' or
+                                     f'www.{result_domain}' == keyword.project.domain)
+                    
+                    serp_result = {
+                        'position': result.get('position', i + 1),
+                        'url': url,
+                        'title': result.get('title', f'Result {i + 1}'),
+                        'snippet': result.get('description') or result.get('snippet', ''),
+                        'is_own_site': is_own_site,
+                        'domain': result.get('domain', ''),
+                    }
+                    serp_results.append(serp_result)
+                
+                # Process local pack results
+                local_pack = results_data.get('local_pack', results_data.get('local_results', {}))
+                if isinstance(local_pack, list):
+                    # Direct list of local results
+                    places_to_process = local_pack[:3]
+                elif isinstance(local_pack, dict) and 'places' in local_pack:
+                    # Nested under 'places' key
+                    places_to_process = local_pack['places'][:3]
+                else:
+                    places_to_process = []
+                
+                for place in places_to_process:
+                    if isinstance(place, dict):
+                        # Handle both 'title' and 'name' fields
+                        title = place.get('title') or place.get('name', '')
+                        
+                        # Parse reviews if it's in format "(18)"
+                        reviews = place.get('reviews', 0)
+                        if isinstance(reviews, str) and reviews.startswith('('):
+                            reviews = reviews.strip('()')
+                            
+                        local_result = {
+                            'title': title,
+                            'position': place.get('position', 0),
+                            'rating': place.get('rating', 0),
+                            'reviews': reviews,
+                            'type': place.get('type', ''),
+                            'address': place.get('address', ''),
+                            'phone': place.get('phone', ''),
+                            'website': place.get('website', ''),
+                        }
+                        local_pack_results.append(local_result)
+                        
+        except Exception as e:
+            logger.error(f"Error loading SERP results from R2: {e}")
+            # Fall back to ranking_pages if R2 fails
+            if hasattr(keyword, 'ranking_pages') and keyword.ranking_pages:
+                for i, page in enumerate(keyword.ranking_pages[:10]):
+                    if isinstance(page, dict):
+                        serp_result = {
+                            'position': page.get('position', i + 1),
+                            'url': page.get('url', '#'),
+                            'title': page.get('title', f'Result {i + 1}'),
+                            'snippet': page.get('description', ''),
+                            'is_own_site': False,
+                        }
+                        serp_results.append(serp_result)
+    
+    # If no R2 data, fall back to ranking_pages
+    elif hasattr(keyword, 'ranking_pages') and keyword.ranking_pages:
         for i, page in enumerate(keyword.ranking_pages[:10]):
             if isinstance(page, dict):
                 serp_result = {
                     'position': page.get('position', i + 1),
                     'url': page.get('url', '#'),
                     'title': page.get('title', f'Result {i + 1}'),
-                    'description': page.get('description', '')
+                    'snippet': page.get('description', ''),
+                    'is_own_site': False,
                 }
                 serp_results.append(serp_result)
     
@@ -905,11 +999,13 @@ def keyword_detail(request, keyword_id):
         'chart_dates': json.dumps(chart_dates) if chart_dates else '[]',
         'chart_ranks': json.dumps(chart_ranks) if chart_ranks else '[]',
         'serp_results': serp_results,
+        'local_pack_results': local_pack_results,
         'competitors': competitors[:5],  # Top 5 competitors
         'best_rank': best_rank if best_rank else 0,
         'worst_rank': worst_rank if worst_rank else 0,
         'avg_rank': int(avg_rank) if avg_rank else 0,
         'total_checks': len(ranking_history),
+        'latest_rank': latest_rank,
     }
     
     return render(request, 'keywords/keyword_detail.html', context)

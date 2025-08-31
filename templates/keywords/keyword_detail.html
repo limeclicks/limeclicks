@@ -1,9 +1,42 @@
 {% extends "dashboard_base.html" %}
 {% load static %}
 
-{% block head_extra %}
+{% block extra_head %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
+    .chart-container {
+        position: relative;
+        height: 300px;
+        width: 100%;
+    }
+    
+    /* Ensure SERP tab is visible by default */
+    #serp-results {
+        display: block !important;
+    }
+    #serp-results.hidden {
+        display: none !important;
+    }
+    
+    /* Custom scrollbar for SERP results */
+    .custom-scrollbar::-webkit-scrollbar {
+        width: 8px;
+    }
+    
+    .custom-scrollbar::-webkit-scrollbar-track {
+        background: rgba(0, 0, 0, 0.1);
+        border-radius: 4px;
+    }
+    
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+        background: rgba(0, 0, 0, 0.3);
+        border-radius: 4px;
+    }
+    
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+        background: rgba(0, 0, 0, 0.5);
+    }
+    
     .stat-card {
         transition: all 0.3s ease;
     }
@@ -151,7 +184,9 @@
         <div class="card bg-base-100 shadow-sm border border-base-300">
             <div class="card-body">
                 <h2 class="card-title mb-4">Ranking History</h2>
-                <canvas id="rankingChart" width="400" height="200"></canvas>
+                <div class="chart-container">
+                    <canvas id="rankingChart"></canvas>
+                </div>
             </div>
         </div>
         
@@ -159,7 +194,9 @@
         <div class="card bg-base-100 shadow-sm border border-base-300">
             <div class="card-body">
                 <h2 class="card-title mb-4">Search Volume Analysis</h2>
-                <canvas id="volumeChart" width="400" height="200"></canvas>
+                <div class="chart-container">
+                    <canvas id="volumeChart"></canvas>
+                </div>
             </div>
         </div>
     </div>
@@ -181,25 +218,81 @@
             
             <!-- SERP Results Tab (visible by default) -->
             <div id="serp-results" class="tab-content p-6">
-                <h3 class="text-lg font-semibold mb-4">Top Search Results ({{ serp_results|length }} results)</h3>
+                <h3 class="text-lg font-semibold mb-4">
+                    Top Search Results 
+                    {% if serp_results %}({{ serp_results|length }} results){% endif %}
+                    {% if latest_rank and latest_rank.search_results_file %}
+                        <span class="text-xs text-base-content/60 ml-2">
+                            <i class="fas fa-clock"></i> {{ latest_rank.created_at|timesince }} ago
+                        </span>
+                    {% endif %}
+                </h3>
+                
+                {% if local_pack_results %}
+                <!-- Local Pack Results -->
+                <div class="mb-6">
+                    <h4 class="text-md font-semibold mb-3 flex items-center">
+                        <i class="fas fa-map-marker-alt mr-2 text-primary"></i>
+                        Local Pack Results
+                    </h4>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        {% for local in local_pack_results %}
+                        <div class="card bg-base-100 border border-base-300 p-4">
+                            <div class="font-medium">{{ local.title }}</div>
+                            {% if local.rating %}
+                            <div class="flex items-center gap-1 mt-1">
+                                <span class="text-yellow-500">★</span>
+                                <span class="text-sm">{{ local.rating }}</span>
+                                {% if local.reviews %}
+                                <span class="text-xs text-base-content/60">({{ local.reviews }} reviews)</span>
+                                {% endif %}
+                            </div>
+                            {% endif %}
+                            {% if local.address %}
+                            <div class="text-xs text-base-content/60 mt-1">{{ local.address }}</div>
+                            {% endif %}
+                            {% if local.website %}
+                            <a href="{{ local.website }}" target="_blank" class="text-xs text-primary hover:underline mt-1">
+                                Visit website
+                            </a>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+                
                 {% if serp_results %}
-                <div class="space-y-3">
+                <!-- Organic Results with Scrolling -->
+                <div class="max-h-[600px] overflow-y-auto pr-2 space-y-3 custom-scrollbar">
                     {% for result in serp_results %}
-                    <div class="serp-result p-4 rounded-lg border border-base-300">
+                    <div class="serp-result p-4 rounded-lg border {% if result.is_own_site %}border-primary-focus border-2 bg-primary/10 shadow-lg{% else %}border-base-300{% endif %}">
                         <div class="flex items-start gap-4">
-                            <span class="badge badge-lg">{{ result.position|default:forloop.counter }}</span>
+                            <span class="badge badge-lg {% if result.is_own_site %}badge-primary{% endif %}">
+                                {{ result.position|default:forloop.counter }}
+                            </span>
                             <div class="flex-1">
+                                {% if result.is_own_site %}
+                                <div class="flex items-center gap-2 mb-2">
+                                    <span class="badge badge-primary badge-sm">
+                                        <i class="fas fa-star mr-1"></i>YOUR SITE
+                                    </span>
+                                    <span class="text-xs text-primary font-semibold">{{ keyword.project.domain }}</span>
+                                </div>
+                                {% endif %}
                                 {% if result.url != '#' %}
-                                <a href="{{ result.url }}" target="_blank" class="text-primary font-medium hover:underline">
+                                <a href="{{ result.url }}" target="_blank" class="text-primary font-medium hover:underline {% if result.is_own_site %}text-lg font-bold{% endif %}">
                                     {{ result.title }}
                                 </a>
                                 <div class="text-sm text-base-content/60 mt-1">{{ result.url|truncatechars:80 }}</div>
                                 {% else %}
                                 <span class="font-medium">{{ result.title }}</span>
-                                <div class="text-sm text-base-content/60 mt-1">Local/Map Result</div>
+                                <div class="text-sm text-base-content/60 mt-1">Special Result</div>
                                 {% endif %}
-                                {% if result.description %}
-                                <div class="text-sm mt-2">{{ result.description|truncatechars:150 }}</div>
+                                {% if result.snippet %}
+                                <div class="text-sm mt-2 {% if result.is_own_site %}text-base-content{% else %}text-base-content/80{% endif %}">
+                                    {{ result.snippet|truncatechars:200 }}
+                                </div>
                                 {% endif %}
                             </div>
                         </div>
@@ -346,13 +439,23 @@
         event.target.classList.add('tab-active');
     }
     
-    // Initialize ranking chart
-    const ctx = document.getElementById('rankingChart');
-    const chartDates = {{ chart_dates|safe|default:'[]' }};
-    const chartRanks = {{ chart_ranks|safe|default:'[]' }};
-    
-    if (ctx) {
-        const rankingChart = new Chart(ctx.getContext('2d'), {
+    // Wait for page and Chart.js to load
+    window.addEventListener('DOMContentLoaded', function() {
+        // Ensure SERP Results tab is visible by default
+        const serpTab = document.getElementById('serp-results');
+        if (serpTab) {
+            serpTab.classList.remove('hidden');
+        }
+        // Hide other tabs
+        document.getElementById('competitors')?.classList.add('hidden');
+        document.getElementById('history')?.classList.add('hidden');
+        // Initialize ranking chart
+        const ctx = document.getElementById('rankingChart');
+        const chartDates = {{ chart_dates|safe|default:'[]' }};
+        const chartRanks = {{ chart_ranks|safe|default:'[]' }};
+        
+        if (ctx && typeof Chart !== 'undefined') {
+            const rankingChart = new Chart(ctx.getContext('2d'), {
         type: 'line',
         data: {
             labels: chartDates.length > 0 ? chartDates : ['No Data'],
@@ -401,12 +504,12 @@
             }
         }
     });
-    }
-    
-    // Initialize volume chart (placeholder)
-    const volumeCtx = document.getElementById('volumeChart');
-    if (volumeCtx) {
-        const volumeChart = new Chart(volumeCtx.getContext('2d'), {
+        }
+        
+        // Initialize volume chart (placeholder)
+        const volumeCtx = document.getElementById('volumeChart');
+        if (volumeCtx && typeof Chart !== 'undefined') {
+            const volumeChart = new Chart(volumeCtx.getContext('2d'), {
         type: 'bar',
         data: {
             labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
@@ -431,6 +534,7 @@
             }
         }
     });
-    }
+        }
+    }); // End of DOMContentLoaded
 </script>
 {% endblock %}
