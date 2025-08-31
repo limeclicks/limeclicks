@@ -87,10 +87,10 @@
                         hx-post="{% url 'keywords:api_force_crawl' keyword.id %}"
                         hx-trigger="click"
                         hx-swap="none"
-                        hx-confirm="Force crawl this keyword now?"
+                        hx-on::after-request="handleRecheckResponse(event)"
                     >
                         <i class="fas fa-sync"></i>
-                        Force Crawl
+                        Re-Check Rank
                     </button>
                 </li>
                 <li>

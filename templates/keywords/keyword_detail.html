@@ -112,10 +112,10 @@
                     hx-post="{% url 'keywords:api_force_crawl' keyword.id %}"
                     hx-trigger="click"
                     hx-swap="none"
-                    hx-confirm="Force crawl this keyword now?"
+                    hx-on::after-request="handleRecheckResponse(event)"
                 >
                     <i class="fas fa-sync mr-2"></i>
-                    Force Crawl
+                    Re-Check Rank
                 </button>
                 <button class="btn btn-ghost">
                     <i class="fas fa-cog"></i>
@@ -463,6 +463,150 @@
 </div>
 
 <script>
+// Handle Re-Check Rank response
+function handleRecheckResponse(event) {
+    const response = event.detail.xhr.response;
+    try {
+        const data = JSON.parse(response);
+        if (data.success) {
+            // Show success message
+            showNotification('Rank re-check initiated successfully. Page will refresh when complete.', 'success');
+            // Update the button to show processing state
+            const button = event.target;
+            button.disabled = true;
+            button.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Checking...';
+            
+            // Reload the page after 10 seconds to show updated data
+            setTimeout(() => {
+                window.location.reload();
+            }, 10000);
+            
+            // Also start polling for faster updates
+            pollForUpdates({{ keyword.id }});
+            
+        } else {
+            // Show error message
+            showNotification(data.message || 'Unable to re-check rank. Please try again later.', 'error');
+        }
+    } catch (e) {
+        showNotification('An error occurred. Please try again.', 'error');
+    }
+}
+
+// Poll for keyword updates
+function pollForUpdates(keywordId) {
+    let pollCount = 0;
+    const maxPolls = 30; // Poll for max 30 seconds
+    
+    const pollInterval = setInterval(() => {
+        fetch(`/keywords/api/keyword/${keywordId}/status/`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && !data.processing) {
+                    // Update has completed
+                    clearInterval(pollInterval);
+                    updateKeywordDisplay(data);
+                    showNotification('Rank check completed!', 'success');
+                } else if (pollCount >= maxPolls) {
+                    // Stop polling after max attempts
+                    clearInterval(pollInterval);
+                }
+                pollCount++;
+            })
+            .catch(error => {
+                console.error('Polling error:', error);
+                clearInterval(pollInterval);
+            });
+    }, 1000); // Poll every second
+}
+
+// Update the keyword display with new data
+function updateKeywordDisplay(data) {
+    console.log('Updating display with data:', data);
+    
+    // Update current rank with change indicator
+    const currentRankCard = document.querySelector('.stat-card:first-child');
+    if (currentRankCard) {
+        const rankElement = currentRankCard.querySelector('.text-3xl');
+        if (rankElement) {
+            let rankHtml = '';
+            if (data.rank > 0 && data.rank <= 100) {
+                rankHtml = `#${data.rank}`;
+                rankElement.className = 'text-3xl font-bold text-success';
+            } else {
+                rankHtml = 'NR';
+                rankElement.className = 'text-3xl font-bold text-error';
+            }
+            
+            // Add change indicator if rank changed
+            if (data.rank_change && data.rank_change !== 0) {
+                if (data.rank_change > 0) {
+                    rankHtml += ` <span class="text-sm text-success">↑${Math.abs(data.rank_change)}</span>`;
+                } else {
+                    rankHtml += ` <span class="text-sm text-error">↓${Math.abs(data.rank_change)}</span>`;
+                }
+            }
+            rankElement.innerHTML = rankHtml;
+        }
+    }
+    
+    // Update best rank if needed
+    const bestRankElement = document.querySelector('.stat-card:nth-child(2) .text-2xl');
+    if (bestRankElement && data.best_rank !== undefined) {
+        if (data.best_rank > 0 && data.best_rank <= 100) {
+            bestRankElement.innerHTML = `#${data.best_rank}`;
+        } else {
+            bestRankElement.innerHTML = 'NR';
+        }
+    }
+    
+    // Update last checked time
+    const lastCheckedElement = document.querySelector('.stat-card:last-child .text-2xl');
+    if (lastCheckedElement && data.time_since) {
+        if (data.time_since === 'Never') {
+            lastCheckedElement.innerHTML = 'Never';
+        } else {
+            lastCheckedElement.innerHTML = 'Just now';
+        }
+    }
+    
+    // Show completion notification with rank change info
+    let message = 'Rank check completed! ';
+    if (data.rank_change && data.rank_change !== 0) {
+        if (data.rank_change > 0) {
+            message += `Rank improved by ${Math.abs(data.rank_change)} positions!`;
+        } else {
+            message += `Rank dropped by ${Math.abs(data.rank_change)} positions.`;
+        }
+    } else {
+        message += 'No rank change.';
+    }
+    showNotification(message, data.rank_change > 0 ? 'success' : 'info');
+    
+    // Refresh the page after a short delay to update all data (charts, SERP results, etc.)
+    setTimeout(() => {
+        window.location.reload();
+    }, 3000);
+}
+
+// Show notification
+function showNotification(message, type = 'info') {
+    // Create toast notification
+    const toast = document.createElement('div');
+    toast.className = `alert alert-${type === 'success' ? 'success' : type === 'error' ? 'error' : 'info'} fixed top-4 right-4 z-50 max-w-sm shadow-lg`;
+    toast.innerHTML = `
+        <div>
+            <span>${message}</span>
+        </div>
+    `;
+    document.body.appendChild(toast);
+    
+    // Auto remove after 5 seconds
+    setTimeout(() => {
+        toast.remove();
+    }, 5000);
+}
+
 // Function to view historical SERP data
 function viewHistoricalSERP(rankId, date, position) {
     const modal = document.getElementById('historicalSerpModal');

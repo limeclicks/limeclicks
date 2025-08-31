@@ -628,6 +628,54 @@ def api_untag_keyword(request, keyword_id, tag_id):
 
 
 @login_required
+def api_keyword_status(request, keyword_id):
+    """
+    Get current status of a keyword (rank, processing state, last checked)
+    """
+    try:
+        keyword = Keyword.objects.get(
+            id=keyword_id,
+            project__user=request.user
+        )
+        
+        # Calculate best rank from history
+        from .models import Rank
+        ranks_with_data = Rank.objects.filter(
+            keyword=keyword,
+            rank__gt=0,
+            rank__lte=100
+        ).values_list('rank', flat=True)
+        
+        best_rank = min(ranks_with_data) if ranks_with_data else (keyword.rank if 0 < keyword.rank <= 100 else 0)
+        
+        return create_ajax_response(
+            success=True,
+            data={
+                'keyword_id': keyword.id,
+                'keyword': keyword.keyword,
+                'rank': keyword.rank,
+                'best_rank': best_rank,
+                'rank_change': keyword.rank_diff_from_last_time,
+                'rank_status': keyword.rank_status,
+                'processing': keyword.processing,
+                'scraped_at': keyword.scraped_at.isoformat() if keyword.scraped_at else None,
+                'last_checked': keyword.scraped_at.strftime('%Y-%m-%d %H:%M:%S') if keyword.scraped_at else 'Never',
+                'time_since': keyword.scraped_at.strftime('%Y-%m-%d %H:%M') if keyword.scraped_at else 'Never'
+            }
+        )
+    except Keyword.DoesNotExist:
+        return create_ajax_response(
+            success=False,
+            message="Keyword not found"
+        )
+    except Exception as e:
+        logger.error(f"Error getting keyword status {keyword_id}: {e}")
+        return create_ajax_response(
+            success=False,
+            message=str(e)
+        )
+
+@login_required
 @require_http_methods(["POST"])
 def api_force_crawl(request, keyword_id):
     """

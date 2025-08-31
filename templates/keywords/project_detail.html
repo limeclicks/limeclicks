@@ -498,10 +498,10 @@
                                                     hx-post="{% url 'keywords:api_force_crawl' keyword.id %}"
                                                     hx-trigger="click"
                                                     hx-swap="none"
-                                                    hx-confirm="Force crawl this keyword now?"
+                                                    hx-on::after-request="handleRecheckResponse(event)"
                                                 >
                                                     <i class="fas fa-sync"></i>
-                                                    Force Crawl
+                                                    Re-Check Rank
                                                 </button>
                                             </li>
                                             <li>
@@ -815,6 +815,49 @@
             }
         }
     });
+    
+    // Handle Re-Check Rank response
+    function handleRecheckResponse(event) {
+        const response = event.detail.xhr.response;
+        try {
+            const data = JSON.parse(response);
+            if (data.success) {
+                // Show success message
+                showNotification('Rank re-check initiated successfully', 'success');
+                // Update the keyword row to show processing state
+                const row = event.target.closest('tr');
+                if (row) {
+                    const rankCell = row.querySelector('.rank-cell');
+                    if (rankCell) {
+                        rankCell.innerHTML = '<span class="badge badge-ghost gap-1"><span class="loading loading-spinner loading-xs"></span>Checking</span>';
+                    }
+                }
+            } else {
+                // Show error message
+                showNotification(data.message || 'Unable to re-check rank. Please try again later.', 'error');
+            }
+        } catch (e) {
+            showNotification('An error occurred. Please try again.', 'error');
+        }
+    }
+    
+    // Show notification
+    function showNotification(message, type = 'info') {
+        // Create toast notification
+        const toast = document.createElement('div');
+        toast.className = `alert alert-${type === 'success' ? 'success' : type === 'error' ? 'error' : 'info'} fixed top-4 right-4 z-50 max-w-sm shadow-lg`;
+        toast.innerHTML = `
+            <div>
+                <span>${message}</span>
+            </div>
+        `;
+        document.body.appendChild(toast);
+        
+        // Auto remove after 5 seconds
+        setTimeout(() => {
+            toast.remove();
+        }, 5000);
+    }
     
     // SSE for real-time updates
     let eventSource = null;
