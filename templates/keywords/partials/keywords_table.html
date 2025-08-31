@@ -1,0 +1,127 @@
+{% if keywords %}
+<div class="overflow-x-auto">
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Keyword</th>
+                <th class="text-center">Current Rank</th>
+                <th class="text-center">Change</th>
+                <th>Country</th>
+                <th>Last Checked</th>
+                <th class="text-right">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for keyword in keywords %}
+            <tr class="keyword-row">
+                <td>
+                    <div class="font-medium">{{ keyword.keyword }}</div>
+                    {% if keyword.rank_url %}
+                    <a href="{{ keyword.rank_url }}" target="_blank" class="text-xs text-primary hover:underline">
+                        <i class="fas fa-external-link-alt mr-1"></i>View SERP
+                    </a>
+                    {% endif %}
+                </td>
+                <td class="text-center">
+                    {% if keyword.rank > 0 and keyword.rank <= 100 %}
+                        <span class="badge rank-badge 
+                            {% if keyword.rank == 1 %}rank-1{% elif keyword.rank == 2 %}rank-2{% elif keyword.rank == 3 %}rank-3{% elif keyword.rank <= 10 %}rank-top10{% elif keyword.rank <= 30 %}rank-top30{% elif keyword.rank <= 50 %}rank-top50{% else %}rank-top100{% endif %}">
+                            #{{ keyword.rank }}
+                        </span>
+                    {% else %}
+                        <span class="badge rank-badge rank-none">NR</span>
+                    {% endif %}
+                </td>
+                <td class="text-center">
+                    {% if keyword.rank_diff_from_last_time != 0 %}
+                        <span class="flex items-center justify-center gap-1">
+                            {% if keyword.rank_diff_from_last_time > 0 %}
+                                <i class="fas fa-arrow-up text-xs rank-change-up"></i>
+                                <span class="text-sm font-semibold rank-change-up">+{{ keyword.rank_diff_from_last_time }}</span>
+                            {% else %}
+                                <i class="fas fa-arrow-down text-xs rank-change-down"></i>
+                                <span class="text-sm font-semibold rank-change-down">{{ keyword.rank_diff_from_last_time }}</span>
+                            {% endif %}
+                        </span>
+                    {% else %}
+                        <span class="text-base-content/40">-</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <span class="badge badge-ghost">{{ keyword.country }}</span>
+                </td>
+                <td>
+                    {% if keyword.scraped_at %}
+                        <span class="text-sm">{{ keyword.scraped_at|timesince }} ago</span>
+                    {% else %}
+                        <span class="text-sm text-base-content/40">Never</span>
+                    {% endif %}
+                </td>
+                <td class="text-right">
+                    <div class="dropdown dropdown-end">
+                        <button tabindex="0" class="btn btn-ghost btn-sm">
+                            <i class="fas fa-ellipsis-v"></i>
+                        </button>
+                        <ul tabindex="0" class="dropdown-content z-[1] menu p-2 shadow bg-base-100 rounded-box w-52 border">
+                            <li>
+                                <button 
+                                    hx-post="{% url 'keywords:api_force_crawl' keyword.id %}"
+                                    hx-trigger="click"
+                                    hx-swap="none"
+                                    hx-confirm="Force crawl this keyword now?"
+                                >
+                                    <i class="fas fa-sync"></i>
+                                    Force Crawl
+                                </button>
+                            </li>
+                            <li>
+                                <a href="#" class="text-error">
+                                    <i class="fas fa-trash"></i>
+                                    Delete
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% if has_next %}
+<!-- Pagination -->
+<div class="p-4 border-t">
+    <button 
+        class="btn btn-primary btn-outline btn-sm w-full"
+        hx-get="{% url 'keywords:project_keywords' project.id %}?page={{ next_page }}"
+        hx-trigger="click"
+        hx-target="#keywords-table tbody"
+        hx-select="tbody tr"
+        hx-swap="beforeend"
+    >
+        Load More Keywords
+    </button>
+</div>
+{% endif %}
+
+{% else %}
+<!-- Empty State -->
+<div class="p-12 text-center">
+    <div class="w-20 h-20 bg-base-200 rounded-full flex items-center justify-center mx-auto mb-4">
+        <i class="fas fa-key text-2xl text-base-content/40"></i>
+    </div>
+    <h3 class="text-lg font-semibold mb-2">No Keywords Yet</h3>
+    <p class="text-base-content/60 mb-6">Add keywords to start tracking rankings for this project.</p>
+    <button 
+        hx-get="{% url 'keywords:add_keyword_modal' %}?project_id={{ project.id }}"
+        hx-trigger="click"
+        hx-target="#modal-container"
+        hx-swap="innerHTML"
+        class="btn btn-primary"
+    >
+        <i class="fas fa-plus mr-2"></i>
+        Add Your First Keywords
+    </button>
+</div>
+{% endif %}

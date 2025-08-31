@@ -1,0 +1,545 @@
+<!-- Add Keywords Modal - Multi-step -->
+<dialog id="add-keywords-modal" class="modal">
+    <div class="modal-box max-w-4xl">
+        <form method="post" id="add-keywords-form" hx-post="{% url 'keywords:add_keywords' %}" hx-trigger="submit"
+            hx-swap="none" hx-indicator="#submit-spinner" enctype="multipart/form-data">
+            {% csrf_token %}
+
+            <!-- Modal Header -->
+            <div class="flex items-center justify-between mb-6">
+                <h3 class="font-bold text-xl">
+                    <span>Add Keywords</span>
+                    <span id="project-domain-header" class="hidden">
+                        (<span id="selected-project-domain"></span>)
+                    </span>
+                </h3>
+                <button type="button" class="btn btn-sm btn-circle btn-ghost" onclick="closeModal()">✕</button>
+            </div>
+
+            <!-- Progress Steps -->
+            <ul class="steps steps-horizontal w-full mb-6">
+                <li class="step step-primary" id="step-1-indicator">
+                    <span class="hidden md:inline">1</span>
+                    Select Project
+                </li>
+                <li class="step" id="step-2-indicator">
+                    <span class="hidden md:inline">2</span>
+                    Add Keywords & Country
+                </li>
+            </ul>
+
+            <!-- Step 1: Project Selection -->
+            <div id="step-1" class="step-content">
+                <div class="form-control">
+                    <label class="label">
+                        <span class="label-text">Select Project <span class="text-error">*</span></span>
+                    </label>
+                    <select name="project_id" id="project-select" class="select select-bordered w-full" required>
+                        <option value="" disabled {% if not request.GET.project_id %}selected{% endif %}>Choose a
+                            project...</option>
+                        {% for project in projects %}
+                        <option value="{{ project.id }}" data-domain="{{ project.domain }}" {% if request.GET.project_id == project.id|stringformat:"s" %}selected{% endif %}>
+                            {% if project.name and project.name != project.domain %}
+                            {{ project.name }} ({{ project.domain }})
+                            {% else %}
+                            {{ project.domain }}
+                            {% endif %}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="modal-action">
+                    <button type="button" class="btn btn-ghost" onclick="closeModal()">
+                        Cancel
+                    </button>
+                    <button type="button" class="btn btn-primary" onclick="goToStep2()" id="next-btn">
+                        Next
+                        <i class="fas fa-arrow-right ml-1"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Step 2: Keywords & Country -->
+            <div id="step-2" class="step-content hidden">
+                <!-- Keyword Counter Badge -->
+                <div class="bg-base-200 rounded-lg p-3 mb-4">
+                    <div class="flex justify-between items-center">
+                        <span class="text-sm font-medium text-base-content/70">Keyword Summary</span>
+                        <div class="badge badge-primary badge-lg gap-2">
+                            <span id="total-keywords-count" class="font-bold">0</span>
+                            <span>keywords will be added</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Country Selection -->
+                <div class="form-control mb-4">
+                    <label class="label">
+                        <span class="label-text">Country <span class="text-error">*</span></span>
+                        <span class="label-text-alt text-warning">
+                            <i class="fas fa-info-circle mr-1"></i>
+                            Multiple selections will create keywords for each country
+                        </span>
+                    </label>
+                    <div class="card border border-base-300 max-h-48 overflow-y-auto">
+                        <div class="card-body p-4">
+                            <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+                                <!-- Popular Countries -->
+                                <label class="flex items-center gap-2 cursor-pointer">
+                                    <input type="checkbox" name="countries" value="US" class="checkbox checkbox-sm"
+                                        checked>
+                                    <span class="flex items-center gap-1">
+                                        <span>🇺🇸</span>
+                                        <span class="text-sm">United States</span>
+                                    </span>
+                                </label>
+                                <label class="flex items-center gap-2 cursor-pointer">
+                                    <input type="checkbox" name="countries" value="GB" class="checkbox checkbox-sm">
+                                    <span class="flex items-center gap-1">
+                                        <span>🇬🇧</span>
+                                        <span class="text-sm">United Kingdom</span>
+                                    </span>
+                                </label>
+                                <label class="flex items-center gap-2 cursor-pointer">
+                                    <input type="checkbox" name="countries" value="CA" class="checkbox checkbox-sm">
+                                    <span class="flex items-center gap-1">
+                                        <span>🇨🇦</span>
+                                        <span class="text-sm">Canada</span>
+                                    </span>
+                                </label>
+                                <label class="flex items-center gap-2 cursor-pointer">
+                                    <input type="checkbox" name="countries" value="AU" class="checkbox checkbox-sm">
+                                    <span class="flex items-center gap-1">
+                                        <span>🇦🇺</span>
+                                        <span class="text-sm">Australia</span>
+                                    </span>
+                                </label>
+                                <label class="flex items-center gap-2 cursor-pointer">
+                                    <input type="checkbox" name="countries" value="IN" class="checkbox checkbox-sm">
+                                    <span class="flex items-center gap-1">
+                                        <span>🇮🇳</span>
+                                        <span class="text-sm">India</span>
+                                    </span>
+                                </label>
+                                <label class="flex items-center gap-2 cursor-pointer">
+                                    <input type="checkbox" name="countries" value="DE" class="checkbox checkbox-sm">
+                                    <span class="flex items-center gap-1">
+                                        <span>🇩🇪</span>
+                                        <span class="text-sm">Germany</span>
+                                    </span>
+                                </label>
+                                <label class="flex items-center gap-2 cursor-pointer">
+                                    <input type="checkbox" name="countries" value="FR" class="checkbox checkbox-sm">
+                                    <span class="flex items-center gap-1">
+                                        <span>🇫🇷</span>
+                                        <span class="text-sm">France</span>
+                                    </span>
+                                </label>
+                                <label class="flex items-center gap-2 cursor-pointer">
+                                    <input type="checkbox" name="countries" value="ES" class="checkbox checkbox-sm">
+                                    <span class="flex items-center gap-1">
+                                        <span>🇪🇸</span>
+                                        <span class="text-sm">Spain</span>
+                                    </span>
+                                </label>
+                                <label class="flex items-center gap-2 cursor-pointer">
+                                    <input type="checkbox" name="countries" value="IT" class="checkbox checkbox-sm">
+                                    <span class="flex items-center gap-1">
+                                        <span>🇮🇹</span>
+                                        <span class="text-sm">Italy</span>
+                                    </span>
+                                </label>
+                                <label class="flex items-center gap-2 cursor-pointer">
+                                    <input type="checkbox" name="countries" value="BR" class="checkbox checkbox-sm">
+                                    <span class="flex items-center gap-1">
+                                        <span>🇧🇷</span>
+                                        <span class="text-sm">Brazil</span>
+                                    </span>
+                                </label>
+                                <label class="flex items-center gap-2 cursor-pointer">
+                                    <input type="checkbox" name="countries" value="MX" class="checkbox checkbox-sm">
+                                    <span class="flex items-center gap-1">
+                                        <span>🇲🇽</span>
+                                        <span class="text-sm">Mexico</span>
+                                    </span>
+                                </label>
+                                <label class="flex items-center gap-2 cursor-pointer">
+                                    <input type="checkbox" name="countries" value="JP" class="checkbox checkbox-sm">
+                                    <span class="flex items-center gap-1">
+                                        <span>🇯🇵</span>
+                                        <span class="text-sm">Japan</span>
+                                    </span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab Navigation for Input Method -->
+                <div class="tabs tabs-boxed mb-4 bg-base-200">
+                    <a class="tab tab-lg tab-active flex-1 gap-2" onclick="showInputMethod('manual')">
+                        <i class="fas fa-keyboard"></i>
+                        <span class="font-semibold">Manual Input</span>
+                    </a>
+                    <a class="tab tab-lg flex-1 gap-2" onclick="showInputMethod('file')">
+                        <i class="fas fa-file-upload"></i>
+                        <span class="font-semibold">CSV/Excel Upload</span>
+                    </a>
+                </div>
+
+                <!-- Manual Input -->
+                <div id="manual-input" class="input-method">
+                    <div class="form-control mb-4">
+                        <label class="label">
+                            <span class="label-text text-base font-semibold">
+                                Add Keywords <span class="text-error">*</span>
+                                <span class="text-sm font-normal text-base-content/60 ml-2">(Press enter after each
+                                    keyword)</span>
+                            </span>
+                        </label>
+                        <textarea name="keywords" id="keywords-input"
+                            class="textarea textarea-bordered h-48 font-mono text-sm w-full"
+                            placeholder="best seo tools&#10;digital marketing agency&#10;web design services&#10;keyword research tool&#10;content marketing strategy"
+                            oninput="updateKeywordCount()"></textarea>
+                        <label class="label">
+                            <span class="label-text-alt text-success">
+                                <i class="fas fa-check-circle mr-1"></i>
+                                <span id="keyword-count">0</span> keywords
+                            </span>
+                            <span class="label-text-alt text-info">
+                                <i class="fas fa-info-circle mr-1"></i>One keyword per line
+                            </span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- File Upload -->
+                <div id="file-input" class="input-method hidden">
+                    <div class="form-control mb-4">
+                        <label class="label flex-col items-start">
+                            <span class="label-text text-base font-semibold mb-1">
+                                Upload CSV/Excel File
+                            </span>
+                            <span class="label-text-alt text-sm text-base-content/60">
+                                File should contain one keyword per row
+                            </span>
+                        </label>
+                        <div class="w-full">
+                            <input type="file" name="keywords_file" accept=".csv,.xlsx,.xls"
+                                class="file-input file-input-bordered file-input-primary w-full"
+                                onchange="handleFileSelect(this)">
+                        </div>
+                    </div>
+
+                    <!-- File preview -->
+                    <div id="file-preview" class="hidden mb-4">
+                        <div class="alert alert-info">
+                            <i class="fas fa-file-excel mr-2"></i>
+                            <div>
+                                <p class="font-semibold">File selected: <span id="file-name"></span></p>
+                                <p class="text-sm"><span id="file-keywords-count">0</span> keywords detected</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Download template -->
+                    <div class="mb-4">
+                        <a href="#" class="btn btn-ghost btn-sm" onclick="downloadTemplate()">
+                            <i class="fas fa-download mr-2"></i>
+                            Download CSV Template
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Error message -->
+                <div id="error-message" class="alert alert-error hidden mb-4">
+                    <i class="fas fa-exclamation-circle"></i>
+                    <span id="error-text">Please add at least one keyword</span>
+                </div>
+
+                <!-- Modal Actions -->
+                <div class="modal-action">
+                    <button type="button" class="btn btn-ghost" onclick="goToStep1()">
+                        <i class="fas fa-arrow-left mr-1"></i>
+                        Back
+                    </button>
+                    <button type="submit" class="btn btn-primary" id="submit-btn" onclick="return validateForm()">
+                        <span id="submit-text">Add Keywords</span>
+                        <span id="submit-spinner" class="htmx-indicator">
+                            <span class="loading loading-spinner loading-sm ml-2"></span>
+                        </span>
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- Modal Backdrop -->
+    <form method="dialog" class="modal-backdrop">
+        <button type="button" onclick="closeModal()">close</button>
+    </form>
+</dialog>
+
+<script>
+    // Auto-open the modal when loaded
+    (function() {
+        try {
+            const modal = document.getElementById('add-keywords-modal');
+            if (!modal) {
+                console.error('Add Keywords modal element not found');
+                return;
+            }
+            
+            if (typeof modal.showModal !== 'function') {
+                console.error('showModal function not available. Browser may not support dialog element.');
+                // Fallback: show modal using class
+                modal.classList.add('modal-open');
+                return;
+            }
+            
+            // Small delay to ensure everything is rendered
+            setTimeout(() => {
+                try {
+                    modal.showModal();
+                    console.log('Add Keywords modal opened successfully');
+                } catch (err) {
+                    console.error('Error opening modal:', err);
+                    // Fallback: show modal using class
+                    modal.classList.add('modal-open');
+                }
+            }, 50);
+        } catch (error) {
+            console.error('Error in modal initialization:', error);
+        }
+    })();
+
+    // Track current step
+    let currentStep = 1;
+
+    // Close modal function
+    function closeModal() {
+        const modal = document.getElementById('add-keywords-modal');
+        if (modal) {
+            modal.close();
+            // Remove the modal from DOM after closing
+            setTimeout(() => {
+                const modalContainer = document.getElementById('modal-container');
+                if (modalContainer) {
+                    modalContainer.innerHTML = '';
+                }
+            }, 100);
+        }
+    }
+
+    // Step navigation functions
+    function goToStep1() {
+        document.getElementById('step-1').classList.remove('hidden');
+        document.getElementById('step-2').classList.add('hidden');
+        document.getElementById('step-1-indicator').classList.add('step-primary');
+        document.getElementById('step-2-indicator').classList.remove('step-primary');
+        document.getElementById('project-domain-header').classList.add('hidden');
+        currentStep = 1;
+    }
+
+    function goToStep2() {
+        const projectSelect = document.getElementById('project-select');
+        if (!projectSelect.value) {
+            alert('Please select a project first');
+            return;
+        }
+
+        // Get selected project domain
+        const selectedOption = projectSelect.options[projectSelect.selectedIndex];
+        const domain = selectedOption.getAttribute('data-domain') || selectedOption.text.trim();
+
+        // Update header with project domain
+        document.getElementById('selected-project-domain').textContent = domain;
+        document.getElementById('project-domain-header').classList.remove('hidden');
+
+        document.getElementById('step-1').classList.add('hidden');
+        document.getElementById('step-2').classList.remove('hidden');
+        document.getElementById('step-1-indicator').classList.add('step-primary');
+        document.getElementById('step-2-indicator').classList.add('step-primary');
+        currentStep = 2;
+
+        // Update keyword count
+        updateKeywordCount();
+    }
+
+    // Input method switching
+    function showInputMethod(method) {
+        const tabs = document.querySelectorAll('.tabs .tab');
+        tabs.forEach(tab => tab.classList.remove('tab-active'));
+
+        if (method === 'manual') {
+            document.getElementById('manual-input').classList.remove('hidden');
+            document.getElementById('file-input').classList.add('hidden');
+            tabs[0].classList.add('tab-active');
+            // Clear file input when switching to manual
+            const fileInput = document.querySelector('input[name="keywords_file"]');
+            if (fileInput) fileInput.value = '';
+            document.getElementById('file-preview').classList.add('hidden');
+        } else {
+            document.getElementById('manual-input').classList.add('hidden');
+            document.getElementById('file-input').classList.remove('hidden');
+            tabs[1].classList.add('tab-active');
+        }
+        updateKeywordCount();
+    }
+
+    // Update keyword count with country multiplication
+    function updateKeywordCount() {
+        const textarea = document.getElementById('keywords-input');
+        const fileInput = document.querySelector('input[name="keywords_file"]');
+        const activeTab = document.querySelector('.tab.tab-active');
+
+        let keywordCount = 0;
+
+        // Count keywords based on active input method
+        if (activeTab && activeTab.textContent.includes('Manual')) {
+            // Manual input - count non-empty lines
+            const lines = textarea.value.split('\n')
+                .map(line => line.trim())
+                .filter(line => line !== '');
+            keywordCount = lines.length;
+
+            // Update the small counter below textarea
+            document.getElementById('keyword-count').textContent = keywordCount;
+        } else if (fileInput && fileInput.files.length > 0) {
+            // File input - use the file keywords count
+            const fileCount = document.getElementById('file-keywords-count');
+            if (fileCount) {
+                keywordCount = parseInt(fileCount.textContent) || 0;
+            }
+        }
+
+        // Count selected countries
+        const selectedCountries = document.querySelectorAll('input[name="countries"]:checked').length;
+
+        // Calculate total keywords (keywords × countries)
+        const totalKeywords = keywordCount * Math.max(1, selectedCountries);
+
+        // Update the main counter badge
+        document.getElementById('total-keywords-count').textContent = totalKeywords;
+
+        // Update button state
+        const submitBtn = document.querySelector('button[type="submit"]');
+        if (submitBtn) {
+            if (keywordCount === 0) {
+                submitBtn.disabled = true;
+                submitBtn.classList.add('btn-disabled');
+            } else {
+                submitBtn.disabled = false;
+                submitBtn.classList.remove('btn-disabled');
+            }
+        }
+    }
+
+    // Listen for country checkbox changes
+    document.querySelectorAll('input[name="countries"]').forEach(checkbox => {
+        checkbox.addEventListener('change', updateKeywordCount);
+    });
+
+    // Handle file selection
+    function handleFileSelect(input) {
+        const file = input.files[0];
+        if (file) {
+            document.getElementById('file-preview').classList.remove('hidden');
+            document.getElementById('file-name').textContent = file.name;
+
+            // Read file to count keywords (simplified - actual implementation would parse CSV/Excel)
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                const lines = e.target.result.split('\n')
+                    .map(line => line.trim())
+                    .filter(line => line !== '' && line.toLowerCase() !== 'keyword');
+                document.getElementById('file-keywords-count').textContent = lines.length;
+                updateKeywordCount(); // Update total count
+            };
+            reader.readAsText(file);
+        }
+    }
+
+    // Download CSV template
+    function downloadTemplate() {
+        const csvContent = "keyword\nseo tools\nkeyword research\nrank tracking\nbacklink analysis\nsite audit";
+        const blob = new Blob([csvContent], { type: 'text/csv' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'keywords_template.csv';
+        a.click();
+        window.URL.revokeObjectURL(url);
+    }
+
+    // Listen for the keywordsAdded event to close the modal
+    document.body.addEventListener('keywordsAdded', function (evt) {
+        closeModal();
+        // Show success notification
+        const notification = document.createElement('div');
+        notification.className = 'alert alert-success fixed top-20 right-4 z-50 shadow-lg max-w-sm';
+        notification.innerHTML = `
+            <i class="fas fa-check-circle"></i>
+            <span>Keywords added successfully!</span>
+        `;
+        document.body.appendChild(notification);
+        setTimeout(() => {
+            notification.remove();
+            // Reload the page or table to show new keywords
+            if (window.location.pathname.includes('/project/')) {
+                htmx.ajax('GET', window.location.href, {
+                    target: '#keywords-table',
+                    swap: 'innerHTML'
+                });
+            }
+        }, 3000);
+    });
+
+    // Form validation
+    function validateForm() {
+        const activeTab = document.querySelector('.tab.tab-active');
+        const errorMessage = document.getElementById('error-message');
+        const errorText = document.getElementById('error-text');
+
+        // Check if keywords are provided
+        if (activeTab && activeTab.textContent.includes('Manual')) {
+            const textarea = document.getElementById('keywords-input');
+            const keywords = textarea.value.trim();
+            if (!keywords) {
+                errorMessage.classList.remove('hidden');
+                errorText.textContent = 'Please add at least one keyword';
+                return false;
+            }
+        } else {
+            const fileInput = document.querySelector('input[name="keywords_file"]');
+            if (!fileInput || !fileInput.files.length) {
+                errorMessage.classList.remove('hidden');
+                errorText.textContent = 'Please select a file to upload';
+                return false;
+            }
+        }
+
+        // Check if at least one country is selected
+        const selectedCountries = document.querySelectorAll('input[name="countries"]:checked');
+        if (selectedCountries.length === 0) {
+            errorMessage.classList.remove('hidden');
+            errorText.textContent = 'Please select at least one country';
+            return false;
+        }
+
+        errorMessage.classList.add('hidden');
+        return true;
+    }
+
+    // Initialize keyword count on modal open
+    updateKeywordCount();
+
+    // Pre-select project if provided
+    {% if request.GET.project_id %}
+    // Auto-advance to step 2 if project is pre-selected
+    setTimeout(() => {
+        goToStep2();
+    }, 100);
+    {% endif %}
+</script>

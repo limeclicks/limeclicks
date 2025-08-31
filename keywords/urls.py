@@ -4,6 +4,12 @@ from . import views
 app_name = 'keywords'
 
 urlpatterns = [
+    # Main list view
+    path('', views.keywords_list, name='list'),
+    path('project/<int:project_id>/', views.project_keywords, name='project_keywords'),
+    path('add-modal/', views.add_keyword_modal, name='add_keyword_modal'),
+    path('add/', views.add_keywords, name='add_keywords'),
+    
     # Tag views
     path('tags/', views.user_tags, name='user_tags'),
     path('tags/<slug:tag_slug>/', views.keywords_by_tag, name='keywords_by_tag'),

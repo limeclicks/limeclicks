@@ -1,0 +1,113 @@
+<div class="keyword-card card bg-base-100 shadow-sm border border-base-300 hover:shadow-lg transition-all duration-300 cursor-pointer" id="project-card-{{ item.project.id }}" onclick="window.location.href='{% url 'keywords:project_keywords' item.project.id %}'">
+    <div class="card-body p-6">
+        <!-- Project Header -->
+        <div class="flex items-start justify-between mb-4">
+            <div class="flex-1">
+                <h3 class="text-lg font-bold text-base-content">
+                    {{ item.project.name|default:item.project.domain }}
+                </h3>
+                <p class="text-sm text-base-content/60 mt-1">{{ item.project.domain }}</p>
+            </div>
+            
+            <!-- Health Status Badge -->
+            {% if item.health_status == 'healthy' %}
+                <div class="badge badge-success gap-1">
+                    <i class="fas fa-check-circle text-xs"></i>
+                    Healthy
+                </div>
+            {% elif item.health_status == 'attention' %}
+                <div class="badge badge-warning gap-1">
+                    <i class="fas fa-exclamation-triangle text-xs"></i>
+                    Needs Attention
+                </div>
+            {% elif item.health_status == 'critical' %}
+                <div class="badge badge-error gap-1">
+                    <i class="fas fa-times-circle text-xs"></i>
+                    Critical
+                </div>
+            {% else %}
+                <div class="badge badge-ghost gap-1">
+                    <i class="fas fa-plus-circle text-xs"></i>
+                    New
+                </div>
+            {% endif %}
+        </div>
+        
+        <!-- Statistics Grid -->
+        <div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
+            <div class="text-center">
+                <p class="text-2xl font-bold text-base-content">{{ item.stats.total_keywords|default:0 }}</p>
+                <p class="text-xs text-base-content/60">Total</p>
+            </div>
+            <div class="text-center">
+                <p class="text-2xl font-bold text-success">{{ item.stats.top10_count|default:0 }}</p>
+                <p class="text-xs text-base-content/60">Top 10</p>
+            </div>
+            <div class="text-center">
+                <p class="text-2xl font-bold text-info">{{ item.stats.improved_count|default:0 }}</p>
+                <p class="text-xs text-base-content/60">Improved</p>
+            </div>
+            <div class="text-center">
+                <p class="text-2xl font-bold text-warning">{{ item.stats.declined_count|default:0 }}</p>
+                <p class="text-xs text-base-content/60">Declined</p>
+            </div>
+            <div class="text-center">
+                <p class="text-2xl font-bold text-error">{{ item.stats.not_ranking_count|default:0 }}</p>
+                <p class="text-xs text-base-content/60">Not Ranking</p>
+            </div>
+        </div>
+        
+        <!-- Average Rank -->
+        {% if item.stats.avg_rank %}
+        <div class="mb-4">
+            <div class="flex items-center justify-between mb-1">
+                <span class="text-xs text-base-content/60">Average Rank</span>
+                <span class="text-sm font-semibold">{{ item.stats.avg_rank|floatformat:1 }}</span>
+            </div>
+            <div class="w-full bg-base-200 rounded-full h-2">
+                {% with avg_percent=item.stats.avg_rank|default:100 %}
+                <div class="bg-gradient-to-r from-success to-warning h-2 rounded-full" style="width: {{ 100|add:"-"|add:avg_percent }}%"></div>
+                {% endwith %}
+            </div>
+        </div>
+        {% endif %}
+        
+        <!-- Recent Keywords -->
+        {% if item.recent_keywords %}
+        <div>
+            <p class="text-xs text-base-content/60 mb-2">Recent Keywords</p>
+            <div class="flex flex-wrap gap-2">
+                {% for keyword in item.recent_keywords|slice:":5" %}
+                <div class="badge badge-ghost badge-sm gap-1">
+                    {{ keyword.keyword|truncatechars:20 }}
+                    {% if keyword.rank > 0 and keyword.rank <= 100 %}
+                        <span class="rank-badge text-xs font-bold 
+                            {% if keyword.rank <= 3 %}text-success{% elif keyword.rank <= 10 %}text-info{% elif keyword.rank <= 30 %}text-warning{% else %}text-base-content/60{% endif %}">
+                            #{{ keyword.rank }}
+                        </span>
+                        {% if keyword.rank_status == 'up' %}
+                            <i class="fas fa-arrow-up text-xs rank-up"></i>
+                        {% elif keyword.rank_status == 'down' %}
+                            <i class="fas fa-arrow-down text-xs rank-down"></i>
+                        {% endif %}
+                    {% else %}
+                        <span class="text-xs text-error">NR</span>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+        
+        <!-- Action Buttons -->
+        <div class="card-actions justify-end mt-4 pt-4 border-t border-base-200">
+            <a 
+                href="{% url 'keywords:project_keywords' item.project.id %}"
+                class="btn btn-primary btn-sm"
+            >
+                View Keywords
+                <i class="fas fa-arrow-right ml-1"></i>
+            </a>
+        </div>
+    </div>
+</div>
