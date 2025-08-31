@@ -1,3 +1,68 @@
+<!-- Issue Lifecycle Summary Cards -->
+{% if lifecycle_stats %}
+<div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+    <!-- Total Issues Card -->
+    <div class="card bg-gradient-to-br from-primary/5 to-primary/10 border border-primary/20">
+        <div class="card-body p-4">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-medium text-base-content/60 uppercase tracking-wider">Total Issues</p>
+                    <p class="text-3xl font-bold text-primary mt-1">{{ total_issues|default:0 }}</p>
+                </div>
+                <div class="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center">
+                    <i class="fas fa-exclamation-triangle text-xl text-primary"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- New Issues Card -->
+    <div class="card bg-gradient-to-br from-success/5 to-success/10 border border-success/20">
+        <div class="card-body p-4">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-medium text-base-content/60 uppercase tracking-wider">New Issues</p>
+                    <p class="text-3xl font-bold text-success mt-1">{{ lifecycle_stats.new_count|default:0 }}</p>
+                </div>
+                <div class="w-12 h-12 rounded-full bg-success/20 flex items-center justify-center">
+                    <i class="fas fa-plus-circle text-xl text-success"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Persisting Issues Card -->
+    <div class="card bg-gradient-to-br from-warning/5 to-warning/10 border border-warning/20">
+        <div class="card-body p-4">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-medium text-base-content/60 uppercase tracking-wider">Persisting</p>
+                    <p class="text-3xl font-bold text-warning mt-1">{{ lifecycle_stats.persisting_count|default:0 }}</p>
+                </div>
+                <div class="w-12 h-12 rounded-full bg-warning/20 flex items-center justify-center">
+                    <i class="fas fa-sync-alt text-xl text-warning"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Resolved Issues Card -->
+    <div class="card bg-gradient-to-br from-info/5 to-info/10 border border-info/20">
+        <div class="card-body p-4">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-medium text-base-content/60 uppercase tracking-wider">Resolved</p>
+                    <p class="text-3xl font-bold text-info mt-1">{{ lifecycle_stats.resolved_count|default:0 }}</p>
+                </div>
+                <div class="w-12 h-12 rounded-full bg-info/20 flex items-center justify-center">
+                    <i class="fas fa-check-circle text-xl text-info"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 <!-- Issues List -->
 <div id="issues-list" class="space-y-4">
     {% include 'site_audit/partials/issues_items.html' %}
