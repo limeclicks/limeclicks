@@ -144,7 +144,18 @@ class Keyword(models.Model):
             # Reset critical priority after force crawl
             self.crawl_priority = 'normal'
         
+        # Mark as not processing
+        self.processing = False
+        
         self.save()
+        
+        # Save to Rank history
+        Rank.objects.create(
+            keyword=self,
+            rank=new_rank if new_rank <= 100 else 0,
+            is_organic=True,
+            created_at=self.scraped_at
+        )
     
     def should_crawl(self):
         """Check if keyword should be crawled based on schedule"""

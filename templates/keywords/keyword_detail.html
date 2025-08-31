@@ -1,0 +1,436 @@
+{% extends "dashboard_base.html" %}
+{% load static %}
+
+{% block head_extra %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+    .stat-card {
+        transition: all 0.3s ease;
+    }
+    
+    .stat-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+    }
+    
+    .serp-result {
+        transition: all 0.2s ease;
+    }
+    
+    .serp-result:hover {
+        background-color: var(--fallback-b2, oklch(var(--b2)));
+    }
+    
+    .rank-badge {
+        min-width: 3rem;
+        text-align: center;
+        font-weight: bold;
+    }
+    
+    /* Green for ranks 1-10 */
+    .rank-1, .rank-2, .rank-3, .rank-top10 { 
+        background-color: #10b981; 
+        color: white; 
+    }
+    
+    /* Yellow for ranks 11-50 */
+    .rank-top30, .rank-top50 { 
+        background-color: #f59e0b; 
+        color: white; 
+    }
+    
+    /* Red for ranks 51+ and NR */
+    .rank-top100, .rank-none { 
+        background-color: #ef4444; 
+        color: white; 
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto">
+    <!-- Header with Back Button -->
+    <div class="mb-8">
+        <div class="flex items-center gap-4 mb-6">
+            <a href="{% url 'keywords:project_keywords' project.id %}" class="btn btn-ghost btn-circle">
+                <i class="fas fa-arrow-left"></i>
+            </a>
+            <div class="flex-1">
+                <h1 class="text-3xl font-bold text-base-content">{{ keyword.keyword }}</h1>
+                <div class="flex items-center gap-4 mt-2">
+                    <span class="text-base-content/60">
+                        <i class="fas fa-globe mr-1"></i>{{ keyword.country }}
+                    </span>
+                    <span class="text-base-content/60">
+                        <i class="fas fa-folder mr-1"></i>{{ project.name|default:project.domain }}
+                    </span>
+                    {% if keyword.rank > 0 and keyword.rank <= 100 %}
+                    <span class="badge rank-badge {% if keyword.rank == 1 %}rank-1{% elif keyword.rank == 2 %}rank-2{% elif keyword.rank == 3 %}rank-3{% elif keyword.rank <= 10 %}rank-top10{% elif keyword.rank <= 30 %}rank-top30{% elif keyword.rank <= 50 %}rank-top50{% else %}rank-top100{% endif %}">
+                        #{{ keyword.rank }}
+                    </span>
+                    {% else %}
+                    <span class="badge rank-badge rank-none">NR</span>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="flex gap-2">
+                <button 
+                    class="btn btn-primary"
+                    hx-post="{% url 'keywords:api_force_crawl' keyword.id %}"
+                    hx-trigger="click"
+                    hx-swap="none"
+                    hx-confirm="Force crawl this keyword now?"
+                >
+                    <i class="fas fa-sync mr-2"></i>
+                    Force Crawl
+                </button>
+                <button class="btn btn-ghost">
+                    <i class="fas fa-cog"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Stats Cards -->
+    <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
+        <div class="stat-card card bg-base-100 shadow-sm border border-base-300">
+            <div class="card-body p-4">
+                <p class="text-base-content/60 text-xs">Current Rank</p>
+                <p class="text-2xl font-bold">
+                    {% if keyword.rank > 0 and keyword.rank <= 100 %}
+                        #{{ keyword.rank }}
+                    {% else %}
+                        NR
+                    {% endif %}
+                </p>
+            </div>
+        </div>
+        
+        <div class="stat-card card bg-base-100 shadow-sm border border-base-300">
+            <div class="card-body p-4">
+                <p class="text-base-content/60 text-xs">Best Rank</p>
+                <p class="text-2xl font-bold text-success">
+                    {% if best_rank > 0 %}#{{ best_rank }}{% else %}—{% endif %}
+                </p>
+            </div>
+        </div>
+        
+        <div class="stat-card card bg-base-100 shadow-sm border border-base-300">
+            <div class="card-body p-4">
+                <p class="text-base-content/60 text-xs">Average Rank</p>
+                <p class="text-2xl font-bold">
+                    {% if avg_rank > 0 %}#{{ avg_rank|floatformat:0 }}{% else %}—{% endif %}
+                </p>
+            </div>
+        </div>
+        
+        <div class="stat-card card bg-base-100 shadow-sm border border-base-300">
+            <div class="card-body p-4">
+                <p class="text-base-content/60 text-xs">Total Checks</p>
+                <p class="text-2xl font-bold">{{ total_checks }}</p>
+            </div>
+        </div>
+        
+        <div class="stat-card card bg-base-100 shadow-sm border border-base-300">
+            <div class="card-body p-4">
+                <p class="text-base-content/60 text-xs">Last Checked</p>
+                <p class="text-sm font-bold">
+                    {% if keyword.scraped_at %}
+                        {{ keyword.scraped_at|timesince }} ago
+                    {% else %}
+                        Never
+                    {% endif %}
+                </p>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Charts Section -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        <!-- Ranking History Chart -->
+        <div class="card bg-base-100 shadow-sm border border-base-300">
+            <div class="card-body">
+                <h2 class="card-title mb-4">Ranking History</h2>
+                <canvas id="rankingChart" width="400" height="200"></canvas>
+            </div>
+        </div>
+        
+        <!-- Search Volume Chart (Placeholder) -->
+        <div class="card bg-base-100 shadow-sm border border-base-300">
+            <div class="card-body">
+                <h2 class="card-title mb-4">Search Volume Analysis</h2>
+                <canvas id="volumeChart" width="400" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Tabs Section -->
+    <div class="card bg-base-100 shadow-sm border border-base-300">
+        <div class="card-body p-0">
+            <div class="tabs tabs-boxed bg-base-200 p-1">
+                <a class="tab tab-active" onclick="showTab('serp-results')">
+                    <i class="fas fa-list mr-2"></i>SERP Results
+                </a>
+                <a class="tab" onclick="showTab('competitors')">
+                    <i class="fas fa-chart-line mr-2"></i>Competitors
+                </a>
+                <a class="tab" onclick="showTab('history')">
+                    <i class="fas fa-history mr-2"></i>History
+                </a>
+            </div>
+            
+            <!-- SERP Results Tab (visible by default) -->
+            <div id="serp-results" class="tab-content p-6">
+                <h3 class="text-lg font-semibold mb-4">Top Search Results ({{ serp_results|length }} results)</h3>
+                {% if serp_results %}
+                <div class="space-y-3">
+                    {% for result in serp_results %}
+                    <div class="serp-result p-4 rounded-lg border border-base-300">
+                        <div class="flex items-start gap-4">
+                            <span class="badge badge-lg">{{ result.position|default:forloop.counter }}</span>
+                            <div class="flex-1">
+                                {% if result.url != '#' %}
+                                <a href="{{ result.url }}" target="_blank" class="text-primary font-medium hover:underline">
+                                    {{ result.title }}
+                                </a>
+                                <div class="text-sm text-base-content/60 mt-1">{{ result.url|truncatechars:80 }}</div>
+                                {% else %}
+                                <span class="font-medium">{{ result.title }}</span>
+                                <div class="text-sm text-base-content/60 mt-1">Local/Map Result</div>
+                                {% endif %}
+                                {% if result.description %}
+                                <div class="text-sm mt-2">{{ result.description|truncatechars:150 }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-center py-8 text-base-content/60">
+                    <i class="fas fa-search text-4xl mb-4"></i>
+                    <p>No SERP data available yet.</p>
+                    <p class="text-sm mt-2">Run a crawl to see search results.</p>
+                </div>
+                {% endif %}
+            </div>
+            
+            <!-- Competitors Tab -->
+            <div id="competitors" class="tab-content p-6 hidden">
+                <h3 class="text-lg font-semibold mb-4">Top Competitors</h3>
+                {% if competitors %}
+                <div class="overflow-x-auto">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Position</th>
+                                <th>Domain</th>
+                                <th>Page</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for comp in competitors %}
+                            <tr>
+                                <td>
+                                    <span class="badge">{{ comp.position }}</span>
+                                </td>
+                                <td>
+                                    <a href="https://{{ comp.domain }}" target="_blank" class="text-primary hover:underline">
+                                        {{ comp.domain }}
+                                    </a>
+                                </td>
+                                <td>
+                                    <a href="{{ comp.url }}" target="_blank" class="text-xs text-base-content/60 hover:text-primary">
+                                        {{ comp.title|truncatechars:50 }}
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-8 text-base-content/60">
+                    No competitor data available.
+                </div>
+                {% endif %}
+            </div>
+            
+            <!-- History Tab -->
+            <div id="history" class="tab-content p-6 hidden">
+                <h3 class="text-lg font-semibold mb-4">Ranking History ({{ ranking_history|length }} checks)</h3>
+                {% if ranking_history %}
+                <div class="overflow-x-auto">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Rank</th>
+                                <th>Change</th>
+                                <th>URL</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for history in ranking_history %}
+                            <tr>
+                                <td>{{ history.created_at|date:"M d, Y H:i" }}</td>
+                                <td>
+                                    {% if history.rank > 0 and history.rank <= 100 %}
+                                        <span class="badge rank-badge {% if history.rank <= 10 %}rank-top10{% elif history.rank <= 30 %}rank-top30{% elif history.rank <= 50 %}rank-top50{% else %}rank-top100{% endif %}">
+                                            #{{ history.rank }}
+                                        </span>
+                                    {% else %}
+                                        <span class="badge rank-badge rank-none">NR</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if history.rank_change != 0 %}
+                                        {% if history.rank_change > 0 %}
+                                            <span class="text-success">
+                                                <i class="fas fa-arrow-up mr-1"></i>{{ history.rank_change }}
+                                            </span>
+                                        {% else %}
+                                            <span class="text-error">
+                                                <i class="fas fa-arrow-down mr-1"></i>{{ history.rank_change|stringformat:"+d"|slice:"1:" }}
+                                            </span>
+                                        {% endif %}
+                                    {% else %}
+                                        <span class="text-base-content/40">—</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if keyword.rank_url %}
+                                        <a href="{{ keyword.rank_url }}" target="_blank" class="text-xs text-primary hover:underline">
+                                            {{ keyword.rank_url|truncatechars:40 }}
+                                        </a>
+                                    {% else %}
+                                        <span class="text-base-content/40">—</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <button class="btn btn-ghost btn-xs">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-8 text-base-content/60">
+                    No historical data available yet.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Tab switching
+    function showTab(tabId) {
+        // Hide all tabs
+        document.querySelectorAll('.tab-content').forEach(tab => {
+            tab.classList.add('hidden');
+        });
+        
+        // Show selected tab
+        document.getElementById(tabId).classList.remove('hidden');
+        
+        // Update tab buttons
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.classList.remove('tab-active');
+        });
+        event.target.classList.add('tab-active');
+    }
+    
+    // Initialize ranking chart
+    const ctx = document.getElementById('rankingChart');
+    const chartDates = {{ chart_dates|safe|default:'[]' }};
+    const chartRanks = {{ chart_ranks|safe|default:'[]' }};
+    
+    if (ctx) {
+        const rankingChart = new Chart(ctx.getContext('2d'), {
+        type: 'line',
+        data: {
+            labels: chartDates.length > 0 ? chartDates : ['No Data'],
+            datasets: [{
+                label: 'Rank',
+                data: chartRanks.length > 0 ? chartRanks : [0],
+                borderColor: 'rgb(59, 130, 246)',
+                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                tension: 0.3,
+                fill: true,
+                pointRadius: chartDates.length === 1 ? 5 : 3
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            let rank = context.parsed.y;
+                            if (rank > 100) {
+                                return 'Not Ranking';
+                            }
+                            return 'Rank #' + rank;
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    reverse: true,
+                    beginAtZero: false,
+                    min: 1,
+                    max: 100,
+                    ticks: {
+                        callback: function(value) {
+                            if (value > 100) return 'NR';
+                            return '#' + value;
+                        }
+                    }
+                }
+            }
+        }
+    });
+    }
+    
+    // Initialize volume chart (placeholder)
+    const volumeCtx = document.getElementById('volumeChart');
+    if (volumeCtx) {
+        const volumeChart = new Chart(volumeCtx.getContext('2d'), {
+        type: 'bar',
+        data: {
+            labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+            datasets: [{
+                label: 'Search Volume',
+                data: [1200, 1900, 3000, 2500, 2700, 3500],
+                backgroundColor: 'rgba(16, 185, 129, 0.8)'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+    }
+</script>
+{% endblock %}

@@ -7,6 +7,7 @@ urlpatterns = [
     # Main list view
     path('', views.keywords_list, name='list'),
     path('project/<int:project_id>/', views.project_keywords, name='project_keywords'),
+    path('keyword/<int:keyword_id>/', views.keyword_detail, name='keyword_detail'),
     path('add-modal/', views.add_keyword_modal, name='add_keyword_modal'),
     path('add/', views.add_keywords, name='add_keywords'),
     

@@ -802,3 +802,114 @@ def keyword_updates_sse(request, project_id):
     response['Cache-Control'] = 'no-cache'
     response['X-Accel-Buffering'] = 'no'
     return response
+
+
+@login_required
+def keyword_detail(request, keyword_id):
+    """Display detailed information for a specific keyword"""
+    try:
+        keyword = Keyword.objects.select_related('project').get(
+            id=keyword_id,
+            project__user=request.user
+        )
+    except Keyword.DoesNotExist:
+        return redirect('keywords:list')
+    
+    # Get ranking history (last 30 entries)
+    from .models import Rank
+    ranking_history = list(Rank.objects.filter(
+        keyword=keyword
+    ).order_by('-created_at')[:30])
+    
+    # Calculate rank changes
+    for i, history in enumerate(ranking_history):
+        if i < len(ranking_history) - 1:
+            prev_rank = ranking_history[i + 1].rank
+            curr_rank = history.rank
+            if prev_rank > 0 and curr_rank > 0:
+                history.rank_change = prev_rank - curr_rank  # Positive means improvement
+            else:
+                history.rank_change = 0
+        else:
+            history.rank_change = 0
+    
+    # Prepare chart data
+    chart_dates = []
+    chart_ranks = []
+    
+    if ranking_history:
+        for history in reversed(ranking_history):
+            chart_dates.append(history.created_at.strftime('%b %d'))
+            # Use 101 for NR (not ranking) to show it at the bottom of chart
+            chart_ranks.append(history.rank if history.rank > 0 else 101)
+    else:
+        # If no history, show current rank as a single point
+        from datetime import datetime
+        chart_dates = [datetime.now().strftime('%b %d')]
+        chart_ranks = [keyword.rank if keyword.rank > 0 else 101]
+    
+    # Get SERP results if available
+    serp_results = []
+    if hasattr(keyword, 'ranking_pages') and keyword.ranking_pages and isinstance(keyword.ranking_pages, list):
+        # Process ranking pages to add missing fields
+        for i, page in enumerate(keyword.ranking_pages[:10]):
+            if isinstance(page, dict):
+                serp_result = {
+                    'position': page.get('position', i + 1),
+                    'url': page.get('url', '#'),
+                    'title': page.get('title', f'Result {i + 1}'),
+                    'description': page.get('description', '')
+                }
+                serp_results.append(serp_result)
+    
+    # Calculate statistics
+    ranks_with_data = [h.rank for h in ranking_history if h.rank > 0]
+    
+    # If no history, use current rank
+    if not ranks_with_data and keyword.rank > 0:
+        ranks_with_data = [keyword.rank]
+    
+    best_rank = keyword.highest_rank if keyword.highest_rank > 0 else (min(ranks_with_data) if ranks_with_data else keyword.rank)
+    worst_rank = max([h.rank for h in ranking_history if h.rank > 0 and h.rank <= 100], default=keyword.rank if keyword.rank > 0 else 0)
+    avg_rank = sum(ranks_with_data) / len(ranks_with_data) if ranks_with_data else keyword.rank
+    
+    # Get competitor analysis (other domains ranking for this keyword)
+    competitors = []
+    if keyword.ranking_pages and isinstance(keyword.ranking_pages, list):
+        from urllib.parse import urlparse
+        seen_domains = set()
+        for page in keyword.ranking_pages[:20]:
+            if isinstance(page, dict) and 'url' in page:
+                domain = urlparse(page['url']).netloc
+                if domain and domain not in seen_domains and domain != keyword.project.domain:
+                    seen_domains.add(domain)
+                    competitors.append({
+                        'domain': domain,
+                        'position': page.get('position', 0),
+                        'url': page['url'],
+                        'title': page.get('title', '')
+                    })
+    
+    # Debug logging
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info(f"Keyword detail for: {keyword.keyword}")
+    logger.info(f"SERP results count: {len(serp_results)}")
+    logger.info(f"Ranking history count: {len(ranking_history)}")
+    logger.info(f"Competitors count: {len(competitors)}")
+    
+    context = {
+        'keyword': keyword,
+        'project': keyword.project,
+        'ranking_history': ranking_history,
+        'chart_dates': json.dumps(chart_dates) if chart_dates else '[]',
+        'chart_ranks': json.dumps(chart_ranks) if chart_ranks else '[]',
+        'serp_results': serp_results,
+        'competitors': competitors[:5],  # Top 5 competitors
+        'best_rank': best_rank if best_rank else 0,
+        'worst_rank': worst_rank if worst_rank else 0,
+        'avg_rank': int(avg_rank) if avg_rank else 0,
+        'total_checks': len(ranking_history),
+    }
+    
+    return render(request, 'keywords/keyword_detail.html', context)

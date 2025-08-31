@@ -2,7 +2,9 @@
 <tr class="keyword-row" data-keyword-id="{{ keyword.id }}">
     <td>
         <div class="flex items-center gap-2">
-            <span class="font-medium">{{ keyword.keyword }}</span>
+            <a href="{% url 'keywords:keyword_detail' keyword.id %}" class="font-medium text-base-content hover:text-primary hover:underline">
+                {{ keyword.keyword }}
+            </a>
             {% if keyword.processing %}
             <span class="loading loading-spinner loading-xs text-primary" title="Checking rank..."></span>
             {% endif %}
@@ -72,6 +74,12 @@
                 <i class="fas fa-ellipsis-v"></i>
             </button>
             <ul tabindex="0" class="dropdown-content z-[1] menu p-2 shadow bg-base-100 rounded-box w-52 border">
+                <li>
+                    <a href="{% url 'keywords:keyword_detail' keyword.id %}">
+                        <i class="fas fa-eye"></i>
+                        View Details
+                    </a>
+                </li>
                 <li>
                     <button 
                         hx-post="{% url 'keywords:api_force_crawl' keyword.id %}"
