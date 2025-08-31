@@ -115,6 +115,10 @@ def project_keywords(request, project_id):
     rank_value = request.GET.get('rank_value', '')
     rank_value2 = request.GET.get('rank_value2', '')
     
+    # Get sort parameters
+    sort_by = request.GET.get('sort', 'keyword')  # Default sort by keyword
+    sort_order = request.GET.get('order', 'asc')  # Default ascending
+    
     # Validate per_page value
     if per_page not in [50, 100, 250]:
         per_page = 50
@@ -123,7 +127,37 @@ def project_keywords(request, project_id):
     keywords_qs = Keyword.objects.filter(
         project=project,
         archive=False
-    ).prefetch_related('keyword_tags__tag').order_by('-created_at')
+    ).prefetch_related('keyword_tags__tag')
+    
+    # Apply sorting
+    if sort_by == 'keyword':
+        if sort_order == 'desc':
+            keywords_qs = keywords_qs.order_by('-keyword')
+        else:
+            keywords_qs = keywords_qs.order_by('keyword')
+    elif sort_by == 'rank':
+        # Sort by rank (NR/0 should come last)
+        if sort_order == 'desc':
+            keywords_qs = keywords_qs.extra(
+                select={'rank_null': 'CASE WHEN rank = 0 OR rank > 100 THEN 1 ELSE 0 END'}
+            ).order_by('rank_null', '-rank')
+        else:
+            keywords_qs = keywords_qs.extra(
+                select={'rank_null': 'CASE WHEN rank = 0 OR rank > 100 THEN 1 ELSE 0 END'}
+            ).order_by('rank_null', 'rank')
+    elif sort_by == 'change':
+        if sort_order == 'desc':
+            keywords_qs = keywords_qs.order_by('-rank_diff_from_last_time')
+        else:
+            keywords_qs = keywords_qs.order_by('rank_diff_from_last_time')
+    elif sort_by == 'last_checked':
+        if sort_order == 'desc':
+            keywords_qs = keywords_qs.order_by('-scraped_at')
+        else:
+            keywords_qs = keywords_qs.order_by('scraped_at')
+    else:
+        # Default sort
+        keywords_qs = keywords_qs.order_by('-created_at')
     
     # Apply search filter
     if search_query:
@@ -205,6 +239,8 @@ def project_keywords(request, project_id):
         'rank_compare': rank_compare,
         'rank_value': rank_value,
         'rank_value2': rank_value2,
+        'sort_by': sort_by,
+        'sort_order': sort_order,
         'total_keywords': keyword_stats['total_keywords'] or 0,
         'top10_count': keyword_stats['top10_count'] or 0,
         'improved_count': keyword_stats['improved_count'] or 0,

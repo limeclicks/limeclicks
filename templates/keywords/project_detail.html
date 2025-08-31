@@ -45,6 +45,24 @@
         from { transform: rotate(0deg); }
         to { transform: rotate(360deg); }
     }
+    
+    /* Sortable header styles */
+    th button {
+        background: none;
+        border: none;
+        padding: 0;
+        transition: color 0.2s;
+    }
+    
+    th button:hover {
+        color: var(--primary);
+    }
+    
+    .sort-indicator {
+        display: inline-flex;
+        align-items: center;
+        margin-left: 4px;
+    }
 </style>
 {% endblock %}
 
@@ -77,6 +95,10 @@
             <div class="card-body p-4">
                 <!-- Search Form -->
                 <form id="search-form" method="get" action="{% url 'keywords:project_keywords' project.id %}">
+                    <!-- Hidden fields for sorting -->
+                    <input type="hidden" name="sort" id="sort-field" value="{{ sort_by }}">
+                    <input type="hidden" name="order" id="order-field" value="{{ sort_order }}">
+                    
                     <!-- Search Row -->
                     <div class="flex gap-2 mb-3">
                         <div class="relative flex-1">
@@ -87,6 +109,10 @@
                                 placeholder="Search by Keyword" 
                                 class="input input-bordered input-sm w-full pl-10"
                                 value="{{ search_query }}"
+                                hx-get="{% url 'keywords:project_keywords' project.id %}"
+                                hx-trigger="keyup changed delay:500ms, search"
+                                hx-target="#keywords-table-body"
+                                hx-include="#search-form"
                             >
                             <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-base-content/40 text-sm"></i>
                         </div>
@@ -95,7 +121,10 @@
                         <button 
                             type="button"
                             class="btn btn-primary btn-sm"
-                            onclick="performSearch()"
+                            hx-get="{% url 'keywords:project_keywords' project.id %}"
+                            hx-trigger="click"
+                            hx-target="#keywords-table-body"
+                            hx-include="#search-form"
                         >
                             Search
                         </button>
@@ -113,7 +142,11 @@
                     <!-- Advanced Filters Row -->
                     <div class="grid grid-cols-1 md:grid-cols-4 gap-2 mb-3">
                         <!-- Country Filter -->
-                        <select name="country" id="country-filter" class="select select-bordered select-sm">
+                        <select name="country" id="country-filter" class="select select-bordered select-sm"
+                                hx-get="{% url 'keywords:project_keywords' project.id %}"
+                                hx-trigger="change"
+                                hx-target="#keywords-table-body"
+                                hx-include="#search-form">
                             <option value="">All Countries</option>
                             <option value="US" {% if request.GET.country == 'US' %}selected{% endif %}>United States</option>
                             <option value="GB" {% if request.GET.country == 'GB' %}selected{% endif %}>United Kingdom</option>
@@ -125,7 +158,11 @@
                         </select>
                         
                         <!-- Tags Filter -->
-                        <select name="tag" id="tag-filter" class="select select-bordered select-sm">
+                        <select name="tag" id="tag-filter" class="select select-bordered select-sm"
+                                hx-get="{% url 'keywords:project_keywords' project.id %}"
+                                hx-trigger="change"
+                                hx-target="#keywords-table-body"
+                                hx-include="#search-form">
                             <option value="">All Tags</option>
                             {% for tag in available_tags %}
                             <option value="{{ tag.id }}" {% if request.GET.tag == tag.id|stringformat:"s" %}selected{% endif %}>
@@ -135,7 +172,11 @@
                         </select>
                         
                         <!-- Rank Comparison -->
-                        <select name="rank_compare" id="rank-compare" class="select select-bordered select-sm">
+                        <select name="rank_compare" id="rank-compare" class="select select-bordered select-sm"
+                                hx-get="{% url 'keywords:project_keywords' project.id %}"
+                                hx-trigger="change"
+                                hx-target="#keywords-table-body"
+                                hx-include="#search-form">
                             <option value="">All Ranks</option>
                             <option value="eq" {% if request.GET.rank_compare == 'eq' %}selected{% endif %}>Rank Equal To</option>
                             <option value="lt" {% if request.GET.rank_compare == 'lt' %}selected{% endif %}>Rank Less Than</option>
@@ -154,6 +195,10 @@
                                 max="100"
                                 class="input input-bordered input-sm w-20"
                                 value="{{ request.GET.rank_value }}"
+                                hx-get="{% url 'keywords:project_keywords' project.id %}"
+                                hx-trigger="change delay:500ms"
+                                hx-target="#keywords-table-body"
+                                hx-include="#search-form"
                             >
                             <input 
                                 type="number" 
@@ -164,6 +209,10 @@
                                 max="100"
                                 class="input input-bordered input-sm w-20 {% if request.GET.rank_compare != 'between' %}hidden{% endif %}"
                                 value="{{ request.GET.rank_value2 }}"
+                                hx-get="{% url 'keywords:project_keywords' project.id %}"
+                                hx-trigger="change delay:500ms"
+                                hx-target="#keywords-table-body"
+                                hx-include="#search-form"
                             >
                         </div>
                     </div>
@@ -285,15 +334,83 @@
                     <table class="table">
                         <thead>
                             <tr>
-                                <th>Keyword</th>
-                                <th class="text-center">Current Rank</th>
-                                <th class="text-center">Change</th>
+                                <th>
+                                    <button class="flex items-center gap-1 font-semibold hover:text-primary cursor-pointer"
+                                            onclick="sortTable('keyword')"
+                                            data-sort="keyword">
+                                        Keyword
+                                        <span class="sort-indicator">
+                                            {% if sort_by == 'keyword' %}
+                                                {% if sort_order == 'asc' %}
+                                                    <i class="fas fa-sort-up text-primary"></i>
+                                                {% else %}
+                                                    <i class="fas fa-sort-down text-primary"></i>
+                                                {% endif %}
+                                            {% else %}
+                                                <i class="fas fa-sort text-base-content/30"></i>
+                                            {% endif %}
+                                        </span>
+                                    </button>
+                                </th>
+                                <th class="text-center">
+                                    <button class="flex items-center justify-center gap-1 font-semibold hover:text-primary cursor-pointer w-full"
+                                            onclick="sortTable('rank')"
+                                            data-sort="rank">
+                                        Current Rank
+                                        <span class="sort-indicator">
+                                            {% if sort_by == 'rank' %}
+                                                {% if sort_order == 'asc' %}
+                                                    <i class="fas fa-sort-up text-primary"></i>
+                                                {% else %}
+                                                    <i class="fas fa-sort-down text-primary"></i>
+                                                {% endif %}
+                                            {% else %}
+                                                <i class="fas fa-sort text-base-content/30"></i>
+                                            {% endif %}
+                                        </span>
+                                    </button>
+                                </th>
+                                <th class="text-center">
+                                    <button class="flex items-center justify-center gap-1 font-semibold hover:text-primary cursor-pointer w-full"
+                                            onclick="sortTable('change')"
+                                            data-sort="change">
+                                        Change
+                                        <span class="sort-indicator">
+                                            {% if sort_by == 'change' %}
+                                                {% if sort_order == 'asc' %}
+                                                    <i class="fas fa-sort-up text-primary"></i>
+                                                {% else %}
+                                                    <i class="fas fa-sort-down text-primary"></i>
+                                                {% endif %}
+                                            {% else %}
+                                                <i class="fas fa-sort text-base-content/30"></i>
+                                            {% endif %}
+                                        </span>
+                                    </button>
+                                </th>
                                 <th>Country</th>
-                                <th>Last Checked</th>
+                                <th>
+                                    <button class="flex items-center gap-1 font-semibold hover:text-primary cursor-pointer"
+                                            onclick="sortTable('last_checked')"
+                                            data-sort="last_checked">
+                                        Last Checked
+                                        <span class="sort-indicator">
+                                            {% if sort_by == 'last_checked' %}
+                                                {% if sort_order == 'asc' %}
+                                                    <i class="fas fa-sort-up text-primary"></i>
+                                                {% else %}
+                                                    <i class="fas fa-sort-down text-primary"></i>
+                                                {% endif %}
+                                            {% else %}
+                                                <i class="fas fa-sort text-base-content/30"></i>
+                                            {% endif %}
+                                        </span>
+                                    </button>
+                                </th>
                                 <th class="text-right">Actions</th>
                             </tr>
                         </thead>
-                        <tbody>
+                        <tbody id="keywords-table-body" data-sort-by="{{ sort_by }}" data-sort-order="{{ sort_order }}">
                             {% for keyword in keywords %}
                             <tr class="keyword-row" data-keyword-id="{{ keyword.id }}">
                                 <td>
@@ -510,6 +627,62 @@
 <div id="modal-container"></div>
 
 <script>
+    // Sort table by column
+    function sortTable(column) {
+        const form = document.getElementById('search-form');
+        const formData = new FormData(form);
+        const params = new URLSearchParams(formData);
+        
+        // Get current sort parameters from hidden fields
+        const currentSort = document.getElementById('sort-field').value || 'keyword';
+        const currentOrder = document.getElementById('order-field').value || 'asc';
+        
+        // Determine new sort order
+        let newOrder = 'asc';
+        if (column === currentSort) {
+            // If clicking the same column, toggle order
+            newOrder = currentOrder === 'asc' ? 'desc' : 'asc';
+        }
+        
+        // Add sort parameters
+        params.set('sort', column);
+        params.set('order', newOrder);
+        params.set('page', 1); // Reset to first page when sorting
+        
+        // Preserve filter if active
+        const activeFilter = document.querySelector('.btn-primary[data-filter]');
+        if (activeFilter) {
+            params.set('filter', activeFilter.dataset.filter);
+        }
+        
+        // Make HTMX request
+        htmx.ajax('GET', '{% url "keywords:project_keywords" project.id %}?' + params.toString(), {
+            target: '#keywords-table-body',
+            swap: 'innerHTML'
+        });
+    }
+    
+    // Update sort indicators in the header
+    function updateSortIndicators(sortBy, sortOrder) {
+        // Reset all indicators
+        document.querySelectorAll('.sort-indicator').forEach(indicator => {
+            indicator.innerHTML = '<i class="fas fa-sort text-base-content/30"></i>';
+        });
+        
+        // Update the active column's indicator
+        const activeButton = document.querySelector(`button[data-sort="${sortBy}"]`);
+        if (activeButton) {
+            const indicator = activeButton.querySelector('.sort-indicator');
+            if (indicator) {
+                if (sortOrder === 'asc') {
+                    indicator.innerHTML = '<i class="fas fa-sort-up text-primary"></i>';
+                } else {
+                    indicator.innerHTML = '<i class="fas fa-sort-down text-primary"></i>';
+                }
+            }
+        }
+    }
+    
     // Apply filter
     function applyFilter(filterValue) {
         const form = document.getElementById('search-form');
@@ -518,8 +691,14 @@
         params.set('filter', filterValue);
         params.set('page', 1); // Reset to first page
         
+        // Get current sort from hidden inputs
+        const sortInput = document.querySelector('input[name="sort"]');
+        const orderInput = document.querySelector('input[name="order"]');
+        params.set('sort', sortInput ? sortInput.value : 'keyword');
+        params.set('order', orderInput ? orderInput.value : 'asc');
+        
         htmx.ajax('GET', '{% url "keywords:project_keywords" project.id %}?' + params.toString(), {
-            target: '#keywords-table',
+            target: '#keywords-table-body',
             swap: 'innerHTML'
         });
     }
@@ -536,10 +715,15 @@
             params.append('filter', activeFilter.dataset.filter);
         }
         
+        // Get current sort from hidden inputs
+        const sortInput = document.querySelector('input[name="sort"]');
+        const orderInput = document.querySelector('input[name="order"]');
+        params.set('sort', sortInput ? sortInput.value : 'keyword');
+        params.set('order', orderInput ? orderInput.value : 'asc');
         params.set('page', 1); // Reset to first page on new search
         
         htmx.ajax('GET', '{% url "keywords:project_keywords" project.id %}?' + params.toString(), {
-            target: '#keywords-table',
+            target: '#keywords-table-body',
             swap: 'innerHTML'
         });
     }
@@ -554,7 +738,7 @@
         document.getElementById('rank-value2').value = '';
         
         htmx.ajax('GET', '{% url "keywords:project_keywords" project.id %}', {
-            target: '#keywords-table',
+            target: '#keywords-table-body',
             swap: 'innerHTML'
         });
     }
@@ -573,7 +757,7 @@
         }
         
         htmx.ajax('GET', '{% url "keywords:project_keywords" project.id %}?' + params.toString(), {
-            target: '#keywords-table',
+            target: '#keywords-table-body',
             swap: 'innerHTML'
         });
     }
@@ -587,7 +771,7 @@
         params.set('page', 1); // Reset to first page
         
         htmx.ajax('GET', '{% url "keywords:project_keywords" project.id %}?' + params.toString(), {
-            target: '#keywords-table',
+            target: '#keywords-table-body',
             swap: 'innerHTML'
         });
     }
@@ -614,6 +798,22 @@
     document.body.addEventListener('keywordsAdded', function(evt) {
         // Properly reload the keywords table without disturbing layout
         window.location.reload();
+    });
+    
+    // Listen for HTMX after swap events to update sort state
+    document.body.addEventListener('htmx:afterSwap', function(evt) {
+        if (evt.target.id === 'keywords-table-body') {
+            // Look for the hidden sort info element
+            const sortInfo = document.querySelector('[data-sort-info="true"]');
+            if (sortInfo) {
+                // Update hidden fields with new sort state
+                document.getElementById('sort-field').value = sortInfo.dataset.sortBy;
+                document.getElementById('order-field').value = sortInfo.dataset.sortOrder;
+                
+                // Update sort indicators
+                updateSortIndicators(sortInfo.dataset.sortBy, sortInfo.dataset.sortOrder);
+            }
+        }
     });
     
     // SSE for real-time updates
