@@ -20,13 +20,18 @@
         font-weight: bold;
     }
     
-    .rank-1 { background: linear-gradient(135deg, #FFD700, #FFA500); color: white; }
-    .rank-2 { background: linear-gradient(135deg, #C0C0C0, #A8A8A8); color: white; }
-    .rank-3 { background: linear-gradient(135deg, #CD7F32, #B87333); color: white; }
+    /* Green for ranks 1-10 */
+    .rank-1 { background-color: #10b981; color: white; }
+    .rank-2 { background-color: #10b981; color: white; }
+    .rank-3 { background-color: #10b981; color: white; }
     .rank-top10 { background-color: #10b981; color: white; }
-    .rank-top30 { background-color: #3b82f6; color: white; }
-    .rank-top50 { background-color: #8b5cf6; color: white; }
-    .rank-top100 { background-color: #f59e0b; color: white; }
+    
+    /* Yellow for ranks 11-50 */
+    .rank-top30 { background-color: #f59e0b; color: white; }
+    .rank-top50 { background-color: #f59e0b; color: white; }
+    
+    /* Red for ranks 51-100 and NR */
+    .rank-top100 { background-color: #ef4444; color: white; }
     .rank-none { background-color: #ef4444; color: white; }
     
     .rank-change-up { color: #10b981; }
@@ -290,9 +295,14 @@
                         </thead>
                         <tbody>
                             {% for keyword in keywords %}
-                            <tr class="keyword-row">
+                            <tr class="keyword-row" data-keyword-id="{{ keyword.id }}">
                                 <td>
-                                    <div class="font-medium">{{ keyword.keyword }}</div>
+                                    <div class="flex items-center gap-2">
+                                        <span class="font-medium">{{ keyword.keyword }}</span>
+                                        {% if keyword.processing %}
+                                        <span class="loading loading-spinner loading-xs text-primary" title="Checking rank..."></span>
+                                        {% endif %}
+                                    </div>
                                     {% if keyword.rank_url %}
                                     <div class="mt-1">
                                         <a href="{{ keyword.rank_url }}" target="_blank" class="text-xs text-base-content/60 hover:text-primary hover:underline block truncate max-w-xs" title="{{ keyword.rank_url }}">
@@ -310,8 +320,13 @@
                                     </div>
                                     {% endif %}
                                 </td>
-                                <td class="text-center">
-                                    {% if keyword.rank > 0 and keyword.rank <= 100 %}
+                                <td class="text-center rank-cell">
+                                    {% if keyword.processing %}
+                                        <span class="badge badge-ghost gap-1">
+                                            <span class="loading loading-spinner loading-xs"></span>
+                                            Checking
+                                        </span>
+                                    {% elif keyword.rank > 0 and keyword.rank <= 100 %}
                                         <span class="badge rank-badge 
                                             {% if keyword.rank == 1 %}rank-1{% elif keyword.rank == 2 %}rank-2{% elif keyword.rank == 3 %}rank-3{% elif keyword.rank <= 10 %}rank-top10{% elif keyword.rank <= 30 %}rank-top30{% elif keyword.rank <= 50 %}rank-top50{% else %}rank-top100{% endif %}">
                                             #{{ keyword.rank }}
@@ -320,8 +335,10 @@
                                         <span class="badge rank-badge rank-none">NR</span>
                                     {% endif %}
                                 </td>
-                                <td class="text-center">
-                                    {% if keyword.rank_diff_from_last_time != 0 %}
+                                <td class="text-center change-cell">
+                                    {% if keyword.processing %}
+                                        <span class="text-base-content/40">-</span>
+                                    {% elif keyword.rank_diff_from_last_time != 0 %}
                                         <span class="flex items-center justify-center gap-1">
                                             {% if keyword.rank_diff_from_last_time > 0 %}
                                                 <i class="fas fa-arrow-up text-xs rank-change-up"></i>
@@ -586,10 +603,135 @@
     });
     
     // Listen for successful keyword additions
-    document.body.addEventListener('htmx:afterRequest', function(evt) {
-        if (evt.detail.successful && evt.detail.target.id === 'modal-container') {
-            // Reload the keywords table after adding
-            performSearch();
+    document.body.addEventListener('keywordsAdded', function(evt) {
+        // Properly reload the keywords table without disturbing layout
+        window.location.reload();
+    });
+    
+    // SSE for real-time updates
+    let eventSource = null;
+    
+    function connectSSE() {
+        if (eventSource) {
+            eventSource.close();
+        }
+        
+        eventSource = new EventSource('{% url "keywords:keyword_updates_sse" project.id %}');
+        
+        eventSource.onmessage = function(event) {
+            const data = JSON.parse(event.data);
+            const row = document.querySelector(`tr[data-keyword-id="${data.id}"]`);
+            
+            if (row) {
+                // Update keyword row with new data
+                const rankCell = row.querySelector('.rank-cell');
+                const changeCell = row.querySelector('.change-cell');
+                const keywordCell = row.querySelector('td:first-child');
+                
+                if (data.processing) {
+                    // Show processing status
+                    rankCell.innerHTML = `
+                        <span class="badge badge-ghost gap-1">
+                            <span class="loading loading-spinner loading-xs"></span>
+                            Checking
+                        </span>
+                    `;
+                    changeCell.innerHTML = '<span class="text-base-content/40">-</span>';
+                    
+                    // Add spinner to keyword name if not already present
+                    const keywordDiv = keywordCell.querySelector('div:first-child');
+                    if (keywordDiv && !keywordDiv.querySelector('.loading')) {
+                        const spinner = document.createElement('span');
+                        spinner.className = 'loading loading-spinner loading-xs text-primary';
+                        spinner.title = 'Checking rank...';
+                        keywordDiv.appendChild(spinner);
+                    }
+                } else {
+                    // Remove processing spinner from keyword name
+                    const spinner = keywordCell.querySelector('.loading');
+                    if (spinner) {
+                        spinner.remove();
+                    }
+                    
+                    // Update rank
+                    if (data.rank > 0 && data.rank <= 100) {
+                        let rankClass = 'rank-top100';
+                        if (data.rank === 1) rankClass = 'rank-1';
+                        else if (data.rank === 2) rankClass = 'rank-2';
+                        else if (data.rank === 3) rankClass = 'rank-3';
+                        else if (data.rank <= 10) rankClass = 'rank-top10';
+                        else if (data.rank <= 30) rankClass = 'rank-top30';
+                        else if (data.rank <= 50) rankClass = 'rank-top50';
+                        
+                        rankCell.innerHTML = `<span class="badge rank-badge ${rankClass}">#${data.rank}</span>`;
+                    } else {
+                        rankCell.innerHTML = '<span class="badge rank-badge rank-none">NR</span>';
+                    }
+                    
+                    // Update change
+                    if (data.rank_diff && data.rank_diff !== 0) {
+                        if (data.rank_diff > 0) {
+                            changeCell.innerHTML = `
+                                <span class="flex items-center justify-center gap-1">
+                                    <i class="fas fa-arrow-up text-xs rank-change-up"></i>
+                                    <span class="text-sm font-semibold rank-change-up">+${data.rank_diff}</span>
+                                </span>
+                            `;
+                        } else {
+                            changeCell.innerHTML = `
+                                <span class="flex items-center justify-center gap-1">
+                                    <i class="fas fa-arrow-down text-xs rank-change-down"></i>
+                                    <span class="text-sm font-semibold rank-change-down">${data.rank_diff}</span>
+                                </span>
+                            `;
+                        }
+                    } else {
+                        changeCell.innerHTML = '<span class="text-base-content/40">-</span>';
+                    }
+                    
+                    // Update URL if present
+                    if (data.rank_url) {
+                        const existingUrlDiv = keywordCell.querySelector('div:nth-child(2)');
+                        if (existingUrlDiv && existingUrlDiv.querySelector('a')) {
+                            const link = existingUrlDiv.querySelector('a');
+                            link.href = data.rank_url;
+                            link.title = data.rank_url;
+                            link.innerHTML = `<i class="fas fa-link text-[10px] mr-1"></i>${data.rank_url.substring(0, 50)}${data.rank_url.length > 50 ? '...' : ''}`;
+                        } else if (!existingUrlDiv) {
+                            // Add URL div if it doesn't exist
+                            const keywordDiv = keywordCell.querySelector('div:first-child');
+                            const urlDiv = document.createElement('div');
+                            urlDiv.className = 'mt-1';
+                            urlDiv.innerHTML = `
+                                <a href="${data.rank_url}" target="_blank" class="text-xs text-base-content/60 hover:text-primary hover:underline block truncate max-w-xs" title="${data.rank_url}">
+                                    <i class="fas fa-link text-[10px] mr-1"></i>${data.rank_url.substring(0, 50)}${data.rank_url.length > 50 ? '...' : ''}
+                                </a>
+                            `;
+                            keywordDiv.after(urlDiv);
+                        }
+                    }
+                    
+                    // Add animation effect
+                    row.classList.add('animate-pulse');
+                    setTimeout(() => row.classList.remove('animate-pulse'), 1000);
+                }
+            }
+        };
+        
+        eventSource.onerror = function(error) {
+            console.error('SSE error:', error);
+            // Reconnect after 5 seconds
+            setTimeout(connectSSE, 5000);
+        };
+    }
+    
+    // Connect to SSE on page load
+    connectSSE();
+    
+    // Cleanup on page unload
+    window.addEventListener('beforeunload', function() {
+        if (eventSource) {
+            eventSource.close();
         }
     });
 </script>

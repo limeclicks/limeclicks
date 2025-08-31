@@ -343,6 +343,9 @@ def add_keywords(request):
     total_created = 0
     created_keywords = []
     
+    # Import the task
+    from .tasks import fetch_keyword_serp_html
+    
     # Create keywords for each country
     for keyword_text in keywords_list:
         for country in countries:
@@ -352,14 +355,21 @@ def add_keywords(request):
                 country=country,
                 defaults={
                     'crawl_interval_hours': 24,
+                    'processing': True,  # Mark as processing for initial rank check
+                    'crawl_priority': 'high',  # High priority for new keywords
                 }
             )
             
             if created:
                 total_created += 1
                 created_keywords.append(keyword)
-                # Schedule initial crawl
+                # Schedule initial crawl with high priority
                 keyword.schedule_next_crawl()
+                keyword.save()
+                
+                # Trigger immediate rank check
+                fetch_keyword_serp_html.delay(keyword.id)
+                
                 if keyword_text not in added:
                     added.append(keyword_text)
             else:
@@ -729,3 +739,66 @@ def api_crawl_queue(request):
             success=False,
             message="Error fetching crawl queue"
         )
+
+
+@login_required
+def keyword_updates_sse(request, project_id):
+    """Server-Sent Events endpoint for real-time keyword rank updates"""
+    from django.http import StreamingHttpResponse
+    import time
+    
+    try:
+        project = Project.objects.get(id=project_id, user=request.user)
+    except Project.DoesNotExist:
+        return JsonResponse({'error': 'Project not found'}, status=404)
+    
+    def event_stream():
+        """Generate SSE events for keyword updates"""
+        last_check = timezone.now()
+        
+        while True:
+            # Check for updated keywords
+            updated_keywords = Keyword.objects.filter(
+                project=project,
+                updated_at__gt=last_check,
+                archive=False
+            ).prefetch_related('keyword_tags__tag')
+            
+            for keyword in updated_keywords:
+                # Send update event
+                data = {
+                    'id': keyword.id,
+                    'keyword': keyword.keyword,
+                    'rank': keyword.rank,
+                    'rank_status': keyword.rank_status,
+                    'rank_diff': keyword.rank_diff_from_last_time,
+                    'rank_url': keyword.rank_url,
+                    'processing': keyword.processing,
+                    'scraped_at': keyword.scraped_at.isoformat() if keyword.scraped_at else None,
+                    'country': keyword.country,
+                }
+                
+                yield f"data: {json.dumps(data)}\n\n"
+            
+            # Also check for processing status changes
+            processing_keywords = Keyword.objects.filter(
+                project=project,
+                processing=True,
+                archive=False
+            )
+            
+            for keyword in processing_keywords:
+                data = {
+                    'id': keyword.id,
+                    'processing': True,
+                    'status': 'checking'
+                }
+                yield f"data: {json.dumps(data)}\n\n"
+            
+            last_check = timezone.now()
+            time.sleep(2)  # Check every 2 seconds
+    
+    response = StreamingHttpResponse(event_stream(), content_type='text/event-stream')
+    response['Cache-Control'] = 'no-cache'
+    response['X-Accel-Buffering'] = 'no'
+    return response

@@ -1,7 +1,12 @@
 {% for keyword in keywords %}
-<tr class="keyword-row">
+<tr class="keyword-row" data-keyword-id="{{ keyword.id }}">
     <td>
-        <div class="font-medium">{{ keyword.keyword }}</div>
+        <div class="flex items-center gap-2">
+            <span class="font-medium">{{ keyword.keyword }}</span>
+            {% if keyword.processing %}
+            <span class="loading loading-spinner loading-xs text-primary" title="Checking rank..."></span>
+            {% endif %}
+        </div>
         {% if keyword.rank_url %}
         <div class="mt-1">
             <a href="{{ keyword.rank_url }}" target="_blank" class="text-xs text-base-content/60 hover:text-primary hover:underline block truncate max-w-xs" title="{{ keyword.rank_url }}">
@@ -19,8 +24,13 @@
         </div>
         {% endif %}
     </td>
-    <td class="text-center">
-        {% if keyword.rank > 0 and keyword.rank <= 100 %}
+    <td class="text-center rank-cell">
+        {% if keyword.processing %}
+            <span class="badge badge-ghost gap-1">
+                <span class="loading loading-spinner loading-xs"></span>
+                Checking
+            </span>
+        {% elif keyword.rank > 0 and keyword.rank <= 100 %}
             <span class="badge rank-badge 
                 {% if keyword.rank == 1 %}rank-1{% elif keyword.rank == 2 %}rank-2{% elif keyword.rank == 3 %}rank-3{% elif keyword.rank <= 10 %}rank-top10{% elif keyword.rank <= 30 %}rank-top30{% elif keyword.rank <= 50 %}rank-top50{% else %}rank-top100{% endif %}">
                 #{{ keyword.rank }}
@@ -29,8 +39,10 @@
             <span class="badge rank-badge rank-none">NR</span>
         {% endif %}
     </td>
-    <td class="text-center">
-        {% if keyword.rank_diff_from_last_time != 0 %}
+    <td class="text-center change-cell">
+        {% if keyword.processing %}
+            <span class="text-base-content/40">-</span>
+        {% elif keyword.rank_diff_from_last_time != 0 %}
             <span class="flex items-center justify-center gap-1">
                 {% if keyword.rank_diff_from_last_time > 0 %}
                     <i class="fas fa-arrow-up text-xs rank-change-up"></i>
