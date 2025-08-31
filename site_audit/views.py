@@ -596,18 +596,17 @@ def audit_detail(request, audit_id):
     
     page_range = get_page_range(page, total_pages)
     
-    # Generate presigned URLs for PageSpeed data if on performance tab
+    # Always generate presigned URLs for PageSpeed data (needed for performance tab)
     mobile_pagespeed_url = None
     desktop_pagespeed_url = None
     
-    if tab == 'performance':
-        # Generate presigned URL for mobile PageSpeed data
-        if audit.pagespeed_mobile_response_r2_path:
-            mobile_pagespeed_url = get_r2_presigned_url(audit.pagespeed_mobile_response_r2_path)
-        
-        # Generate presigned URL for desktop PageSpeed data
-        if audit.pagespeed_desktop_response_r2_path:
-            desktop_pagespeed_url = get_r2_presigned_url(audit.pagespeed_desktop_response_r2_path)
+    # Generate presigned URL for mobile PageSpeed data
+    if audit.pagespeed_mobile_response_r2_path:
+        mobile_pagespeed_url = get_r2_presigned_url(audit.pagespeed_mobile_response_r2_path)
+    
+    # Generate presigned URL for desktop PageSpeed data
+    if audit.pagespeed_desktop_response_r2_path:
+        desktop_pagespeed_url = get_r2_presigned_url(audit.pagespeed_desktop_response_r2_path)
     
     context = {
         'audit': audit,
