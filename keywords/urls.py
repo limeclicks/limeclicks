@@ -27,4 +27,7 @@ urlpatterns = [
     path('api/keyword/<int:keyword_id>/crawl-status/', views.api_crawl_status, name='api_crawl_status'),
     path('api/crawl-queue/', views.api_crawl_queue, name='api_crawl_queue'),
     path('api/project/<int:project_id>/updates-sse/', views.keyword_updates_sse, name='keyword_updates_sse'),
+    
+    # Historical SERP data
+    path('api/rank/<int:rank_id>/serp/', views.api_rank_serp, name='api_rank_serp'),
 ]

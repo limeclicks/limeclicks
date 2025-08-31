@@ -213,6 +213,7 @@ class GoogleSearchParser:
         """
         organic_results = []
         sponsored_results = []
+        special_results = []  # Track special results separately
         organic_position = 1
         sponsored_position = 1
         
@@ -264,13 +265,26 @@ class GoogleSearchParser:
                     if not any(r['url'] == result['url'] for r in sponsored_results):
                         sponsored_results.append(result)
                         sponsored_position += 1
-            elif not self._is_special_result(element):
+            elif self._is_special_result(element):
+                # Parse special result but track separately
+                result = self._parse_special_result(element, organic_position)
+                if result:
+                    result['result_type'] = 'special'
+                    special_results.append(result)
+                    # Don't increment organic position for special results
+            else:
                 # Parse as organic result
                 result = self._parse_single_result(element, organic_position)
-                if result and result.get('url'):
-                    result['result_type'] = 'organic'
-                    organic_results.append(result)
-                    organic_position += 1
+                if result:
+                    # Only add to organic results if it has a valid URL
+                    if result.get('url') and not result['url'].startswith('#') and result['url'] != '#':
+                        result['result_type'] = 'organic'
+                        organic_results.append(result)
+                        organic_position += 1
+                    else:
+                        # This is likely a special result without proper URL
+                        result['result_type'] = 'special'
+                        special_results.append(result)
         
         logger.info(f"Extracted {len(organic_results)} organic and {len(sponsored_results)} sponsored results")
         return organic_results, sponsored_results
@@ -780,7 +794,7 @@ class GoogleSearchParser:
     def _is_special_result(self, element: BeautifulSoup) -> bool:
         """Check if element is a special result (video, news, etc.)"""
         # Check for special result types
-        special_classes = ['g-blk', 'kno-kp', 'hp-xpdbox', 'g-inner-card']
+        special_classes = ['g-blk', 'kno-kp', 'hp-xpdbox', 'g-inner-card', 'kp-blk', 'xpdopen']
         element_classes = element.get('class', [])
         
         if any(cls in element_classes for cls in special_classes):
@@ -788,6 +802,16 @@ class GoogleSearchParser:
         
         # Check for video results
         if element.select_one('div[data-vid], g-scrolling-carousel'):
+            return True
+        
+        # Check for knowledge panels, answer boxes, etc.
+        if element.select_one('[data-attrid*="kc:/"], [data-tts="answers"]'):
+            return True
+        
+        # Check if element doesn't have a regular link structure
+        link = element.select_one('a[href]')
+        if not link or not link.get('href'):
+            # No link found, likely a special result
             return True
         
         return False
@@ -1504,6 +1528,58 @@ class GoogleSearchParser:
             return stock if stock['price'] else None
         
         return None
+    
+    def _parse_special_result(self, element: BeautifulSoup, position: int) -> Optional[Dict[str, Any]]:
+        """
+        Parse a special result element (knowledge panel, answer box, etc.)
+        
+        Args:
+            element: BeautifulSoup element for special result
+            position: Position in search results
+            
+        Returns:
+            Dictionary with special result data or None
+        """
+        try:
+            result = {
+                'position': position,
+                'title': '',
+                'url': '#',  # Special results often don't have URLs
+                'domain': 'Special Result',
+                'description': '',
+                'result_type': 'special',
+                'special_type': 'unknown'
+            }
+            
+            # Try to extract title
+            title_elem = element.select_one('h2, h3, div[role="heading"], span[data-tts]')
+            if title_elem:
+                result['title'] = title_elem.get_text(strip=True)
+            
+            # Try to extract description/content
+            desc_elem = element.select_one('span.hgKElc, div.kno-rdesc, div.wDYxhc')
+            if desc_elem:
+                result['description'] = desc_elem.get_text(strip=True)[:500]
+            
+            # Try to identify special result type
+            if element.select_one('[data-attrid*="kc:/"]'):
+                result['special_type'] = 'knowledge_panel'
+            elif element.select_one('[data-tts="answers"]'):
+                result['special_type'] = 'answer_box'
+            elif element.select_one('div[data-vid]'):
+                result['special_type'] = 'video'
+            elif 'kp-blk' in element.get('class', []):
+                result['special_type'] = 'knowledge_block'
+            
+            # If we have at least a title or description, return the result
+            if result['title'] or result['description']:
+                return result
+            
+            return None
+            
+        except Exception as e:
+            logger.debug(f"Error parsing special result: {str(e)}")
+            return None
     
     def _extract_currency_converter(self, soup: BeautifulSoup) -> Optional[Dict[str, Any]]:
         """Extract Currency converter widget"""

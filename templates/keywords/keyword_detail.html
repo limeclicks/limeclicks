@@ -143,7 +143,7 @@
             <div class="card-body p-4">
                 <p class="text-base-content/60 text-xs">Best Rank</p>
                 <p class="text-2xl font-bold text-success">
-                    {% if best_rank > 0 %}#{{ best_rank }}{% else %}—{% endif %}
+                    {% if best_rank > 0 and best_rank <= 100 %}#{{ best_rank }}{% else %}NR{% endif %}
                 </p>
             </div>
         </div>
@@ -152,7 +152,7 @@
             <div class="card-body p-4">
                 <p class="text-base-content/60 text-xs">Average Rank</p>
                 <p class="text-2xl font-bold">
-                    {% if avg_rank > 0 %}#{{ avg_rank|floatformat:0 }}{% else %}—{% endif %}
+                    {% if avg_rank > 0 and avg_rank <= 100 %}#{{ avg_rank|floatformat:0 }}{% else %}NR{% endif %}
                 </p>
             </div>
         </div>
@@ -205,13 +205,13 @@
     <div class="card bg-base-100 shadow-sm border border-base-300">
         <div class="card-body p-0">
             <div class="tabs tabs-boxed bg-base-200 p-1">
-                <a class="tab tab-active" onclick="showTab('serp-results')">
+                <a class="tab tab-active" onclick="showTab(event, 'serp-results')">
                     <i class="fas fa-list mr-2"></i>SERP Results
                 </a>
-                <a class="tab" onclick="showTab('competitors')">
+                <a class="tab" onclick="showTab(event, 'competitors')">
                     <i class="fas fa-chart-line mr-2"></i>Competitors
                 </a>
-                <a class="tab" onclick="showTab('history')">
+                <a class="tab" onclick="showTab(event, 'history')">
                     <i class="fas fa-history mr-2"></i>History
                 </a>
             </div>
@@ -219,13 +219,7 @@
             <!-- SERP Results Tab (visible by default) -->
             <div id="serp-results" class="tab-content p-6">
                 <h3 class="text-lg font-semibold mb-4">
-                    Top Search Results 
-                    {% if serp_results %}({{ serp_results|length }} results){% endif %}
-                    {% if latest_rank and latest_rank.search_results_file %}
-                        <span class="text-xs text-base-content/60 ml-2">
-                            <i class="fas fa-clock"></i> {{ latest_rank.created_at|timesince }} ago
-                        </span>
-                    {% endif %}
+                    Top Search Results
                 </h3>
                 
                 {% if local_pack_results %}
@@ -280,14 +274,17 @@
                                     <span class="text-xs text-primary font-semibold">{{ keyword.project.domain }}</span>
                                 </div>
                                 {% endif %}
-                                {% if result.url != '#' %}
+                                {% if result.url and result.url != '#' %}
                                 <a href="{{ result.url }}" target="_blank" class="text-primary font-medium hover:underline {% if result.is_own_site %}text-lg font-bold{% endif %}">
                                     {{ result.title }}
                                 </a>
                                 <div class="text-sm text-base-content/60 mt-1">{{ result.url|truncatechars:80 }}</div>
                                 {% else %}
+                                <!-- This shouldn't happen with the new filtering, but keep as fallback -->
                                 <span class="font-medium">{{ result.title }}</span>
-                                <div class="text-sm text-base-content/60 mt-1">Special Result</div>
+                                <div class="text-sm text-base-content/60 mt-1">
+                                    <span class="badge badge-ghost badge-sm">Special Result</span>
+                                </div>
                                 {% endif %}
                                 {% if result.snippet %}
                                 <div class="text-sm mt-2 {% if result.is_own_site %}text-base-content{% else %}text-base-content/80{% endif %}">
@@ -310,110 +307,133 @@
             
             <!-- Competitors Tab -->
             <div id="competitors" class="tab-content p-6 hidden">
-                <h3 class="text-lg font-semibold mb-4">Top Competitors</h3>
+                <h3 class="text-lg font-semibold mb-4">
+                    Top Competitors 
+                    <span class="text-sm text-base-content/60">({{ competitors|length }} competing domains)</span>
+                </h3>
                 {% if competitors %}
-                <div class="overflow-x-auto">
-                    <table class="table">
-                        <thead>
-                            <tr>
-                                <th>Position</th>
-                                <th>Domain</th>
-                                <th>Page</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for comp in competitors %}
-                            <tr>
-                                <td>
-                                    <span class="badge">{{ comp.position }}</span>
-                                </td>
-                                <td>
-                                    <a href="https://{{ comp.domain }}" target="_blank" class="text-primary hover:underline">
-                                        {{ comp.domain }}
+                <div class="max-h-[600px] overflow-y-auto custom-scrollbar">
+                    <div class="space-y-3">
+                        {% for comp in competitors %}
+                        <div class="card bg-base-100 border border-base-300 p-4 hover:shadow-lg transition-shadow">
+                            <div class="flex items-start gap-4">
+                                <div class="flex flex-col items-center">
+                                    <span class="badge badge-lg {% if comp.position <= 3 %}badge-success{% elif comp.position <= 10 %}badge-warning{% else %}badge-ghost{% endif %}">
+                                        #{{ comp.position }}
+                                    </span>
+                                    {% if comp.count > 1 %}
+                                    <span class="text-xs text-base-content/60 mt-1">+{{ comp.count|add:"-1" }} more</span>
+                                    {% endif %}
+                                </div>
+                                <div class="flex-1">
+                                    <div class="flex items-center gap-2 mb-1">
+                                        <a href="https://{{ comp.domain }}" target="_blank" class="font-semibold text-primary hover:underline">
+                                            {{ comp.domain }}
+                                        </a>
+                                        {% if comp.position <= 3 %}
+                                        <span class="badge badge-success badge-xs">TOP 3</span>
+                                        {% elif comp.position <= 10 %}
+                                        <span class="badge badge-warning badge-xs">TOP 10</span>
+                                        {% endif %}
+                                    </div>
+                                    <div class="text-sm font-medium mb-1">{{ comp.title|truncatechars:80 }}</div>
+                                    {% if comp.snippet %}
+                                    <div class="text-xs text-base-content/60">{{ comp.snippet|truncatechars:150 }}</div>
+                                    {% endif %}
+                                    <a href="{{ comp.url }}" target="_blank" class="text-xs text-primary hover:underline mt-2 inline-block">
+                                        <i class="fas fa-external-link-alt mr-1"></i>View Page
                                     </a>
-                                </td>
-                                <td>
-                                    <a href="{{ comp.url }}" target="_blank" class="text-xs text-base-content/60 hover:text-primary">
-                                        {{ comp.title|truncatechars:50 }}
-                                    </a>
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
                 </div>
                 {% else %}
                 <div class="text-center py-8 text-base-content/60">
-                    No competitor data available.
+                    <i class="fas fa-chart-line text-4xl mb-4"></i>
+                    <p>No competitor data available yet.</p>
                 </div>
                 {% endif %}
             </div>
             
             <!-- History Tab -->
             <div id="history" class="tab-content p-6 hidden">
-                <h3 class="text-lg font-semibold mb-4">Ranking History ({{ ranking_history|length }} checks)</h3>
+                <h3 class="text-lg font-semibold mb-4">
+                    Complete Ranking History 
+                    <span class="text-sm text-base-content/60">({{ ranking_history|length }} checks)</span>
+                </h3>
                 {% if ranking_history %}
-                <div class="overflow-x-auto">
-                    <table class="table">
-                        <thead>
-                            <tr>
-                                <th>Date</th>
-                                <th>Rank</th>
-                                <th>Change</th>
-                                <th>URL</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for history in ranking_history %}
-                            <tr>
-                                <td>{{ history.created_at|date:"M d, Y H:i" }}</td>
-                                <td>
-                                    {% if history.rank > 0 and history.rank <= 100 %}
-                                        <span class="badge rank-badge {% if history.rank <= 10 %}rank-top10{% elif history.rank <= 30 %}rank-top30{% elif history.rank <= 50 %}rank-top50{% else %}rank-top100{% endif %}">
-                                            #{{ history.rank }}
-                                        </span>
-                                    {% else %}
-                                        <span class="badge rank-badge rank-none">NR</span>
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    {% if history.rank_change != 0 %}
-                                        {% if history.rank_change > 0 %}
-                                            <span class="text-success">
-                                                <i class="fas fa-arrow-up mr-1"></i>{{ history.rank_change }}
+                <div class="max-h-[600px] overflow-y-auto custom-scrollbar">
+                    <div class="space-y-3">
+                        {% for history in ranking_history %}
+                        <div class="card bg-base-100 border border-base-300 p-4 hover:shadow-lg transition-shadow">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center gap-4">
+                                    <!-- Date and Time -->
+                                    <div>
+                                        <div class="text-sm font-semibold">{{ history.created_at|date:"M d, Y" }}</div>
+                                        <div class="text-xs text-base-content/60">{{ history.created_at|date:"H:i" }}</div>
+                                    </div>
+                                    
+                                    <!-- Rank Badge -->
+                                    <div>
+                                        {% if history.rank > 0 and history.rank <= 100 %}
+                                            <span class="badge badge-lg {% if history.rank <= 3 %}badge-success{% elif history.rank <= 10 %}badge-warning{% elif history.rank <= 30 %}badge-info{% else %}badge-ghost{% endif %}">
+                                                #{{ history.rank }}
                                             </span>
                                         {% else %}
-                                            <span class="text-error">
-                                                <i class="fas fa-arrow-down mr-1"></i>{{ history.rank_change|stringformat:"+d"|slice:"1:" }}
-                                            </span>
+                                            <span class="badge badge-lg badge-ghost">NR</span>
                                         {% endif %}
-                                    {% else %}
-                                        <span class="text-base-content/40">—</span>
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    {% if keyword.rank_url %}
-                                        <a href="{{ keyword.rank_url }}" target="_blank" class="text-xs text-primary hover:underline">
-                                            {{ keyword.rank_url|truncatechars:40 }}
-                                        </a>
-                                    {% else %}
-                                        <span class="text-base-content/40">—</span>
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    <button class="btn btn-ghost btn-xs">
-                                        <i class="fas fa-eye"></i>
+                                    </div>
+                                    
+                                    <!-- Change Indicator -->
+                                    <div class="min-w-[80px]">
+                                        {% if history.rank_change != 0 %}
+                                            {% if history.rank_change > 0 %}
+                                                <span class="text-success font-semibold">
+                                                    <i class="fas fa-arrow-up mr-1"></i>+{{ history.rank_change }}
+                                                </span>
+                                            {% else %}
+                                                <span class="text-error font-semibold">
+                                                    <i class="fas fa-arrow-down mr-1"></i>{{ history.rank_change }}
+                                                </span>
+                                            {% endif %}
+                                        {% else %}
+                                            <span class="text-base-content/40">—</span>
+                                        {% endif %}
+                                    </div>
+                                    
+                                    <!-- SERP Data Indicator -->
+                                    <div>
+                                        {% if history.search_results_file %}
+                                        <span class="badge badge-ghost badge-sm">
+                                            <i class="fas fa-database mr-1"></i>SERP Data
+                                        </span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                
+                                <!-- Actions -->
+                                <div class="flex items-center gap-2">
+                                    {% if history.search_results_file %}
+                                    <button onclick="viewHistoricalSERP({{ history.id }}, '{{ history.created_at|date:'M d, Y H:i' }}', {{ history.rank }})" 
+                                            class="btn btn-primary btn-sm">
+                                        <i class="fas fa-eye mr-1"></i>View SERP
                                     </button>
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+                                    {% else %}
+                                    <span class="text-xs text-base-content/40">No SERP data</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
                 </div>
                 {% else %}
                 <div class="text-center py-8 text-base-content/60">
-                    No historical data available yet.
+                    <i class="fas fa-history text-4xl mb-4"></i>
+                    <p>No historical data available yet.</p>
                 </div>
                 {% endif %}
             </div>
@@ -421,9 +441,98 @@
     </div>
 </div>
 
+<!-- Modal for Historical SERP Data -->
+<div id="historicalSerpModal" class="modal">
+    <div class="modal-box max-w-5xl">
+        <form method="dialog">
+            <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">✕</button>
+        </form>
+        <h3 class="font-bold text-lg mb-4">
+            <span id="modalTitle">Historical SERP Results</span>
+        </h3>
+        <div id="modalContent" class="max-h-[600px] overflow-y-auto">
+            <div class="text-center py-8">
+                <span class="loading loading-spinner loading-lg"></span>
+                <p class="mt-2">Loading SERP data...</p>
+            </div>
+        </div>
+    </div>
+    <form method="dialog" class="modal-backdrop">
+        <button>close</button>
+    </form>
+</div>
+
+<script>
+// Function to view historical SERP data
+function viewHistoricalSERP(rankId, date, position) {
+    const modal = document.getElementById('historicalSerpModal');
+    const modalTitle = document.getElementById('modalTitle');
+    const modalContent = document.getElementById('modalContent');
+    
+    // Update modal title
+    modalTitle.textContent = `SERP Results - ${date} (Rank #${position})`;
+    
+    // Show modal
+    modal.showModal();
+    
+    // Fetch historical SERP data
+    fetch(`/keywords/api/rank/${rankId}/serp/`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.serp_results) {
+                // Build HTML for SERP results
+                let html = '<div class="space-y-3">';
+                
+                // Local Pack
+                if (data.local_pack && data.local_pack.length > 0) {
+                    html += '<h4 class="font-semibold mb-2">Local Pack Results</h4>';
+                    html += '<div class="grid grid-cols-1 md:grid-cols-3 gap-2 mb-4">';
+                    data.local_pack.forEach(local => {
+                        html += `
+                            <div class="card bg-base-100 border p-3">
+                                <div class="font-medium text-sm">${local.title || local.name}</div>
+                                ${local.rating ? `<div class="text-xs">⭐ ${local.rating} (${local.reviews})</div>` : ''}
+                            </div>
+                        `;
+                    });
+                    html += '</div>';
+                }
+                
+                // Organic Results
+                html += '<h4 class="font-semibold mb-2">Organic Results</h4>';
+                data.serp_results.forEach(result => {
+                    const isOwnSite = result.is_own_site;
+                    html += `
+                        <div class="p-3 rounded border ${isOwnSite ? 'border-primary bg-primary/5' : 'border-base-300'}">
+                            <div class="flex items-start gap-3">
+                                <span class="badge ${isOwnSite ? 'badge-primary' : ''}">${result.position}</span>
+                                <div class="flex-1">
+                                    ${isOwnSite ? '<span class="badge badge-primary badge-sm mb-1">YOUR SITE</span>' : ''}
+                                    <div class="font-medium text-sm">${result.title}</div>
+                                    <div class="text-xs text-base-content/60">${result.url}</div>
+                                    ${result.snippet ? `<div class="text-xs mt-1">${result.snippet.substring(0, 150)}...</div>` : ''}
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+                html += '</div>';
+                
+                modalContent.innerHTML = html;
+            } else {
+                modalContent.innerHTML = '<div class="text-center py-8 text-base-content/60">No SERP data available for this rank.</div>';
+            }
+        })
+        .catch(error => {
+            console.error('Error loading SERP data:', error);
+            modalContent.innerHTML = '<div class="text-center py-8 text-error">Failed to load SERP data.</div>';
+        });
+}
+</script>
+
 <script>
     // Tab switching
-    function showTab(tabId) {
+    function showTab(event, tabId) {
         // Hide all tabs
         document.querySelectorAll('.tab-content').forEach(tab => {
             tab.classList.add('hidden');
@@ -436,7 +545,7 @@
         document.querySelectorAll('.tab').forEach(tab => {
             tab.classList.remove('tab-active');
         });
-        event.target.classList.add('tab-active');
+        event.currentTarget.classList.add('tab-active');
     }
     
     // Wait for page and Chart.js to load

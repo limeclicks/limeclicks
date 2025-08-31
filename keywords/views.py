@@ -649,6 +649,107 @@ def api_force_crawl(request, keyword_id):
 
 @login_required
 @require_http_methods(["GET"])
+def api_rank_serp(request, rank_id):
+    """Get SERP data for a specific historical rank"""
+    try:
+        from .models import Rank
+        from services.r2_storage import get_r2_service
+        from urllib.parse import urlparse
+        
+        # Get the rank and ensure user owns it
+        rank = Rank.objects.select_related('keyword__project').get(
+            id=rank_id,
+            keyword__project__user=request.user
+        )
+        
+        if not rank.search_results_file:
+            return create_ajax_response(
+                success=False,
+                message="No SERP data available for this rank"
+            )
+        
+        # Load SERP data from R2
+        r2_service = get_r2_service()
+        search_data = r2_service.download_json(rank.search_results_file)
+        
+        if not search_data:
+            return create_ajax_response(
+                success=False,
+                message="Failed to load SERP data"
+            )
+        
+        # Parse the data
+        if 'results' in search_data and isinstance(search_data['results'], dict):
+            results_data = search_data['results']
+        else:
+            results_data = search_data
+        
+        # Process organic results
+        serp_results = []
+        organic_results = results_data.get('organic_results', [])
+        for i, result in enumerate(organic_results):
+            is_own_site = False
+            url = result.get('url') or result.get('link', '#')
+            if url and url != '#':
+                result_domain = urlparse(url).netloc
+                is_own_site = (result_domain == rank.keyword.project.domain or 
+                             result_domain == f'www.{rank.keyword.project.domain}' or
+                             f'www.{result_domain}' == rank.keyword.project.domain)
+            
+            serp_results.append({
+                'position': result.get('position', i + 1),
+                'url': url,
+                'title': result.get('title', f'Result {i + 1}'),
+                'snippet': result.get('description') or result.get('snippet', ''),
+                'is_own_site': is_own_site,
+            })
+        
+        # Process local pack
+        local_pack_results = []
+        local_pack = results_data.get('local_pack', {})
+        if isinstance(local_pack, dict) and 'places' in local_pack:
+            for place in local_pack['places'][:3]:
+                if isinstance(place, dict):
+                    title = place.get('title') or place.get('name', '')
+                    reviews = place.get('reviews', 0)
+                    if isinstance(reviews, str) and reviews.startswith('('):
+                        reviews = reviews.strip('()')
+                    
+                    local_pack_results.append({
+                        'title': title,
+                        'rating': place.get('rating', 0),
+                        'reviews': reviews,
+                        'address': place.get('address', ''),
+                    })
+        
+        return create_ajax_response(
+            success=True,
+            message="",
+            data={
+                'rank_id': rank.id,
+                'position': rank.rank,
+                'created_at': rank.created_at.isoformat(),
+                'serp_results': serp_results,
+                'local_pack': local_pack_results,
+                'total_results': len(serp_results)
+            }
+        )
+        
+    except Rank.DoesNotExist:
+        return create_ajax_response(
+            success=False,
+            message="Rank not found or you don't have permission"
+        )
+    except Exception as e:
+        logger.error(f"Error fetching SERP data for rank {rank_id}: {e}")
+        return create_ajax_response(
+            success=False,
+            message="Failed to load SERP data"
+        )
+
+
+@login_required
+@require_http_methods(["GET"])
 def api_crawl_status(request, keyword_id):
     """Get the crawl status and schedule for a keyword"""
     try:
@@ -875,10 +976,15 @@ def keyword_detail(request, keyword_id):
                 # Process ALL organic results (not limited to 10)
                 organic_results = results_data.get('organic_results', [])
                 for i, result in enumerate(organic_results):
+                    # Skip results without valid URLs (these are likely special results)
+                    url = result.get('url') or result.get('link', '')
+                    if not url or url == '#' or url.startswith('#'):
+                        # Skip this result as it's likely a special result
+                        continue
+                    
                     # Check if this result is from our project domain
                     is_own_site = False
-                    url = result.get('url') or result.get('link', '#')
-                    if url and url != '#':
+                    if url:
                         from urllib.parse import urlparse
                         result_domain = urlparse(url).netloc
                         is_own_site = (result_domain == keyword.project.domain or 
@@ -892,6 +998,7 @@ def keyword_detail(request, keyword_id):
                         'snippet': result.get('description') or result.get('snippet', ''),
                         'is_own_site': is_own_site,
                         'domain': result.get('domain', ''),
+                        'result_type': result.get('result_type', 'organic'),
                     }
                     serp_results.append(serp_result)
                 
@@ -957,32 +1064,49 @@ def keyword_detail(request, keyword_id):
                 serp_results.append(serp_result)
     
     # Calculate statistics
-    ranks_with_data = [h.rank for h in ranking_history if h.rank > 0]
+    ranks_with_data = [h.rank for h in ranking_history if h.rank > 0 and h.rank <= 100]
     
-    # If no history, use current rank
-    if not ranks_with_data and keyword.rank > 0:
+    # If no history, use current rank only if it's valid (1-100)
+    if not ranks_with_data and keyword.rank > 0 and keyword.rank <= 100:
         ranks_with_data = [keyword.rank]
     
-    best_rank = keyword.highest_rank if keyword.highest_rank > 0 else (min(ranks_with_data) if ranks_with_data else keyword.rank)
-    worst_rank = max([h.rank for h in ranking_history if h.rank > 0 and h.rank <= 100], default=keyword.rank if keyword.rank > 0 else 0)
-    avg_rank = sum(ranks_with_data) / len(ranks_with_data) if ranks_with_data else keyword.rank
+    # Set best_rank, worst_rank, and avg_rank to 0 if no valid ranking data (will show as NR)
+    if ranks_with_data:
+        best_rank = min(ranks_with_data)
+        worst_rank = max(ranks_with_data)
+        avg_rank = sum(ranks_with_data) / len(ranks_with_data)
+    else:
+        best_rank = 0  # Will display as NR in template
+        worst_rank = 0  # Will display as NR in template
+        avg_rank = 0   # Will display as NR in template
     
-    # Get competitor analysis (other domains ranking for this keyword)
+    # Get competitor analysis from SERP results
     competitors = []
-    if keyword.ranking_pages and isinstance(keyword.ranking_pages, list):
+    competitor_domains = {}  # Track domains and their best positions
+    
+    if serp_results:
         from urllib.parse import urlparse
-        seen_domains = set()
-        for page in keyword.ranking_pages[:20]:
-            if isinstance(page, dict) and 'url' in page:
-                domain = urlparse(page['url']).netloc
-                if domain and domain not in seen_domains and domain != keyword.project.domain:
-                    seen_domains.add(domain)
-                    competitors.append({
-                        'domain': domain,
-                        'position': page.get('position', 0),
-                        'url': page['url'],
-                        'title': page.get('title', '')
-                    })
+        for result in serp_results:
+            if result['url'] and result['url'] != '#':
+                domain = urlparse(result['url']).netloc
+                # Skip our own domain and empty domains
+                if domain and domain != keyword.project.domain and domain != f'www.{keyword.project.domain}':
+                    # Track the best (lowest) position for each domain
+                    if domain not in competitor_domains or result['position'] < competitor_domains[domain]['position']:
+                        competitor_domains[domain] = {
+                            'domain': domain,
+                            'position': result['position'],
+                            'url': result['url'],
+                            'title': result['title'],
+                            'snippet': result.get('snippet', '')[:100],
+                            'count': competitor_domains.get(domain, {}).get('count', 0) + 1
+                        }
+                    else:
+                        # Increment count if domain appears multiple times
+                        competitor_domains[domain]['count'] = competitor_domains.get(domain, {}).get('count', 0) + 1
+        
+        # Convert to list and sort by position
+        competitors = sorted(competitor_domains.values(), key=lambda x: x['position'])[:20]
     
     # Debug logging
     import logging
@@ -1000,7 +1124,7 @@ def keyword_detail(request, keyword_id):
         'chart_ranks': json.dumps(chart_ranks) if chart_ranks else '[]',
         'serp_results': serp_results,
         'local_pack_results': local_pack_results,
-        'competitors': competitors[:5],  # Top 5 competitors
+        'competitors': competitors,  # All competitors, already limited to top 20 in processing
         'best_rank': best_rank if best_rank else 0,
         'worst_rank': worst_rank if worst_rank else 0,
         'avg_rank': int(avg_rank) if avg_rank else 0,
