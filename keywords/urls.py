@@ -15,7 +15,8 @@ urlpatterns = [
     path('tags/<slug:tag_slug>/', views.keywords_by_tag, name='keywords_by_tag'),
     
     # API endpoints
-    path('api/tags/', views.api_user_tags, name='api_user_tags'),
+    path('api/tags/', views.api_tags, name='api_tags'),  # Simple tags list for autocomplete
+    path('api/user-tags/', views.api_user_tags, name='api_user_tags'),  # Full tags data
     path('api/tags/create/', views.api_create_tag, name='api_create_tag'),
     path('api/tags/keyword/', views.api_tag_keyword, name='api_tag_keyword'),
     path('api/tags/keyword/<int:keyword_id>/<int:tag_id>/', views.api_untag_keyword, name='api_untag_keyword'),

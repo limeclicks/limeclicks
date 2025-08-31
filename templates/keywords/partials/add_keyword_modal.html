@@ -1,6 +1,6 @@
 <!-- Add Keywords Modal - Multi-step -->
 <dialog id="add-keywords-modal" class="modal">
-    <div class="modal-box max-w-4xl">
+    <div class="modal-box max-w-4xl max-h-[90vh] overflow-y-auto">
         <form method="post" id="add-keywords-form" hx-post="{% url 'keywords:add_keywords' %}" hx-trigger="submit"
             hx-swap="none" hx-indicator="#submit-spinner" enctype="multipart/form-data">
             {% csrf_token %}
@@ -16,17 +16,31 @@
                 <button type="button" class="btn btn-sm btn-circle btn-ghost" onclick="closeModal()">✕</button>
             </div>
 
-            <!-- Progress Steps -->
-            <ul class="steps steps-horizontal w-full mb-6">
-                <li class="step step-primary" id="step-1-indicator">
-                    <span class="hidden md:inline">1</span>
-                    Select Project
-                </li>
-                <li class="step" id="step-2-indicator">
-                    <span class="hidden md:inline">2</span>
-                    Add Keywords & Country
-                </li>
-            </ul>
+            <!-- Progress Steps - Compact Style -->
+            <div class="flex items-center justify-center mb-6">
+                <div class="flex items-center gap-2">
+                    <!-- Step 1 -->
+                    <div class="flex items-center">
+                        <div id="step-1-indicator" class="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center text-sm font-medium transition-all duration-200">
+                            1
+                        </div>
+                        <span class="ml-2 text-sm font-medium text-base-content">Select Project</span>
+                    </div>
+                    
+                    <!-- Connector Line -->
+                    <div class="w-12 h-0.5 bg-base-300 relative">
+                        <div id="step-connector" class="absolute top-0 left-0 h-full bg-primary transition-all duration-300" style="width: 0%"></div>
+                    </div>
+                    
+                    <!-- Step 2 -->
+                    <div class="flex items-center">
+                        <div id="step-2-indicator" class="w-8 h-8 rounded-full bg-base-300 text-base-content/50 flex items-center justify-center text-sm font-medium transition-all duration-200">
+                            2
+                        </div>
+                        <span class="ml-2 text-sm font-medium text-base-content/50" id="step-2-text">Add Keywords & Country</span>
+                    </div>
+                </div>
+            </div>
 
             <!-- Step 1: Project Selection -->
             <div id="step-1" class="step-content">
@@ -82,9 +96,9 @@
                             Multiple selections will create keywords for each country
                         </span>
                     </label>
-                    <div class="card border border-base-300 max-h-48 overflow-y-auto">
-                        <div class="card-body p-4">
-                            <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+                    <div class="card border border-base-300 max-h-40 overflow-y-auto">
+                        <div class="card-body p-3">
+                            <div class="grid grid-cols-2 md:grid-cols-3 gap-2">
                                 <!-- Popular Countries -->
                                 <label class="flex items-center gap-2 cursor-pointer">
                                     <input type="checkbox" name="countries" value="US" class="checkbox checkbox-sm"
@@ -199,7 +213,7 @@
                             </span>
                         </label>
                         <textarea name="keywords" id="keywords-input"
-                            class="textarea textarea-bordered h-48 font-mono text-sm w-full"
+                            class="textarea textarea-bordered h-40 font-mono text-sm w-full"
                             placeholder="best seo tools&#10;digital marketing agency&#10;web design services&#10;keyword research tool&#10;content marketing strategy"
                             oninput="updateKeywordCount()"></textarea>
                         <label class="label">
@@ -252,6 +266,44 @@
                     </div>
                 </div>
 
+                <!-- Tags Selection -->
+                <div class="form-control mb-4">
+                    <label class="label">
+                        <span class="label-text">Tags <span class="text-base-content/50 text-xs ml-1">(Optional)</span></span>
+                        <span class="label-text-alt text-info">
+                            <i class="fas fa-plus-circle mr-1"></i>
+                            Add tags to organize your keywords
+                        </span>
+                    </label>
+                    <div class="relative">
+                        <input type="text" 
+                               id="tag-input" 
+                               class="input input-bordered w-full pr-10" 
+                               placeholder="Type to search or create tags..."
+                               autocomplete="off">
+                        <button type="button" 
+                                onclick="toggleTagDropdown()" 
+                                class="absolute right-2 top-1/2 -translate-y-1/2 text-base-content/50 hover:text-base-content">
+                            <i class="fas fa-chevron-down"></i>
+                        </button>
+                    </div>
+                    
+                    <!-- Selected Tags Display -->
+                    <div id="selected-tags" class="mt-2 max-h-24 overflow-y-auto">
+                        <!-- Selected tags will appear here -->
+                    </div>
+                    
+                    <!-- Tags Dropdown -->
+                    <div id="tags-dropdown" class="absolute z-50 w-full mt-1 bg-base-100 border border-base-300 rounded-lg shadow-lg hidden max-h-48 overflow-y-auto">
+                        <div id="tags-list" class="p-2">
+                            <!-- Tag suggestions will appear here -->
+                        </div>
+                    </div>
+                    
+                    <!-- Hidden input to store selected tag IDs -->
+                    <input type="hidden" name="tags" id="tags-hidden-input" value="">
+                </div>
+
                 <!-- Error message -->
                 <div id="error-message" class="alert alert-error hidden mb-4">
                     <i class="fas fa-exclamation-circle"></i>
@@ -275,50 +327,54 @@
         </form>
     </div>
 
-    <!-- Modal Backdrop -->
-    <form method="dialog" class="modal-backdrop">
-        <button type="button" onclick="closeModal()">close</button>
-    </form>
+    <!-- Modal Backdrop - Removed close functionality -->
+    <div class="modal-backdrop"></div>
 </dialog>
 
 <script>
+(function() {
+    // Encapsulate all modal logic to avoid global scope conflicts
+    
     // Auto-open the modal when loaded
-    (function() {
-        try {
-            const modal = document.getElementById('add-keywords-modal');
-            if (!modal) {
-                console.error('Add Keywords modal element not found');
-                return;
-            }
-            
-            if (typeof modal.showModal !== 'function') {
-                console.error('showModal function not available. Browser may not support dialog element.');
+    try {
+        const modal = document.getElementById('add-keywords-modal');
+        if (!modal) {
+            console.error('Add Keywords modal element not found');
+            return;
+        }
+        
+        // Prevent ESC key from closing the modal
+        modal.addEventListener('cancel', (e) => {
+            e.preventDefault();
+        });
+        
+        if (typeof modal.showModal !== 'function') {
+            console.error('showModal function not available. Browser may not support dialog element.');
+            // Fallback: show modal using class
+            modal.classList.add('modal-open');
+            return;
+        }
+        
+        // Small delay to ensure everything is rendered
+        setTimeout(() => {
+            try {
+                modal.showModal();
+                console.log('Add Keywords modal opened successfully');
+            } catch (err) {
+                console.error('Error opening modal:', err);
                 // Fallback: show modal using class
                 modal.classList.add('modal-open');
-                return;
             }
-            
-            // Small delay to ensure everything is rendered
-            setTimeout(() => {
-                try {
-                    modal.showModal();
-                    console.log('Add Keywords modal opened successfully');
-                } catch (err) {
-                    console.error('Error opening modal:', err);
-                    // Fallback: show modal using class
-                    modal.classList.add('modal-open');
-                }
-            }, 50);
-        } catch (error) {
-            console.error('Error in modal initialization:', error);
-        }
-    })();
+        }, 50);
+    } catch (error) {
+        console.error('Error in modal initialization:', error);
+    }
 
-    // Track current step
+    // Track current step (local to this closure)
     let currentStep = 1;
 
-    // Close modal function
-    function closeModal() {
+    // Make functions available globally by attaching to window
+    window.closeModal = function() {
         const modal = document.getElementById('add-keywords-modal');
         if (modal) {
             modal.close();
@@ -330,19 +386,26 @@
                 }
             }, 100);
         }
-    }
+    };
 
     // Step navigation functions
-    function goToStep1() {
+    window.goToStep1 = function() {
         document.getElementById('step-1').classList.remove('hidden');
         document.getElementById('step-2').classList.add('hidden');
-        document.getElementById('step-1-indicator').classList.add('step-primary');
-        document.getElementById('step-2-indicator').classList.remove('step-primary');
+        
+        // Update step indicators back to step 1
+        document.getElementById('step-1-indicator').className = 'w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center text-sm font-medium transition-all duration-200';
+        document.getElementById('step-1-indicator').innerHTML = '1';
+        document.getElementById('step-2-indicator').className = 'w-8 h-8 rounded-full bg-base-300 text-base-content/50 flex items-center justify-center text-sm font-medium transition-all duration-200';
+        document.getElementById('step-2-indicator').innerHTML = '2';
+        document.getElementById('step-2-text').className = 'ml-2 text-sm font-medium text-base-content/50';
+        document.getElementById('step-connector').style.width = '0%';
+        
         document.getElementById('project-domain-header').classList.add('hidden');
         currentStep = 1;
-    }
+    };
 
-    function goToStep2() {
+    window.goToStep2 = function() {
         const projectSelect = document.getElementById('project-select');
         if (!projectSelect.value) {
             alert('Please select a project first');
@@ -359,16 +422,22 @@
 
         document.getElementById('step-1').classList.add('hidden');
         document.getElementById('step-2').classList.remove('hidden');
-        document.getElementById('step-1-indicator').classList.add('step-primary');
-        document.getElementById('step-2-indicator').classList.add('step-primary');
+        
+        // Update step indicators for step 2
+        document.getElementById('step-1-indicator').className = 'w-8 h-8 rounded-full bg-success text-white flex items-center justify-center text-sm font-medium transition-all duration-200';
+        document.getElementById('step-1-indicator').innerHTML = '<i class="fas fa-check text-xs"></i>';
+        document.getElementById('step-2-indicator').className = 'w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center text-sm font-medium transition-all duration-200';
+        document.getElementById('step-2-text').className = 'ml-2 text-sm font-medium text-base-content';
+        document.getElementById('step-connector').style.width = '100%';
+        
         currentStep = 2;
 
         // Update keyword count
-        updateKeywordCount();
-    }
+        window.updateKeywordCount();
+    };
 
     // Input method switching
-    function showInputMethod(method) {
+    window.showInputMethod = function(method) {
         const tabs = document.querySelectorAll('.tabs .tab');
         tabs.forEach(tab => tab.classList.remove('tab-active'));
 
@@ -385,11 +454,11 @@
             document.getElementById('file-input').classList.remove('hidden');
             tabs[1].classList.add('tab-active');
         }
-        updateKeywordCount();
-    }
+        window.updateKeywordCount();
+    };
 
     // Update keyword count with country multiplication
-    function updateKeywordCount() {
+    window.updateKeywordCount = function() {
         const textarea = document.getElementById('keywords-input');
         const fileInput = document.querySelector('input[name="keywords_file"]');
         const activeTab = document.querySelector('.tab.tab-active');
@@ -434,15 +503,15 @@
                 submitBtn.classList.remove('btn-disabled');
             }
         }
-    }
+    };
 
     // Listen for country checkbox changes
     document.querySelectorAll('input[name="countries"]').forEach(checkbox => {
-        checkbox.addEventListener('change', updateKeywordCount);
+        checkbox.addEventListener('change', window.updateKeywordCount);
     });
 
     // Handle file selection
-    function handleFileSelect(input) {
+    window.handleFileSelect = function(input) {
         const file = input.files[0];
         if (file) {
             document.getElementById('file-preview').classList.remove('hidden');
@@ -455,14 +524,14 @@
                     .map(line => line.trim())
                     .filter(line => line !== '' && line.toLowerCase() !== 'keyword');
                 document.getElementById('file-keywords-count').textContent = lines.length;
-                updateKeywordCount(); // Update total count
+                window.updateKeywordCount(); // Update total count
             };
             reader.readAsText(file);
         }
-    }
+    };
 
     // Download CSV template
-    function downloadTemplate() {
+    window.downloadTemplate = function() {
         const csvContent = "keyword\nseo tools\nkeyword research\nrank tracking\nbacklink analysis\nsite audit";
         const blob = new Blob([csvContent], { type: 'text/csv' });
         const url = window.URL.createObjectURL(blob);
@@ -471,11 +540,11 @@
         a.download = 'keywords_template.csv';
         a.click();
         window.URL.revokeObjectURL(url);
-    }
+    };
 
     // Listen for the keywordsAdded event to close the modal
     document.body.addEventListener('keywordsAdded', function (evt) {
-        closeModal();
+        window.closeModal();
         // Show success notification
         const notification = document.createElement('div');
         notification.className = 'alert alert-success fixed top-20 right-4 z-50 shadow-lg max-w-sm';
@@ -497,7 +566,7 @@
     });
 
     // Form validation
-    function validateForm() {
+    window.validateForm = function() {
         const activeTab = document.querySelector('.tab.tab-active');
         const errorMessage = document.getElementById('error-message');
         const errorText = document.getElementById('error-text');
@@ -530,16 +599,199 @@
 
         errorMessage.classList.add('hidden');
         return true;
-    }
+    };
 
     // Initialize keyword count on modal open
-    updateKeywordCount();
+    window.updateKeywordCount();
+    
+    // Tags management
+    let selectedTags = [];
+    let availableTags = [];
+    
+    // Fetch available tags from the server
+    window.fetchAvailableTags = async function() {
+        try {
+            const response = await fetch('/keywords/api/tags/');
+            if (response.ok) {
+                availableTags = await response.json();
+                updateTagSuggestions();
+            }
+        } catch (error) {
+            console.error('Error fetching tags:', error);
+        }
+    };
+    
+    // Toggle tags dropdown
+    window.toggleTagDropdown = function() {
+        const dropdown = document.getElementById('tags-dropdown');
+        dropdown.classList.toggle('hidden');
+        if (!dropdown.classList.contains('hidden')) {
+            updateTagSuggestions();
+        }
+    };
+    
+    // Update tag suggestions in dropdown
+    window.updateTagSuggestions = function(searchTerm = '') {
+        const tagsList = document.getElementById('tags-list');
+        const filteredTags = availableTags.filter(tag => 
+            tag.name.toLowerCase().includes(searchTerm.toLowerCase()) &&
+            !selectedTags.some(selected => selected.id === tag.id)
+        );
+        
+        let html = '';
+        
+        if (filteredTags.length > 0) {
+            filteredTags.forEach(tag => {
+                html += `
+                    <div class="tag-suggestion p-2 hover:bg-base-200 rounded cursor-pointer flex items-center justify-between"
+                         onclick="selectTag(${tag.id}, '${tag.name}', '${tag.color || '#6B7280'}')">
+                        <div class="flex items-center gap-2">
+                            <span class="w-3 h-3 rounded-full" style="background-color: ${tag.color || '#6B7280'}"></span>
+                            <span>${tag.name}</span>
+                        </div>
+                        <span class="text-xs text-base-content/50">${tag.count || 0} keywords</span>
+                    </div>
+                `;
+            });
+        }
+        
+        // Add option to create new tag if search term exists and doesn't match existing
+        if (searchTerm && !availableTags.some(tag => tag.name.toLowerCase() === searchTerm.toLowerCase())) {
+            html += `
+                <div class="tag-suggestion p-2 hover:bg-primary/10 rounded cursor-pointer border-t border-base-300 mt-2"
+                     onclick="createNewTag('${searchTerm}')">
+                    <div class="flex items-center gap-2">
+                        <span class="w-6 h-6 rounded-full bg-primary text-white flex items-center justify-center text-xs">
+                            <i class="fas fa-plus"></i>
+                        </span>
+                        <span class="text-primary font-medium">Create "${searchTerm}"</span>
+                    </div>
+                </div>
+            `;
+        }
+        
+        tagsList.innerHTML = html || '<div class="p-2 text-base-content/50 text-center">No tags found</div>';
+    };
+    
+    // Select a tag
+    window.selectTag = function(id, name, color) {
+        if (!selectedTags.some(tag => tag.id === id)) {
+            selectedTags.push({ id, name, color });
+            updateSelectedTagsDisplay();
+            updateTagsHiddenInput();
+        }
+        document.getElementById('tag-input').value = '';
+        document.getElementById('tags-dropdown').classList.add('hidden');
+    };
+    
+    // Create new tag
+    window.createNewTag = function(name) {
+        // Generate a temporary ID for the new tag (will be created on server when form is submitted)
+        const tempId = 'new_' + Date.now();
+        const color = generateRandomColor();
+        selectedTags.push({ id: tempId, name, color, isNew: true });
+        updateSelectedTagsDisplay();
+        updateTagsHiddenInput();
+        document.getElementById('tag-input').value = '';
+        document.getElementById('tags-dropdown').classList.add('hidden');
+    };
+    
+    // Remove a selected tag
+    window.removeTag = function(id) {
+        selectedTags = selectedTags.filter(tag => tag.id !== id);
+        updateSelectedTagsDisplay();
+        updateTagsHiddenInput();
+    };
+    
+    // Update selected tags display
+    window.updateSelectedTagsDisplay = function() {
+        const container = document.getElementById('selected-tags');
+        if (selectedTags.length === 0) {
+            container.innerHTML = '<div class="text-base-content/40 text-sm py-2">No tags selected</div>';
+        } else {
+            container.innerHTML = '<div class="flex flex-wrap gap-2">' + 
+                selectedTags.map(tag => `
+                    <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium" 
+                          style="background-color: ${tag.color}; color: white;">
+                        ${tag.name}
+                        <button type="button" onclick="removeTag('${tag.id}')" 
+                                class="ml-1 hover:text-red-200 focus:outline-none">
+                            <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
+                            </svg>
+                        </button>
+                    </span>
+                `).join('') + '</div>';
+        }
+    };
+    
+    // Update hidden input with selected tag data
+    window.updateTagsHiddenInput = function() {
+        const input = document.getElementById('tags-hidden-input');
+        input.value = JSON.stringify(selectedTags);
+    };
+    
+    // Generate random color for new tags
+    window.generateRandomColor = function() {
+        const colors = ['#EF4444', '#F59E0B', '#10B981', '#3B82F6', '#8B5CF6', '#EC4899', '#14B8A6', '#F97316'];
+        return colors[Math.floor(Math.random() * colors.length)];
+    };
+    
+    // Tag input listeners
+    const tagInput = document.getElementById('tag-input');
+    if (tagInput) {
+        tagInput.addEventListener('input', function(e) {
+            const searchTerm = e.target.value;
+            const dropdown = document.getElementById('tags-dropdown');
+            if (searchTerm.length > 0) {
+                dropdown.classList.remove('hidden');
+                updateTagSuggestions(searchTerm);
+            } else {
+                dropdown.classList.add('hidden');
+            }
+        });
+        
+        tagInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                const searchTerm = e.target.value.trim();
+                if (searchTerm) {
+                    // Check if tag exists
+                    const existingTag = availableTags.find(tag => 
+                        tag.name.toLowerCase() === searchTerm.toLowerCase()
+                    );
+                    if (existingTag) {
+                        selectTag(existingTag.id, existingTag.name, existingTag.color);
+                    } else {
+                        createNewTag(searchTerm);
+                    }
+                }
+            }
+        });
+    }
+    
+    // Close dropdown when clicking outside
+    document.addEventListener('click', function(e) {
+        const dropdown = document.getElementById('tags-dropdown');
+        const tagInput = document.getElementById('tag-input');
+        const toggleBtn = e.target.closest('button[onclick*="toggleTagDropdown"]');
+        
+        if (!dropdown.contains(e.target) && e.target !== tagInput && !toggleBtn) {
+            dropdown.classList.add('hidden');
+        }
+    });
+    
+    // Initialize tags
+    fetchAvailableTags();
+    updateSelectedTagsDisplay();
 
     // Pre-select project if provided
     {% if request.GET.project_id %}
     // Auto-advance to step 2 if project is pre-selected
     setTimeout(() => {
-        goToStep2();
+        window.goToStep2();
     }, 100);
     {% endif %}
+    
+})(); // Close the IIFE
 </script>

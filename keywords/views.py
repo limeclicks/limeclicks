@@ -9,6 +9,7 @@ from .models import Tag, Keyword, KeywordTag
 from .crawl_scheduler import CrawlScheduler
 from common.utils import create_ajax_response, get_logger
 from project.models import Project
+import json
 
 logger = get_logger(__name__)
 
@@ -107,18 +108,52 @@ def project_keywords(request, project_id):
     # Get filter parameters
     search_query = request.GET.get('search', '')
     filter_status = request.GET.get('filter', 'all')
+    per_page = int(request.GET.get('per_page', 50))  # Default to 50 per page
+    country_filter = request.GET.get('country', '')
+    tag_filter = request.GET.get('tag', '')
+    rank_compare = request.GET.get('rank_compare', '')
+    rank_value = request.GET.get('rank_value', '')
+    rank_value2 = request.GET.get('rank_value2', '')
     
-    # Build queryset for keywords
+    # Validate per_page value
+    if per_page not in [50, 100, 250]:
+        per_page = 50
+    
+    # Build queryset for keywords with tags prefetched
     keywords_qs = Keyword.objects.filter(
         project=project,
         archive=False
-    ).order_by('-created_at')
+    ).prefetch_related('keyword_tags__tag').order_by('-created_at')
     
     # Apply search filter
     if search_query:
         keywords_qs = keywords_qs.filter(
             keyword__icontains=search_query
         )
+    
+    # Apply country filter
+    if country_filter:
+        keywords_qs = keywords_qs.filter(country=country_filter)
+    
+    # Apply tag filter
+    if tag_filter:
+        keywords_qs = keywords_qs.filter(keyword_tags__tag_id=tag_filter)
+    
+    # Apply rank comparison filter
+    if rank_compare and rank_value:
+        try:
+            rank_val = int(rank_value)
+            if rank_compare == 'eq':
+                keywords_qs = keywords_qs.filter(rank=rank_val)
+            elif rank_compare == 'lt':
+                keywords_qs = keywords_qs.filter(rank__lt=rank_val, rank__gt=0)
+            elif rank_compare == 'gt':
+                keywords_qs = keywords_qs.filter(rank__gt=rank_val)
+            elif rank_compare == 'between' and rank_value2:
+                rank_val2 = int(rank_value2)
+                keywords_qs = keywords_qs.filter(rank__gte=rank_val, rank__lte=rank_val2)
+        except ValueError:
+            pass
     
     # Apply status filter
     if filter_status == 'top10':
@@ -142,14 +177,34 @@ def project_keywords(request, project_id):
     
     # Pagination
     page_number = request.GET.get('page', 1)
-    paginator = Paginator(keywords_qs, 20)
+    paginator = Paginator(keywords_qs, per_page)
     page_obj = paginator.get_page(page_number)
+    
+    # Get available tags for filter dropdown
+    available_tags = Tag.objects.filter(
+        user=request.user,
+        is_active=True
+    ).annotate(
+        keyword_count=Count('keyword_tags')
+    ).filter(keyword_count__gt=0)
+    
+    # Get unique countries from keywords
+    available_countries = Keyword.objects.filter(
+        project=project,
+        archive=False
+    ).values_list('country', flat=True).distinct().order_by('country')
     
     context = {
         'project': project,
         'keywords': page_obj.object_list,
         'search_query': search_query,
         'filter_status': filter_status,
+        'per_page': per_page,
+        'country_filter': country_filter,
+        'tag_filter': tag_filter,
+        'rank_compare': rank_compare,
+        'rank_value': rank_value,
+        'rank_value2': rank_value2,
         'total_keywords': keyword_stats['total_keywords'] or 0,
         'top10_count': keyword_stats['top10_count'] or 0,
         'improved_count': keyword_stats['improved_count'] or 0,
@@ -159,6 +214,8 @@ def project_keywords(request, project_id):
         'page_obj': page_obj,
         'has_next': page_obj.has_next(),
         'next_page': page_obj.next_page_number() if page_obj.has_next() else None,
+        'available_tags': available_tags,
+        'available_countries': available_countries,
     }
     
     # Handle HTMX requests for partial updates
@@ -190,6 +247,7 @@ def add_keywords(request):
     countries = request.POST.getlist('countries')  # Get multiple countries
     keywords_file = request.FILES.get('keywords_file')
     keywords_text = request.POST.get('keywords', '')
+    tags_data = request.POST.get('tags', '[]')  # Get tags as JSON string
     
     if not project_id:
         return JsonResponse({'error': 'Project is required'}, status=400)
@@ -249,9 +307,41 @@ def add_keywords(request):
     if not keywords_list:
         return JsonResponse({'error': 'No keywords provided'}, status=400)
     
+    # Parse tags data
+    try:
+        tags = json.loads(tags_data) if tags_data else []
+    except json.JSONDecodeError:
+        tags = []
+    
+    # Process tags - create new ones if needed
+    tag_objects = []
+    for tag_info in tags:
+        if isinstance(tag_info, dict):
+            tag_id = tag_info.get('id')
+            tag_name = tag_info.get('name', '')
+            tag_color = tag_info.get('color', '#6B7280')
+            is_new = tag_info.get('isNew', False)
+            
+            if is_new or str(tag_id).startswith('new_'):
+                # Create new tag
+                tag, _ = Tag.objects.get_or_create(
+                    user=request.user,
+                    name=tag_name,
+                    defaults={'color': tag_color}
+                )
+                tag_objects.append(tag)
+            else:
+                # Use existing tag
+                try:
+                    tag = Tag.objects.get(id=tag_id, user=request.user)
+                    tag_objects.append(tag)
+                except Tag.DoesNotExist:
+                    pass
+    
     added = []
     skipped = []
     total_created = 0
+    created_keywords = []
     
     # Create keywords for each country
     for keyword_text in keywords_list:
@@ -267,6 +357,7 @@ def add_keywords(request):
             
             if created:
                 total_created += 1
+                created_keywords.append(keyword)
                 # Schedule initial crawl
                 keyword.schedule_next_crawl()
                 if keyword_text not in added:
@@ -274,6 +365,13 @@ def add_keywords(request):
             else:
                 if keyword_text not in skipped:
                     skipped.append(keyword_text)
+            
+            # Add tags to keyword (whether new or existing)
+            for tag in tag_objects:
+                KeywordTag.objects.get_or_create(
+                    keyword=keyword,
+                    tag=tag
+                )
     
     # Return success response for HTMX
     if request.headers.get('HX-Request'):
@@ -328,12 +426,27 @@ def api_user_tags(request):
     tags = Tag.objects.filter(
         user=request.user,
         is_active=True
-    ).values('id', 'name', 'slug', 'color', 'description')
+    ).annotate(
+        count=Count('keyword_tags')
+    ).values('id', 'name', 'slug', 'color', 'description', 'count')
     
     return JsonResponse({
         'tags': list(tags),
         'count': len(tags)
     })
+
+
+@login_required
+def api_tags(request):
+    """Simple API endpoint to get user's tags for autocomplete"""
+    tags = Tag.objects.filter(
+        user=request.user,
+        is_active=True
+    ).annotate(
+        count=Count('keyword_tags')
+    ).values('id', 'name', 'color', 'count')
+    
+    return JsonResponse(list(tags), safe=False)
 
 
 @login_required

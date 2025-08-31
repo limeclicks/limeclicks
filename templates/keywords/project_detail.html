@@ -70,27 +70,99 @@
         <!-- Search and Filter Card -->
         <div class="card bg-base-100 shadow-sm border border-base-300">
             <div class="card-body p-4">
-                <!-- Search Bar -->
-                <div class="relative mb-4">
-                    <input 
-                        type="text" 
-                        id="search-input"
-                        name="search"
-                        placeholder="Search keywords..." 
-                        class="input input-bordered w-full pl-12 pr-4 h-12"
-                        value="{{ search_query }}"
-                        hx-get="{% url 'keywords:project_keywords' project.id %}"
-                        hx-trigger="keyup changed delay:500ms"
-                        hx-target="#keywords-table"
-                        hx-swap="innerHTML"
-                        hx-vals='{"filter": "{{ filter_status|default:"all" }}"}'
-                        hx-indicator="#search-spinner"
-                    >
-                    <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-base-content/40"></i>
-                    <span id="search-spinner" class="htmx-indicator absolute right-4 top-1/2 -translate-y-1/2">
-                        <i class="fas fa-spinner loading-spinner text-primary"></i>
-                    </span>
-                </div>
+                <!-- Search Form -->
+                <form id="search-form" method="get" action="{% url 'keywords:project_keywords' project.id %}">
+                    <!-- Search Row -->
+                    <div class="flex gap-2 mb-3">
+                        <div class="relative flex-1">
+                            <input 
+                                type="text" 
+                                id="search-input"
+                                name="search"
+                                placeholder="Search by Keyword" 
+                                class="input input-bordered input-sm w-full pl-10"
+                                value="{{ search_query }}"
+                            >
+                            <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-base-content/40 text-sm"></i>
+                        </div>
+                        
+                        <!-- Search Button -->
+                        <button 
+                            type="button"
+                            class="btn btn-primary btn-sm"
+                            onclick="performSearch()"
+                        >
+                            Search
+                        </button>
+                        
+                        <!-- Clear Button -->
+                        <button 
+                            type="button"
+                            class="btn btn-ghost btn-sm"
+                            onclick="clearAllFilters()"
+                        >
+                            Clear
+                        </button>
+                    </div>
+                    
+                    <!-- Advanced Filters Row -->
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-2 mb-3">
+                        <!-- Country Filter -->
+                        <select name="country" id="country-filter" class="select select-bordered select-sm">
+                            <option value="">All Countries</option>
+                            <option value="US" {% if request.GET.country == 'US' %}selected{% endif %}>United States</option>
+                            <option value="GB" {% if request.GET.country == 'GB' %}selected{% endif %}>United Kingdom</option>
+                            <option value="CA" {% if request.GET.country == 'CA' %}selected{% endif %}>Canada</option>
+                            <option value="AU" {% if request.GET.country == 'AU' %}selected{% endif %}>Australia</option>
+                            <option value="DE" {% if request.GET.country == 'DE' %}selected{% endif %}>Germany</option>
+                            <option value="FR" {% if request.GET.country == 'FR' %}selected{% endif %}>France</option>
+                            <option value="IN" {% if request.GET.country == 'IN' %}selected{% endif %}>India</option>
+                        </select>
+                        
+                        <!-- Tags Filter -->
+                        <select name="tag" id="tag-filter" class="select select-bordered select-sm">
+                            <option value="">All Tags</option>
+                            {% for tag in available_tags %}
+                            <option value="{{ tag.id }}" {% if request.GET.tag == tag.id|stringformat:"s" %}selected{% endif %}>
+                                {{ tag.name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        
+                        <!-- Rank Comparison -->
+                        <select name="rank_compare" id="rank-compare" class="select select-bordered select-sm">
+                            <option value="">All Ranks</option>
+                            <option value="eq" {% if request.GET.rank_compare == 'eq' %}selected{% endif %}>Rank Equal To</option>
+                            <option value="lt" {% if request.GET.rank_compare == 'lt' %}selected{% endif %}>Rank Less Than</option>
+                            <option value="gt" {% if request.GET.rank_compare == 'gt' %}selected{% endif %}>Rank Greater Than</option>
+                            <option value="between" {% if request.GET.rank_compare == 'between' %}selected{% endif %}>Rank Between</option>
+                        </select>
+                        
+                        <!-- Rank Value -->
+                        <div class="flex gap-1">
+                            <input 
+                                type="number" 
+                                name="rank_value" 
+                                id="rank-value"
+                                placeholder="Rank"
+                                min="1" 
+                                max="100"
+                                class="input input-bordered input-sm w-20"
+                                value="{{ request.GET.rank_value }}"
+                            >
+                            <input 
+                                type="number" 
+                                name="rank_value2" 
+                                id="rank-value2"
+                                placeholder="To"
+                                min="1" 
+                                max="100"
+                                class="input input-bordered input-sm w-20 {% if request.GET.rank_compare != 'between' %}hidden{% endif %}"
+                                value="{{ request.GET.rank_value2 }}"
+                            >
+                        </div>
+                    </div>
+                </form>
                 
                 <!-- Filter Buttons -->
                 <div class="flex items-center gap-2 flex-wrap">
@@ -99,12 +171,8 @@
                     <button 
                         type="button"
                         class="btn btn-sm {% if filter_status == 'all' or not filter_status %}btn-primary{% else %}btn-outline{% endif %}"
-                        hx-get="{% url 'keywords:project_keywords' project.id %}"
-                        hx-trigger="click"
-                        hx-target="#keywords-table"
-                        hx-swap="innerHTML"
-                        hx-include="#search-input"
-                        hx-vals='{"filter": "all"}'
+                        data-filter="all"
+                        onclick="applyFilter('all')"
                     >
                         All
                         <span class="badge badge-sm ml-1">{{ total_keywords }}</span>
@@ -113,12 +181,8 @@
                     <button 
                         type="button"
                         class="btn btn-sm {% if filter_status == 'top10' %}btn-success{% else %}btn-outline btn-success{% endif %}"
-                        hx-get="{% url 'keywords:project_keywords' project.id %}"
-                        hx-trigger="click"
-                        hx-target="#keywords-table"
-                        hx-swap="innerHTML"
-                        hx-include="#search-input"
-                        hx-vals='{"filter": "top10"}'
+                        data-filter="top10"
+                        onclick="applyFilter('top10')"
                     >
                         <i class="fas fa-trophy mr-1"></i>
                         Top 10
@@ -128,12 +192,8 @@
                     <button 
                         type="button"
                         class="btn btn-sm {% if filter_status == 'improved' %}btn-info{% else %}btn-outline btn-info{% endif %}"
-                        hx-get="{% url 'keywords:project_keywords' project.id %}"
-                        hx-trigger="click"
-                        hx-target="#keywords-table"
-                        hx-swap="innerHTML"
-                        hx-include="#search-input"
-                        hx-vals='{"filter": "improved"}'
+                        data-filter="improved"
+                        onclick="applyFilter('improved')"
                     >
                         <i class="fas fa-arrow-up mr-1"></i>
                         Improved
@@ -143,12 +203,8 @@
                     <button 
                         type="button"
                         class="btn btn-sm {% if filter_status == 'declined' %}btn-warning{% else %}btn-outline btn-warning{% endif %}"
-                        hx-get="{% url 'keywords:project_keywords' project.id %}"
-                        hx-trigger="click"
-                        hx-target="#keywords-table"
-                        hx-swap="innerHTML"
-                        hx-include="#search-input"
-                        hx-vals='{"filter": "declined"}'
+                        data-filter="declined"
+                        onclick="applyFilter('declined')"
                     >
                         <i class="fas fa-arrow-down mr-1"></i>
                         Declined
@@ -158,12 +214,8 @@
                     <button 
                         type="button"
                         class="btn btn-sm {% if filter_status == 'not_ranking' %}btn-error{% else %}btn-outline btn-error{% endif %}"
-                        hx-get="{% url 'keywords:project_keywords' project.id %}"
-                        hx-trigger="click"
-                        hx-target="#keywords-table"
-                        hx-swap="innerHTML"
-                        hx-include="#search-input"
-                        hx-vals='{"filter": "not_ranking"}'
+                        data-filter="not_ranking"
+                        onclick="applyFilter('not_ranking')"
                     >
                         <i class="fas fa-times-circle mr-1"></i>
                         Not Ranking
@@ -242,9 +294,20 @@
                                 <td>
                                     <div class="font-medium">{{ keyword.keyword }}</div>
                                     {% if keyword.rank_url %}
-                                    <a href="{{ keyword.rank_url }}" target="_blank" class="text-xs text-primary hover:underline">
-                                        <i class="fas fa-external-link-alt mr-1"></i>View SERP
-                                    </a>
+                                    <div class="mt-1">
+                                        <a href="{{ keyword.rank_url }}" target="_blank" class="text-xs text-base-content/60 hover:text-primary hover:underline block truncate max-w-xs" title="{{ keyword.rank_url }}">
+                                            <i class="fas fa-link text-[10px] mr-1"></i>{{ keyword.rank_url|truncatechars:50 }}
+                                        </a>
+                                    </div>
+                                    {% endif %}
+                                    {% if keyword.keyword_tags.all %}
+                                    <div class="flex flex-wrap gap-1 mt-1">
+                                        {% for keyword_tag in keyword.keyword_tags.all %}
+                                        <span class="badge badge-sm" style="background-color: {{ keyword_tag.tag.color }}; color: white;">
+                                            {{ keyword_tag.tag.name }}
+                                        </span>
+                                        {% endfor %}
+                                    </div>
                                     {% endif %}
                                 </td>
                                 <td class="text-center">
@@ -313,23 +376,6 @@
                         </tbody>
                     </table>
                 </div>
-                
-                {% if has_next %}
-                <!-- Pagination -->
-                <div class="p-4 border-t">
-                    <button 
-                        class="btn btn-primary btn-outline btn-sm w-full"
-                        hx-get="{% url 'keywords:project_keywords' project.id %}?page={{ next_page }}"
-                        hx-trigger="click"
-                        hx-target="#keywords-table tbody"
-                        hx-select="tbody tr"
-                        hx-swap="beforeend"
-                    >
-                        Load More Keywords
-                    </button>
-                </div>
-                {% endif %}
-                
                 {% else %}
                 <!-- Empty State -->
                 <div class="p-12 text-center">
@@ -353,20 +399,197 @@
             </div>
         </div>
     </div>
+    
+    {% if keywords %}
+    <!-- Pagination Card (Separate from table) -->
+    <div class="card bg-base-100 shadow-sm border border-base-300 mt-4">
+        <div class="card-body p-4">
+            <div class="flex items-center justify-between">
+                <!-- Per Page Selector (Left) -->
+                <div class="flex items-center gap-2">
+                    <span class="text-sm text-base-content/60">Show</span>
+                    <select 
+                        id="per-page-bottom"
+                        class="select select-bordered select-sm"
+                        onchange="changePerPage(this.value)"
+                    >
+                        <option value="50" {% if per_page == 50 %}selected{% endif %}>50</option>
+                        <option value="100" {% if per_page == 100 %}selected{% endif %}>100</option>
+                        <option value="250" {% if per_page == 250 %}selected{% endif %}>250</option>
+                    </select>
+                    <span class="text-sm text-base-content/60">per page</span>
+                </div>
+                
+                <!-- Pagination Controls (Center) -->
+                <div class="join">
+                    {% if page_obj.has_previous %}
+                    <button 
+                        class="join-item btn btn-sm"
+                        onclick="goToPage(1)"
+                    >
+                        «
+                    </button>
+                    <button 
+                        class="join-item btn btn-sm"
+                        onclick="goToPage({{ page_obj.previous_page_number }})"
+                    >
+                        ‹
+                    </button>
+                    {% else %}
+                    <button class="join-item btn btn-sm btn-disabled">«</button>
+                    <button class="join-item btn btn-sm btn-disabled">‹</button>
+                    {% endif %}
+                    
+                    <!-- Page Numbers -->
+                    {% for num in page_obj.paginator.page_range %}
+                        {% if num > page_obj.number|add:"-3" and num < page_obj.number|add:"3" %}
+                        <button 
+                            class="join-item btn btn-sm {% if page_obj.number == num %}btn-active{% endif %}"
+                            onclick="goToPage({{ num }})"
+                        >
+                            {{ num }}
+                        </button>
+                        {% endif %}
+                    {% endfor %}
+                    
+                    {% if page_obj.has_next %}
+                    <button 
+                        class="join-item btn btn-sm"
+                        onclick="goToPage({{ page_obj.next_page_number }})"
+                    >
+                        ›
+                    </button>
+                    <button 
+                        class="join-item btn btn-sm"
+                        onclick="goToPage({{ page_obj.paginator.num_pages }})"
+                    >
+                        »
+                    </button>
+                    {% else %}
+                    <button class="join-item btn btn-sm btn-disabled">›</button>
+                    <button class="join-item btn btn-sm btn-disabled">»</button>
+                    {% endif %}
+                </div>
+                
+                <!-- Results Info (Right) -->
+                <div class="text-sm text-base-content/60">
+                    Showing {{ page_obj.start_index }} to {{ page_obj.end_index }} of {{ page_obj.paginator.count }} results
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
 </div>
 
 <!-- Modal Container -->
 <div id="modal-container"></div>
 
 <script>
+    // Apply filter
+    function applyFilter(filterValue) {
+        const form = document.getElementById('search-form');
+        const formData = new FormData(form);
+        const params = new URLSearchParams(formData);
+        params.set('filter', filterValue);
+        params.set('page', 1); // Reset to first page
+        
+        htmx.ajax('GET', '{% url "keywords:project_keywords" project.id %}?' + params.toString(), {
+            target: '#keywords-table',
+            swap: 'innerHTML'
+        });
+    }
+    
+    // Perform search with all filters
+    function performSearch() {
+        const form = document.getElementById('search-form');
+        const formData = new FormData(form);
+        const params = new URLSearchParams(formData);
+        
+        // Add filter parameter if active
+        const activeFilter = document.querySelector('.btn-primary[data-filter]');
+        if (activeFilter) {
+            params.append('filter', activeFilter.dataset.filter);
+        }
+        
+        params.set('page', 1); // Reset to first page on new search
+        
+        htmx.ajax('GET', '{% url "keywords:project_keywords" project.id %}?' + params.toString(), {
+            target: '#keywords-table',
+            swap: 'innerHTML'
+        });
+    }
+    
+    // Clear all filters
+    function clearAllFilters() {
+        document.getElementById('search-input').value = '';
+        document.getElementById('country-filter').value = '';
+        document.getElementById('tag-filter').value = '';
+        document.getElementById('rank-compare').value = '';
+        document.getElementById('rank-value').value = '';
+        document.getElementById('rank-value2').value = '';
+        
+        htmx.ajax('GET', '{% url "keywords:project_keywords" project.id %}', {
+            target: '#keywords-table',
+            swap: 'innerHTML'
+        });
+    }
+    
+    // Go to specific page
+    function goToPage(page) {
+        const form = document.getElementById('search-form');
+        const formData = new FormData(form);
+        const params = new URLSearchParams(formData);
+        params.append('page', page);
+        
+        // Add filter parameter
+        const activeFilter = document.querySelector('.btn-primary[data-filter]');
+        if (activeFilter) {
+            params.append('filter', activeFilter.dataset.filter);
+        }
+        
+        htmx.ajax('GET', '{% url "keywords:project_keywords" project.id %}?' + params.toString(), {
+            target: '#keywords-table',
+            swap: 'innerHTML'
+        });
+    }
+    
+    // Change per page
+    function changePerPage(value) {
+        const form = document.getElementById('search-form');
+        const formData = new FormData(form);
+        const params = new URLSearchParams(formData);
+        params.set('per_page', value);
+        params.set('page', 1); // Reset to first page
+        
+        htmx.ajax('GET', '{% url "keywords:project_keywords" project.id %}?' + params.toString(), {
+            target: '#keywords-table',
+            swap: 'innerHTML'
+        });
+    }
+    
+    // Handle rank comparison change
+    document.getElementById('rank-compare').addEventListener('change', function() {
+        const rankValue2 = document.getElementById('rank-value2');
+        if (this.value === 'between') {
+            rankValue2.classList.remove('hidden');
+        } else {
+            rankValue2.classList.add('hidden');
+        }
+    });
+    
+    // Handle enter key in search input
+    document.getElementById('search-input').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            performSearch();
+        }
+    });
+    
     // Listen for successful keyword additions
     document.body.addEventListener('htmx:afterRequest', function(evt) {
         if (evt.detail.successful && evt.detail.target.id === 'modal-container') {
             // Reload the keywords table after adding
-            htmx.ajax('GET', '{% url "keywords:project_keywords" project.id %}', {
-                target: '#keywords-table',
-                swap: 'innerHTML'
-            });
+            performSearch();
         }
     });
 </script>
