@@ -60,16 +60,16 @@ jobs:
             export NVM_DIR="$HOME/.nvm"
             [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
             
-            # Use Node.js version 22
-            nvm use 22
+            # Use Node.js version 22.18.0
+            nvm use 22.18.0
             
             # Install Node dependencies
             echo "Installing Node dependencies..."
             npm install
             
-            # Build frontend assets
+            # Build frontend assets (use build-css script)
             echo "Building frontend assets..."
-            npm run build || ./build-css.sh
+            npm run build-css
             
             # Collect static files (before migration)
             echo "Collecting static files..."
