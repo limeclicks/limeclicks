@@ -98,7 +98,7 @@ class Keyword(models.Model):
         Args:
             new_rank: The new rank position
             url: Optional URL where the site was found
-            from_rank_save: Internal flag to prevent circular calls
+            from_rank_save: Internal flag - when True, skip updating scraped_at as it's managed by the task
         """
         # Get the previous rank from history (not current rank)
         # This ensures we compare against the actual previous rank
@@ -160,9 +160,14 @@ class Keyword(models.Model):
         # Calculate impact based on rank change
         self.impact = self.calculate_impact(old_rank, new_rank)
         
-        # Update scraped timestamp and schedule next crawl
-        self.scraped_at = timezone.now()
-        self.next_crawl_at = self.scraped_at + timedelta(hours=self.crawl_interval_hours)
+        # Update scraped timestamp and schedule next crawl (skip if called from Rank save)
+        if not from_rank_save:
+            self.scraped_at = timezone.now()
+            self.next_crawl_at = self.scraped_at + timedelta(hours=self.crawl_interval_hours)
+        else:
+            # Still update next_crawl_at based on existing scraped_at
+            if self.scraped_at:
+                self.next_crawl_at = self.scraped_at + timedelta(hours=self.crawl_interval_hours)
         
         # Reset priority to normal after successful crawl (unless it was forced)
         if self.crawl_priority == 'high' and old_rank == 0:

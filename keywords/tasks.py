@@ -50,6 +50,16 @@ def fetch_keyword_serp_html(self, keyword_id: int) -> None:
         # Check if this is a force crawl or scheduled crawl
         is_force_crawl = keyword.crawl_priority == 'critical'
         
+        # If force crawl, delete today's rank to allow re-ranking
+        if is_force_crawl:
+            from .models import Rank
+            deleted_count = Rank.objects.filter(
+                keyword=keyword,
+                created_at__date=timezone.now().date()
+            ).delete()[0]
+            if deleted_count > 0:
+                logger.info(f"Deleted {deleted_count} existing rank(s) for keyword {keyword.id} (force crawl)")
+        
         # Check eligibility (unless force crawled)
         if not is_force_crawl and keyword.scraped_at:
             # Use the model's should_crawl method for consistency
@@ -183,9 +193,12 @@ def _handle_successful_fetch(keyword: Keyword, html_content: str) -> None:
     is_new_file = not absolute_path.exists()
     
     # Check if file for today already exists (idempotency)
-    if not is_new_file:
-        logger.info(f"File already exists for today: {relative_path}")
-        # Don't overwrite, but still count as success
+    # For force crawls, we overwrite; for regular crawls, we skip
+    is_force_crawl = keyword.crawl_priority == 'critical'
+    
+    if not is_new_file and not is_force_crawl:
+        logger.info(f"File already exists for today: {relative_path} (skipping overwrite)")
+        # Don't overwrite for regular crawls, but still count as success
         # Extract top 3 ranking pages
         top_pages = _extract_top_pages(html_content, limit=3)
         
@@ -194,20 +207,27 @@ def _handle_successful_fetch(keyword: Keyword, html_content: str) -> None:
         keyword.last_error_message = None
         keyword.processing = False  # Reset processing flag
         keyword.ranking_pages = top_pages  # Update top 3 pages
-        # Only update scraped_at if it's the first success today
+        # Update file path if it's different
         if not keyword.scrape_do_file_path or keyword.scrape_do_file_path != relative_path:
-            keyword.scraped_at = timezone.now()
             keyword.scrape_do_file_path = relative_path
             # Ensure it's in the file list
             if relative_path not in (keyword.scrape_do_files or []):
                 file_list = keyword.scrape_do_files or []
                 file_list.insert(0, relative_path)
                 keyword.scrape_do_files = file_list[:settings.SERP_HISTORY_DAYS]
-        keyword.save()
         
-        # Still process for ranking if not already done today
+        # Process for ranking first (which might update and save keyword)
         _process_ranking_if_needed(keyword, html_content, date_str)
+        
+        # Reload keyword to get any changes from ranking process
+        keyword.refresh_from_db()
+        
+        # Always update scraped_at after ranking (to ensure it's set correctly)
+        keyword.scraped_at = timezone.now()
+        keyword.save(update_fields=['scraped_at'])
         return
+    elif not is_new_file and is_force_crawl:
+        logger.info(f"File exists but force crawl requested: {relative_path} (will overwrite)")
     
     # Ensure directory exists
     absolute_path.parent.mkdir(parents=True, exist_ok=True)
@@ -250,20 +270,26 @@ def _handle_successful_fetch(keyword: Keyword, html_content: str) -> None:
     # Update database
     keyword.scrape_do_file_path = relative_path
     keyword.scrape_do_files = file_list
-    keyword.scraped_at = timezone.now()
     keyword.success_api_hit_count += 1
     keyword.last_error_message = None
     keyword.processing = False  # Reset processing flag
     keyword.ranking_pages = top_pages  # Store top 3 pages
-    keyword.save()
+    # Don't save yet - let ranking process first
+    
+    # Process ranking extraction for new file
+    _process_ranking_if_needed(keyword, html_content, date_str)
+    
+    # Reload keyword to get any changes from ranking process
+    keyword.refresh_from_db()
+    
+    # Now update scraped_at and save (after ranking which might also save)
+    keyword.scraped_at = timezone.now()
+    keyword.save(update_fields=['scraped_at'])
     
     logger.info(
         f"SUCCESS: keyword_id={keyword.id}, status=200, "
         f"file={relative_path}"
     )
-    
-    # Process ranking extraction for new file
-    _process_ranking_if_needed(keyword, html_content, date_str)
 
 
 def _handle_failed_fetch(keyword: Keyword, error_message: str) -> None:
@@ -302,15 +328,19 @@ def _process_ranking_if_needed(keyword: Keyword, html_content: str, date_str: st
     scraped_date = datetime.strptime(date_str, '%Y-%m-%d')
     scraped_date = timezone.make_aware(scraped_date)
     
-    # Check if we already have a rank for this date
-    existing_rank = Rank.objects.filter(
-        keyword=keyword,
-        created_at__date=scraped_date.date()
-    ).exists()
+    # For force crawls, we've already deleted today's rank, so process anyway
+    is_force_crawl = keyword.crawl_priority == 'critical'
     
-    if existing_rank:
-        logger.info(f"Rank already exists for keyword {keyword.id} on {date_str}")
-        return
+    if not is_force_crawl:
+        # Check if we already have a rank for this date
+        existing_rank = Rank.objects.filter(
+            keyword=keyword,
+            created_at__date=scraped_date.date()
+        ).exists()
+        
+        if existing_rank:
+            logger.info(f"Rank already exists for keyword {keyword.id} on {date_str}")
+            return
     
     # Process ranking
     try:

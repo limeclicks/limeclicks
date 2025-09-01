@@ -91,10 +91,11 @@ class CrawlScheduler:
             keyword.processing = True
             keyword.save(update_fields=['processing'])
             
-            # Queue with high priority
+            # Queue with high priority using serp_high queue
             fetch_keyword_serp_html.apply_async(
                 args=[keyword.id],
-                priority=9  # High priority in celery
+                queue='serp_high',  # Use high priority queue
+                priority=10  # Maximum priority
             )
             
             logger.info(f"Force crawled keyword {keyword.id}")
