@@ -73,6 +73,9 @@ class ScreamingFrogCLI:
             env['DISPLAY'] = ''
             env['QT_QPA_PLATFORM'] = 'offscreen'
             
+            # Try to bypass EULA check by setting Java system property
+            env['_JAVA_OPTIONS'] = '-Dsfseospider.eula.accepted=15 -Deula.sfseospider.accepted=15'
+            
             # Execute the command
             result = subprocess.run(
                 cmd,
