@@ -103,10 +103,24 @@ class Keyword(models.Model):
         # Get the previous rank from history (not current rank)
         # This ensures we compare against the actual previous rank
         from .models import Rank  # Import here to avoid circular import
-        previous_rank = Rank.objects.filter(
+        
+        # Get the latest rank that's not from today to compare against
+        current_ranks = Rank.objects.filter(
             keyword=self,
-            created_at__lt=timezone.now() - timedelta(minutes=1)  # Exclude very recent entries
+            created_at__date=timezone.now().date()
+        ).values_list('id', flat=True)
+        
+        previous_rank = Rank.objects.filter(
+            keyword=self
+        ).exclude(
+            id__in=current_ranks  # Exclude today's ranks
         ).order_by('-created_at').first()
+        
+        # If no previous rank excluding today, just get the previous one
+        if not previous_rank:
+            previous_rank = Rank.objects.filter(
+                keyword=self
+            ).order_by('-created_at')[1:2].first()  # Skip the most recent, get the second
         
         old_rank = previous_rank.rank if previous_rank else 0
         
