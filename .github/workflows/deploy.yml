@@ -1,0 +1,98 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: limeclicks
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Deploy to server
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+        run: |
+          # Setup SSH
+          mkdir -p ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H 91.230.110.86 >> ~/.ssh/known_hosts
+          
+          # Deploy to server
+          ssh -i ~/.ssh/deploy_key ubuntu@91.230.110.86 << 'ENDSSH'
+            set -e
+            
+            echo "Starting deployment..."
+            
+            # Navigate to project directory
+            cd /home/ubuntu/new-limeclicks
+            
+            # Pull latest code
+            echo "Pulling latest code from GitHub..."
+            git pull origin main
+            
+            # Setup pyenv and Python 3.12.2
+            echo "Setting up Python environment..."
+            export PYENV_ROOT="$HOME/.pyenv"
+            export PATH="$PYENV_ROOT/bin:$PATH"
+            eval "$(pyenv init -)"
+            
+            # Use Python 3.12.2
+            pyenv local 3.12.2
+            pyenv global 3.12.2
+            
+            # Upgrade pip
+            echo "Upgrading pip..."
+            python -m pip install --upgrade pip
+            
+            # Install/update Python dependencies
+            echo "Installing Python dependencies..."
+            pip install -r requirements.txt
+            
+            # Setup Node.js with nvm
+            echo "Setting up Node.js environment..."
+            export NVM_DIR="$HOME/.nvm"
+            [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+            
+            # Use Node.js version 22
+            nvm use 22
+            
+            # Install Node dependencies
+            echo "Installing Node dependencies..."
+            npm install
+            
+            # Build frontend assets
+            echo "Building frontend assets..."
+            npm run build || ./build-css.sh
+            
+            # Collect static files (before migration)
+            echo "Collecting static files..."
+            python manage.py collectstatic --noinput
+            
+            # Run database migrations
+            echo "Running database migrations..."
+            python manage.py migrate
+            
+            # Restart services
+            echo "Restarting services..."
+            sudo systemctl restart limeclicks-gunicorn
+            sudo systemctl restart limeclicks-celery
+            sudo systemctl restart limeclicks-celerybeat
+            
+            # Check service status
+            echo "Checking service status..."
+            sudo systemctl status limeclicks-gunicorn --no-pager
+            sudo systemctl status limeclicks-celery --no-pager
+            sudo systemctl status limeclicks-celerybeat --no-pager
+            
+            echo "Deployment completed successfully!"
+          ENDSSH
+          
+          # Cleanup
+          rm -f ~/.ssh/deploy_key
