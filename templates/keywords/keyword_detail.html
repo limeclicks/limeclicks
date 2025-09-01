@@ -212,10 +212,6 @@
                 <button type="button" class="tab" onclick="showTab(event, 'history')">
                     <i class="fas fa-history mr-2"></i>History
                 </button>
-                <!-- Debug button - remove after testing -->
-                <button type="button" class="btn btn-xs btn-ghost ml-auto" onclick="debugHistory()">
-                    Debug
-                </button>
             </div>
             
             <!-- SERP Results Tab (visible by default) -->
@@ -625,41 +621,8 @@ function viewHistoricalSERP(rankId, date, position) {
 </script>
 
 <script>
-    // Debug function
-    function debugHistory() {
-        const historyTab = document.getElementById('history');
-        if (!historyTab) {
-            alert('History tab not found!');
-            return;
-        }
-        
-        const cards = historyTab.querySelectorAll('.card');
-        const dates = [];
-        cards.forEach(card => {
-            const dateEl = card.querySelector('.text-sm.font-semibold');
-            if (dateEl) dates.push(dateEl.textContent);
-        });
-        
-        alert(`History Debug:\n- Tab exists: Yes\n- Cards found: ${cards.length}\n- Dates: ${dates.join(', ')}\n\nForcing display now...`);
-        
-        // Force show the history tab
-        document.querySelectorAll('.tab-content').forEach(tab => {
-            tab.classList.add('hidden');
-        });
-        historyTab.classList.remove('hidden');
-        historyTab.style.display = 'block';
-        
-        // Update tab buttons
-        document.querySelectorAll('.tab').forEach(tab => {
-            tab.classList.remove('tab-active');
-        });
-        document.querySelector('[onclick*="history"]').classList.add('tab-active');
-    }
-    
     // Tab switching
     function showTab(event, tabId) {
-        console.log('showTab called with:', tabId);
-        
         // Hide all tabs
         document.querySelectorAll('.tab-content').forEach(tab => {
             tab.classList.add('hidden');
@@ -671,25 +634,6 @@ function viewHistoricalSERP(rankId, date, position) {
         if (targetTab) {
             targetTab.classList.remove('hidden');
             targetTab.style.display = 'block'; // Force display
-            console.log('Tab shown:', tabId);
-            
-            // Verify it's visible
-            const isVisible = !targetTab.classList.contains('hidden');
-            console.log('Tab visibility check:', isVisible);
-            
-            // Debug: Count and log cards in History tab
-            if (tabId === 'history') {
-                const cards = targetTab.querySelectorAll('.card');
-                console.log('History cards found:', cards.length);
-                cards.forEach((card, i) => {
-                    const dateEl = card.querySelector('.text-sm.font-semibold');
-                    if (dateEl) {
-                        console.log(`  Card ${i+1}: ${dateEl.textContent}`);
-                    }
-                });
-            }
-        } else {
-            console.error('Tab not found:', tabId);
         }
         
         // Update tab buttons
