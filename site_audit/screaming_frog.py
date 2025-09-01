@@ -89,8 +89,18 @@ class ScreamingFrogCLI:
                 logger.warning(f"Screaming Frog stderr: {result.stderr}")
             
             # Check if any files were generated
+            # Screaming Frog creates a timestamped subdirectory when using --timestamped-output
             output_files = list(Path(temp_dir).glob('*'))
-            if output_files:
+            
+            # If there's a timestamped directory, use that as the actual output directory
+            if len(output_files) == 1 and output_files[0].is_dir():
+                actual_output_dir = output_files[0]
+                output_files = list(actual_output_dir.glob('*'))
+                print(f"✅ Crawl completed. Generated {len(output_files)} files in {actual_output_dir.name}:")
+                for file in output_files[:10]:  # Show first 10 files
+                    print(f"  - {file.name}")
+                return True, str(actual_output_dir), None
+            elif output_files:
                 print(f"✅ Crawl completed. Generated {len(output_files)} files:")
                 for file in output_files[:10]:  # Show first 10 files
                     print(f"  - {file.name}")
