@@ -1,0 +1,13 @@
+{
+  "name": "limeclicks",
+  "version": "1.0.0",
+  "description": "LimeClicks frontend assets",
+  "scripts": {
+    "build-css": "npx tailwindcss -i ./static/src/input.css -o ./staticfiles/dist/tailwind.css --minify",
+    "watch-css": "npx tailwindcss -i ./static/src/input.css -o ./staticfiles/dist/tailwind.css --watch"
+  },
+  "devDependencies": {
+    "tailwindcss": "^3.4.17",
+    "daisyui": "^5.0.54"
+  }
+}
