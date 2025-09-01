@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 
 from pathlib import Path
 import os
+import ast
 from dotenv import load_dotenv
 from django.contrib.messages import constants as messages
 import dj_database_url
@@ -25,7 +26,19 @@ load_dotenv(BASE_DIR / ".env")
 # Security
 SECRET_KEY = os.getenv("SECRET_KEY")
 DEBUG = os.getenv("DEBUG", "False").lower() in ("1", "true", "yes")
-ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "127.0.0.1,localhost,testserver").split(",")
+
+# Parse ALLOWED_DOMAINS from .env file, supporting both list format and comma-separated string
+allowed_domains_env = os.getenv("ALLOWED_DOMAINS", "['localhost', '127.0.0.1', 'testserver']")
+try:
+    # Try to parse as Python literal (list format)
+    ALLOWED_HOSTS = ast.literal_eval(allowed_domains_env)
+except (ValueError, SyntaxError):
+    # Fall back to comma-separated string
+    ALLOWED_HOSTS = [host.strip() for host in allowed_domains_env.split(",")]
+
+# Add portal domains for production
+if not DEBUG:
+    ALLOWED_HOSTS.extend(['portal.limeclicks.com', 'portal.fastgenerations.net'])
 
 # Application definition
 
