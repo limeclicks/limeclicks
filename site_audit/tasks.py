@@ -493,8 +493,8 @@ def cleanup_screaming_frog_data(hours_old=24):
 @shared_task(
     bind=True,
     max_retries=3,
-    time_limit=300,  # 5 minutes for PageSpeed Insights
-    soft_time_limit=240  # 4 minutes soft limit
+    time_limit=720,  # 12 minutes for PageSpeed Insights (5 mins per strategy + buffer)
+    soft_time_limit=600  # 10 minutes soft limit
 )
 def collect_pagespeed_insights(self, site_audit_id: int) -> dict:
     """

@@ -233,8 +233,7 @@ class SiteAudit(models.Model):
                 self.overall_site_health_score = 60
             else:
                 self.overall_site_health_score = max(0, 100 - (weighted_issues * 2))
-        
-        # Special handling: If there are high priority issues, cap the score
+
         if high_issues > 0:
             if high_issues >= 5:
                 # 5+ high issues = critical (max 40%)

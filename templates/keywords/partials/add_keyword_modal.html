@@ -656,15 +656,15 @@
         }
         
         // Add option to create new tag if search term exists and doesn't match existing
-        if (searchTerm && !availableTags.some(tag => tag.name.toLowerCase() === searchTerm.toLowerCase())) {
+        if (searchTerm && searchTerm.trim() && !availableTags.some(tag => tag.name.toLowerCase() === searchTerm.toLowerCase())) {
             html += `
                 <div class="tag-suggestion p-2 hover:bg-primary/10 rounded cursor-pointer border-t border-base-300 mt-2"
-                     onclick="createNewTag('${searchTerm}')">
+                     onclick="createNewTag('${searchTerm.trim()}')">
                     <div class="flex items-center gap-2">
                         <span class="w-6 h-6 rounded-full bg-primary text-white flex items-center justify-center text-xs">
                             <i class="fas fa-plus"></i>
                         </span>
-                        <span class="text-primary font-medium">Create "${searchTerm}"</span>
+                        <span class="text-primary font-medium">Create "${searchTerm.trim()}"</span>
                     </div>
                 </div>
             `;
@@ -675,8 +675,13 @@
     
     // Select a tag
     window.selectTag = function(id, name, color) {
+        // Validate that name is not empty
+        if (!name || !name.trim()) {
+            return; // Don't select empty tags
+        }
+        
         if (!selectedTags.some(tag => tag.id === id)) {
-            selectedTags.push({ id, name, color });
+            selectedTags.push({ id, name: name.trim(), color });
             updateSelectedTagsDisplay();
             updateTagsHiddenInput();
         }
@@ -686,10 +691,23 @@
     
     // Create new tag
     window.createNewTag = function(name) {
+        // Validate that name is not empty or whitespace only
+        if (!name || !name.trim()) {
+            return; // Don't create empty tags
+        }
+        
+        // Clean the name
+        const cleanName = name.trim();
+        
+        // Check if tag with same name already exists
+        if (selectedTags.some(tag => tag.name.toLowerCase() === cleanName.toLowerCase())) {
+            return; // Don't add duplicate tags
+        }
+        
         // Generate a temporary ID for the new tag (will be created on server when form is submitted)
         const tempId = 'new_' + Date.now();
         const color = generateRandomColor();
-        selectedTags.push({ id: tempId, name, color, isNew: true });
+        selectedTags.push({ id: tempId, name: cleanName, color, isNew: true });
         updateSelectedTagsDisplay();
         updateTagsHiddenInput();
         document.getElementById('tag-input').value = '';

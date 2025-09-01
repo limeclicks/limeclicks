@@ -88,7 +88,7 @@
         background: white;
         border: 1px solid #e5e7eb;
         border-radius: 8px;
-        padding: 16px;
+        overflow: hidden;
         margin-bottom: 12px;
     }
     
@@ -104,6 +104,19 @@
         border-left: 4px solid #3b82f6;
     }
     
+    /* Fix for collapse arrow positioning */
+    .opportunity-card .collapse-arrow::after {
+        position: absolute;
+        right: 1.5rem;
+        top: 50%;
+        transform: translateY(-50%);
+    }
+    
+    .opportunity-card .collapse-title {
+        position: relative;
+        padding-left: 1rem;
+    }
+    
     .diagnostic-item {
         display: flex;
         justify-content: space-between;
@@ -117,11 +130,13 @@
 </style>
 
 <script>
-    // Performance data cache
-    let performanceDataCache = {
-        mobile: null,
-        desktop: null
-    };
+    // Use window object to avoid redeclaration errors with HTMX
+    if (typeof window.performanceDataCache === 'undefined') {
+        window.performanceDataCache = {
+            mobile: null,
+            desktop: null
+        };
+    }
 
     // Load performance data when tab is opened
     // Use a small delay to ensure DOM is ready when loaded via HTMX
@@ -133,7 +148,7 @@
         }
     }, 100);
 
-    function showPerformanceTab(tabName, element) {
+    window.showPerformanceTab = function(tabName, element) {
         // Update active tab styling
         document.querySelectorAll('#mobile-tab-btn, #desktop-tab-btn').forEach(tab => {
             tab.classList.remove('tab-active');
@@ -150,12 +165,12 @@
         contentElement.classList.remove('hidden');
         
         // Load data if not already loaded
-        if (!performanceDataCache[tabName]) {
+        if (!window.performanceDataCache[tabName]) {
             loadPerformanceData(tabName);
         }
     }
 
-    async function loadPerformanceData(device) {
+    window.loadPerformanceData = async function(device) {
         const contentElement = document.getElementById(`${device}-performance-content`);
         const url = contentElement.dataset.url;
         
@@ -186,8 +201,8 @@
             }
             
             const data = await response.json();
-            performanceDataCache[device] = data;
-            renderPerformanceData(device, data);
+            window.performanceDataCache[device] = data;
+            window.renderPerformanceData(device, data);
         } catch (error) {
             console.error(`Error loading ${device} performance data:`, error);
             
@@ -223,7 +238,7 @@
         }
     }
 
-    function renderPerformanceData(device, data) {
+    window.renderPerformanceData = function(device, data) {
         const contentElement = document.getElementById(`${device}-performance-content`);
         
         console.log(`Rendering ${device} performance data:`, data);
@@ -353,10 +368,10 @@
                     <!-- Scores Grid -->
                     <div class="lg:col-span-2">
                         <div class="grid grid-cols-2 gap-4">
-                            ${renderScoreCard('Performance', performanceScore, 'fa-tachometer-alt')}
-                            ${renderScoreCard('Accessibility', accessibilityScore, 'fa-universal-access')}
-                            ${renderScoreCard('Best Practices', bestPracticesScore, 'fa-shield-alt')}
-                            ${renderScoreCard('SEO', seoScore, 'fa-search')}
+                            ${window.renderScoreCard('Performance', performanceScore, 'fa-tachometer-alt')}
+                            ${window.renderScoreCard('Accessibility', accessibilityScore, 'fa-universal-access')}
+                            ${window.renderScoreCard('Best Practices', bestPracticesScore, 'fa-shield-alt')}
+                            ${window.renderScoreCard('SEO', seoScore, 'fa-search')}
                         </div>
                     </div>
                 </div>
@@ -366,9 +381,9 @@
                     <div class="card-body">
                         <h3 class="text-lg font-semibold mb-4">Core Web Vitals</h3>
                         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            ${renderMetric('First Contentful Paint', metrics.fcp, getMetricStatus(audits['first-contentful-paint']))}
-                            ${renderMetric('Largest Contentful Paint', metrics.lcp, getMetricStatus(audits['largest-contentful-paint']))}
-                            ${renderMetric('Cumulative Layout Shift', metrics.cls, getMetricStatus(audits['cumulative-layout-shift']))}
+                            ${window.renderMetric('First Contentful Paint', metrics.fcp, window.getMetricStatus(audits['first-contentful-paint']))}
+                            ${window.renderMetric('Largest Contentful Paint', metrics.lcp, window.getMetricStatus(audits['largest-contentful-paint']))}
+                            ${window.renderMetric('Cumulative Layout Shift', metrics.cls, window.getMetricStatus(audits['cumulative-layout-shift']))}
                         </div>
                     </div>
                 </div>
@@ -378,9 +393,9 @@
                     <div class="card-body">
                         <h3 class="text-lg font-semibold mb-4">Performance Metrics</h3>
                         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            ${renderMetric('Speed Index', metrics.si, getMetricStatus(audits['speed-index']))}
-                            ${renderMetric('Time to Interactive', metrics.tti, getMetricStatus(audits['interactive']))}
-                            ${renderMetric('Total Blocking Time', metrics.tbt, getMetricStatus(audits['total-blocking-time']))}
+                            ${window.renderMetric('Speed Index', metrics.si, window.getMetricStatus(audits['speed-index']))}
+                            ${window.renderMetric('Time to Interactive', metrics.tti, window.getMetricStatus(audits['interactive']))}
+                            ${window.renderMetric('Total Blocking Time', metrics.tbt, window.getMetricStatus(audits['total-blocking-time']))}
                         </div>
                     </div>
                 </div>
@@ -419,7 +434,7 @@
                         </h3>
                         <p class="text-sm text-base-content/60 mb-4">These suggestions can help your page load faster.</p>
                         <div class="space-y-3">
-                            ${opportunities.map(opp => renderOpportunity(opp)).join('')}
+                            ${opportunities.map(opp => window.renderOpportunity(opp)).join('')}
                         </div>
                     </div>
                 </div>
@@ -435,7 +450,7 @@
                         </h3>
                         <p class="text-sm text-base-content/60 mb-4">Detailed recommendations to improve your site's performance.</p>
                         <div class="space-y-3">
-                            ${improvements.map(imp => renderImprovement(imp)).join('')}
+                            ${improvements.map(imp => window.renderImprovement(imp)).join('')}
                         </div>
                     </div>
                 </div>
@@ -451,7 +466,7 @@
                         </h3>
                         <p class="text-sm text-base-content/60 mb-4">Additional items to check.</p>
                         <div class="space-y-2">
-                            ${diagnostics.slice(0, 10).map(diag => renderDiagnostic(diag)).join('')}
+                            ${diagnostics.slice(0, 10).map(diag => window.renderDiagnostic(diag)).join('')}
                         </div>
                     </div>
                 </div>
@@ -460,8 +475,8 @@
         `;
     }
 
-    function renderScoreCard(title, score, icon) {
-        const color = getScoreColor(score);
+    window.renderScoreCard = function(title, score, icon) {
+        const color = window.getScoreColor(score);
         return `
             <div class="metric-card">
                 <div class="flex flex-col items-center w-full">
@@ -484,7 +499,7 @@
         `;
     }
 
-    function renderMetric(title, value, status) {
+    window.renderMetric = function(title, value, status) {
         const statusColors = {
             'good': 'text-success',
             'needs-improvement': 'text-warning',
@@ -507,7 +522,7 @@
         `;
     }
 
-    function renderOpportunity(opp) {
+    window.renderOpportunity = function(opp) {
         const impactClass = opp.impact > 1000 ? 'high-impact' : opp.impact > 500 ? 'medium-impact' : 'low-impact';
         const hasDetails = opp.details && opp.details.items && opp.details.items.length > 0;
         
@@ -515,15 +530,15 @@
             <div class="opportunity-card ${impactClass}">
                 <div class="collapse collapse-arrow">
                     <input type="checkbox" id="opp-${opp.id}" />
-                    <div class="collapse-title p-0">
-                        <div class="flex justify-between items-start p-4">
-                            <div class="flex-1">
+                    <div class="collapse-title pr-12" style="min-height: auto; padding-top: 0; padding-bottom: 0;">
+                        <div class="flex justify-between items-center py-4">
+                            <div class="flex-1 pr-4">
                                 <h4 class="font-medium text-base-content mb-1">${opp.title}</h4>
                                 <p class="text-sm text-base-content/60">${opp.description}</p>
                             </div>
                             ${opp.displayValue ? `
-                            <div class="ml-4 text-right">
-                                <span class="text-sm font-medium text-base-content">${opp.displayValue}</span>
+                            <div class="ml-4 text-right flex-shrink-0 flex items-center">
+                                <span class="text-sm font-medium text-base-content whitespace-nowrap">${opp.displayValue}</span>
                             </div>
                             ` : ''}
                         </div>
@@ -532,7 +547,7 @@
                     <div class="collapse-content">
                         <div class="pt-2 px-4 pb-4">
                             <div class="bg-base-200/50 rounded-lg p-3">
-                                ${renderAuditDetails(opp.details)}
+                                ${window.renderAuditDetails(opp.details)}
                             </div>
                         </div>
                     </div>
@@ -542,18 +557,18 @@
         `;
     }
     
-    function renderImprovement(imp) {
+    window.renderImprovement = function(imp) {
         const hasDetails = imp.details && (imp.details.items || imp.details.headings);
         
         return `
             <div class="border border-base-300 rounded-lg">
                 <div class="collapse collapse-arrow">
                     <input type="checkbox" id="imp-${imp.id}" />
-                    <div class="collapse-title p-0">
-                        <div class="p-4">
+                    <div class="collapse-title pr-12" style="min-height: auto; padding-top: 0; padding-bottom: 0;">
+                        <div class="py-4">
                             <div class="flex items-start gap-3">
                                 <i class="fas fa-exclamation-circle text-error mt-1"></i>
-                                <div class="flex-1">
+                                <div class="flex-1 pr-4">
                                     <h4 class="font-medium text-base-content mb-1">${imp.title}</h4>
                                     <p class="text-sm text-base-content/60">${imp.description}</p>
                                     ${imp.displayValue ? `
@@ -567,7 +582,7 @@
                     <div class="collapse-content">
                         <div class="pt-2 px-4 pb-4">
                             <div class="bg-base-200/50 rounded-lg p-3">
-                                ${renderAuditDetails(imp.details)}
+                                ${window.renderAuditDetails(imp.details)}
                             </div>
                         </div>
                     </div>
@@ -577,7 +592,7 @@
         `;
     }
     
-    function renderAuditDetails(details) {
+    window.renderAuditDetails = function(details) {
         if (!details) return '';
         
         // Handle table-like data
@@ -635,7 +650,7 @@
         return '<p class="text-xs text-base-content/60">No additional details available</p>';
     }
 
-    function renderDiagnostic(diag) {
+    window.renderDiagnostic = function(diag) {
         return `
             <div class="diagnostic-item">
                 <span class="text-sm text-base-content">${diag.title}</span>
@@ -644,13 +659,13 @@
         `;
     }
 
-    function getScoreColor(score) {
+    window.getScoreColor = function(score) {
         if (score >= 90) return '#10b981';
         if (score >= 50) return '#f59e0b';
         return '#ef4444';
     }
 
-    function getMetricStatus(audit) {
+    window.getMetricStatus = function(audit) {
         if (!audit || audit.score === null) return 'unknown';
         if (audit.score >= 0.9) return 'good';
         if (audit.score >= 0.5) return 'needs-improvement';

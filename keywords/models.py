@@ -92,15 +92,29 @@ class Keyword(models.Model):
     def __str__(self):
         return f"{self.keyword} - {self.project.domain} ({self.country})"
     
-    def update_rank(self, new_rank, url=None):
-        """Update rank and calculate differences"""
-        old_rank = self.rank
+    def update_rank(self, new_rank, url=None, from_rank_save=False):
+        """Update rank and calculate differences
+        
+        Args:
+            new_rank: The new rank position
+            url: Optional URL where the site was found
+            from_rank_save: Internal flag to prevent circular calls
+        """
+        # Get the previous rank from history (not current rank)
+        # This ensures we compare against the actual previous rank
+        from .models import Rank  # Import here to avoid circular import
+        previous_rank = Rank.objects.filter(
+            keyword=self,
+            created_at__lt=timezone.now() - timedelta(minutes=1)  # Exclude very recent entries
+        ).order_by('-created_at').first()
+        
+        old_rank = previous_rank.rank if previous_rank else 0
         
         # Handle not found in top 100 case
         if new_rank == 0 or new_rank > 100:
             new_rank = 101  # Use 101 to indicate not in top 100
         
-        # Calculate rank difference (negative means improvement)
+        # Calculate rank difference (positive means improvement in ranking)
         if old_rank > 0:
             self.rank_diff_from_last_time = old_rank - new_rank
             
@@ -148,14 +162,6 @@ class Keyword(models.Model):
         self.processing = False
         
         self.save()
-        
-        # Save to Rank history
-        Rank.objects.create(
-            keyword=self,
-            rank=new_rank if new_rank <= 100 else 0,
-            is_organic=True,
-            created_at=self.scraped_at
-        )
     
     def should_crawl(self):
         """Check if keyword should be crawled based on schedule"""
@@ -306,7 +312,8 @@ class Rank(models.Model):
             url = None
             if hasattr(self, '_rank_url'):
                 url = self._rank_url
-            self.keyword.update_rank(self.rank, url=url)
+            # Pass from_rank_save=True to prevent circular calls
+            self.keyword.update_rank(self.rank, url=url, from_rank_save=True)
 
 
 class Tag(models.Model):
@@ -338,6 +345,13 @@ class Tag(models.Model):
     
     def save(self, *args, **kwargs):
         """Auto-generate slug from name"""
+        # Validate that name is not empty or whitespace only
+        if not self.name or not self.name.strip():
+            raise ValueError("Tag name cannot be empty")
+        
+        # Clean the name
+        self.name = self.name.strip()
+        
         if not self.slug:
             from django.utils.text import slugify
             base_slug = slugify(self.name)

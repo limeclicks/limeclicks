@@ -51,7 +51,8 @@ class PageSpeedInsightsClient:
         
         try:
             logger.info(f"Analyzing {url} with strategy {strategy}")
-            response = requests.get(self.BASE_URL, params=params, timeout=30)
+            # Set timeout to 5 minutes (300 seconds) for PageSpeed API calls
+            response = requests.get(self.BASE_URL, params=params, timeout=300)
             response.raise_for_status()
             
             data = response.json()

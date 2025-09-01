@@ -358,6 +358,13 @@ def add_keywords(request):
             tag_color = tag_info.get('color', '#6B7280')
             is_new = tag_info.get('isNew', False)
             
+            # Skip empty tag names
+            if not tag_name or not tag_name.strip():
+                continue
+            
+            # Clean the tag name
+            tag_name = tag_name.strip()
+            
             if is_new or str(tag_id).startswith('new_'):
                 # Create new tag
                 tag, _ = Tag.objects.get_or_create(
@@ -503,8 +510,12 @@ def api_create_tag(request):
     color = request.POST.get('color', '#6B7280')
     description = request.POST.get('description', '')
     
-    if not name:
-        return JsonResponse({'error': 'Name is required'}, status=400)
+    # Validate that name is not empty or whitespace only
+    if not name or not name.strip():
+        return JsonResponse({'error': 'Tag name cannot be empty'}, status=400)
+    
+    # Clean the name
+    name = name.strip()
     
     # Check if tag already exists for this user
     if Tag.objects.filter(user=request.user, name=name).exists():

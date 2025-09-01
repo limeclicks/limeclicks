@@ -205,15 +205,16 @@
     <div class="card bg-base-100 shadow-sm border border-base-300">
         <div class="card-body p-0">
             <div class="tabs tabs-boxed bg-base-200 p-1">
-                <a class="tab tab-active" onclick="showTab(event, 'serp-results')">
+                <button type="button" class="tab tab-active" onclick="showTab(event, 'serp-results')">
                     <i class="fas fa-list mr-2"></i>SERP Results
-                </a>
-                <a class="tab" onclick="showTab(event, 'competitors')">
-                    <i class="fas fa-chart-line mr-2"></i>Competitors
-                </a>
-                <a class="tab" onclick="showTab(event, 'history')">
+                </button>
+                <button type="button" class="tab" onclick="showTab(event, 'history')">
                     <i class="fas fa-history mr-2"></i>History
-                </a>
+                </button>
+                <!-- Debug button - remove after testing -->
+                <button type="button" class="btn btn-xs btn-ghost ml-auto" onclick="debugHistory()">
+                    Debug
+                </button>
             </div>
             
             <!-- SERP Results Tab (visible by default) -->
@@ -301,58 +302,6 @@
                     <i class="fas fa-search text-4xl mb-4"></i>
                     <p>No SERP data available yet.</p>
                     <p class="text-sm mt-2">Run a crawl to see search results.</p>
-                </div>
-                {% endif %}
-            </div>
-            
-            <!-- Competitors Tab -->
-            <div id="competitors" class="tab-content p-6 hidden">
-                <h3 class="text-lg font-semibold mb-4">
-                    Top Competitors 
-                    <span class="text-sm text-base-content/60">({{ competitors|length }} competing domains)</span>
-                </h3>
-                {% if competitors %}
-                <div class="max-h-[600px] overflow-y-auto custom-scrollbar">
-                    <div class="space-y-3">
-                        {% for comp in competitors %}
-                        <div class="card bg-base-100 border border-base-300 p-4 hover:shadow-lg transition-shadow">
-                            <div class="flex items-start gap-4">
-                                <div class="flex flex-col items-center">
-                                    <span class="badge badge-lg {% if comp.position <= 3 %}badge-success{% elif comp.position <= 10 %}badge-warning{% else %}badge-ghost{% endif %}">
-                                        #{{ comp.position }}
-                                    </span>
-                                    {% if comp.count > 1 %}
-                                    <span class="text-xs text-base-content/60 mt-1">+{{ comp.count|add:"-1" }} more</span>
-                                    {% endif %}
-                                </div>
-                                <div class="flex-1">
-                                    <div class="flex items-center gap-2 mb-1">
-                                        <a href="https://{{ comp.domain }}" target="_blank" class="font-semibold text-primary hover:underline">
-                                            {{ comp.domain }}
-                                        </a>
-                                        {% if comp.position <= 3 %}
-                                        <span class="badge badge-success badge-xs">TOP 3</span>
-                                        {% elif comp.position <= 10 %}
-                                        <span class="badge badge-warning badge-xs">TOP 10</span>
-                                        {% endif %}
-                                    </div>
-                                    <div class="text-sm font-medium mb-1">{{ comp.title|truncatechars:80 }}</div>
-                                    {% if comp.snippet %}
-                                    <div class="text-xs text-base-content/60">{{ comp.snippet|truncatechars:150 }}</div>
-                                    {% endif %}
-                                    <a href="{{ comp.url }}" target="_blank" class="text-xs text-primary hover:underline mt-2 inline-block">
-                                        <i class="fas fa-external-link-alt mr-1"></i>View Page
-                                    </a>
-                                </div>
-                            </div>
-                        </div>
-                        {% endfor %}
-                    </div>
-                </div>
-                {% else %}
-                <div class="text-center py-8 text-base-content/60">
-                    <i class="fas fa-chart-line text-4xl mb-4"></i>
-                    <p>No competitor data available yet.</p>
                 </div>
                 {% endif %}
             </div>
@@ -675,21 +624,80 @@ function viewHistoricalSERP(rankId, date, position) {
 </script>
 
 <script>
-    // Tab switching
-    function showTab(event, tabId) {
-        // Hide all tabs
+    // Debug function
+    function debugHistory() {
+        const historyTab = document.getElementById('history');
+        if (!historyTab) {
+            alert('History tab not found!');
+            return;
+        }
+        
+        const cards = historyTab.querySelectorAll('.card');
+        const dates = [];
+        cards.forEach(card => {
+            const dateEl = card.querySelector('.text-sm.font-semibold');
+            if (dateEl) dates.push(dateEl.textContent);
+        });
+        
+        alert(`History Debug:\n- Tab exists: Yes\n- Cards found: ${cards.length}\n- Dates: ${dates.join(', ')}\n\nForcing display now...`);
+        
+        // Force show the history tab
         document.querySelectorAll('.tab-content').forEach(tab => {
             tab.classList.add('hidden');
         });
-        
-        // Show selected tab
-        document.getElementById(tabId).classList.remove('hidden');
+        historyTab.classList.remove('hidden');
+        historyTab.style.display = 'block';
         
         // Update tab buttons
         document.querySelectorAll('.tab').forEach(tab => {
             tab.classList.remove('tab-active');
         });
-        event.currentTarget.classList.add('tab-active');
+        document.querySelector('[onclick*="history"]').classList.add('tab-active');
+    }
+    
+    // Tab switching
+    function showTab(event, tabId) {
+        console.log('showTab called with:', tabId);
+        
+        // Hide all tabs
+        document.querySelectorAll('.tab-content').forEach(tab => {
+            tab.classList.add('hidden');
+            tab.style.display = ''; // Clear any inline display style
+        });
+        
+        // Show selected tab
+        const targetTab = document.getElementById(tabId);
+        if (targetTab) {
+            targetTab.classList.remove('hidden');
+            targetTab.style.display = 'block'; // Force display
+            console.log('Tab shown:', tabId);
+            
+            // Verify it's visible
+            const isVisible = !targetTab.classList.contains('hidden');
+            console.log('Tab visibility check:', isVisible);
+            
+            // Debug: Count and log cards in History tab
+            if (tabId === 'history') {
+                const cards = targetTab.querySelectorAll('.card');
+                console.log('History cards found:', cards.length);
+                cards.forEach((card, i) => {
+                    const dateEl = card.querySelector('.text-sm.font-semibold');
+                    if (dateEl) {
+                        console.log(`  Card ${i+1}: ${dateEl.textContent}`);
+                    }
+                });
+            }
+        } else {
+            console.error('Tab not found:', tabId);
+        }
+        
+        // Update tab buttons
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.classList.remove('tab-active');
+        });
+        if (event && event.currentTarget) {
+            event.currentTarget.classList.add('tab-active');
+        }
     }
     
     // Wait for page and Chart.js to load
@@ -700,7 +708,6 @@ function viewHistoricalSERP(rankId, date, position) {
             serpTab.classList.remove('hidden');
         }
         // Hide other tabs
-        document.getElementById('competitors')?.classList.add('hidden');
         document.getElementById('history')?.classList.add('hidden');
         // Initialize ranking chart
         const ctx = document.getElementById('rankingChart');
