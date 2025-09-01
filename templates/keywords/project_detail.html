@@ -1,5 +1,6 @@
 {% extends "dashboard_base.html" %}
 {% load static %}
+{% load country_flags %}
 
 {% block title %}{{ project.name|default:project.domain }} Keywords - LimeClicks{% endblock %}
 {% block page_title %}Keywords - {{ project.name|default:project.domain }}{% endblock %}
@@ -472,7 +473,9 @@
                                     {% endif %}
                                 </td>
                                 <td>
-                                    <span class="badge badge-ghost">{{ keyword.country }}</span>
+                                    <span class="badge badge-ghost" title="Search location: {{ keyword.country|google_domain }}">
+                                        {{ keyword.country|country_flag }} {{ keyword.country }}
+                                    </span>
                                 </td>
                                 <td>
                                     {% if keyword.scraped_at %}

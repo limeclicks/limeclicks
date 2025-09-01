@@ -1,3 +1,4 @@
+{% load country_flags %}
 <!-- Hidden element to pass sort state to JavaScript -->
 <tr style="display: none;" data-sort-info="true" data-sort-by="{{ sort_by }}" data-sort-order="{{ sort_order }}"></tr>
 {% for keyword in keywords %}
@@ -61,7 +62,9 @@
         {% endif %}
     </td>
     <td>
-        <span class="badge badge-ghost">{{ keyword.country }}</span>
+        <span class="badge badge-ghost" title="Search location: {{ keyword.country|google_domain }}">
+            {{ keyword.country|country_flag }}
+        </span>
     </td>
     <td>
         {% if keyword.scraped_at %}
