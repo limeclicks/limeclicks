@@ -1,0 +1,49 @@
+[Unit]
+Description=LimeClicks Gunicorn Application Server
+After=network.target postgresql.service redis.service
+Wants=postgresql.service redis.service
+
+[Service]
+Type=notify
+User=limeclicks
+Group=limeclicks
+WorkingDirectory=/home/limeclicks/limeclicks
+Environment="PATH=/home/limeclicks/.pyenv/shims:/home/limeclicks/.pyenv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+Environment="PYENV_ROOT=/home/limeclicks/.pyenv"
+
+# Load environment variables from .env file
+EnvironmentFile=/home/limeclicks/.env
+
+# Start command with appropriate number of workers
+ExecStart=/home/limeclicks/limeclicks/venv/bin/gunicorn \
+          --workers 4 \
+          --worker-class sync \
+          --bind unix:/home/limeclicks/limeclicks/gunicorn.sock \
+          --timeout 300 \
+          --access-logfile /var/log/limeclicks/gunicorn-access.log \
+          --error-logfile /var/log/limeclicks/gunicorn-error.log \
+          --log-level info \
+          --capture-output \
+          limeclicks.wsgi:application
+
+# Restart policy
+Restart=always
+RestartSec=10
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/home/limeclicks/limeclicks /var/log/limeclicks
+
+# Resource limits
+LimitNOFILE=65536
+LimitNPROC=4096
+
+# Kill settings
+KillMode=mixed
+KillSignal=SIGQUIT
+
+[Install]
+WantedBy=multi-user.target
