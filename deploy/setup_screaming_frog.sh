@@ -13,7 +13,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-SF_VERSION="19.8"  # Update this to latest version
+SF_VERSION="22.2"  # Update this to latest version
 SF_USER="limeclicks"
 SF_DIR="/opt/screamingfrogseospider"
 SF_CONFIG_DIR="/home/${SF_USER}/.ScreamingFrogSEOSpider"
@@ -109,27 +109,21 @@ install_screaming_frog() {
     mkdir -p ${SF_DIR}
     cd /tmp
     
-    # Download Screaming Frog (adjust URL based on latest version)
-    DOWNLOAD_URL="https://download.screamingfrog.co.uk/products/seo-spider/ScreamingFrogSEOSpider-${SF_VERSION}.x86_64.rpm"
+    # Download Screaming Frog DEB package directly
+    DOWNLOAD_URL="https://download.screamingfrog.co.uk/products/seo-spider/screamingfrogseospider_${SF_VERSION}_all.deb"
     
     echo_info "Downloading from: ${DOWNLOAD_URL}"
-    wget -O screamingfrog.rpm "${DOWNLOAD_URL}" || {
+    wget -O screamingfrog.deb "${DOWNLOAD_URL}" || {
         echo_error "Failed to download Screaming Frog. Please check the version number."
         echo_info "Visit https://www.screamingfrog.co.uk/seo-spider/release-notes/ for latest version"
         exit 1
     }
     
-    # Convert RPM to DEB and install (for Ubuntu/Debian)
-    apt-get install -y alien
-    alien -d screamingfrog.rpm
-    dpkg -i screamingfrog*.deb || apt-get install -f -y
-    
-    # Alternative: Direct installation for Ubuntu
-    # wget https://download.screamingfrog.co.uk/products/seo-spider/ScreamingFrogSEOSpider-${SF_VERSION}.deb
-    # dpkg -i ScreamingFrogSEOSpider-${SF_VERSION}.deb || apt-get install -f -y
+    # Install the DEB package
+    dpkg -i screamingfrog.deb || apt-get install -f -y
     
     # Clean up
-    rm -f screamingfrog.rpm screamingfrog*.deb
+    rm -f screamingfrog.deb
     
     echo_info "Screaming Frog installed successfully"
 }
