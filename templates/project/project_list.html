@@ -223,6 +223,55 @@
 </div>
 {% endif %}
 
+<!-- Delete Project Modal -->
+<div id="delete-project-modal" class="modal">
+    <div class="modal-box max-w-md">
+        <div class="flex justify-between items-center mb-6">
+            <h3 class="font-bold text-lg text-error">Delete Project</h3>
+            <button onclick="closeDeleteModal()" class="btn btn-sm btn-circle btn-ghost">✕</button>
+        </div>
+        
+        <div class="alert alert-warning mb-4">
+            <i class="fas fa-exclamation-triangle"></i>
+            <span>This action cannot be undone. All project data will be permanently deleted.</span>
+        </div>
+        
+        <div class="mb-4">
+            <p class="text-base-content mb-2">You are about to delete the project:</p>
+            <p class="font-bold text-lg" id="delete-project-domain"></p>
+        </div>
+        
+        <div class="form-control w-full mb-6">
+            <label class="label">
+                <span class="label-text">Type <span class="font-bold text-error">delete</span> to confirm</span>
+            </label>
+            <input 
+                type="text" 
+                id="delete-confirmation-input"
+                placeholder="Type 'delete' here" 
+                class="input input-bordered w-full" 
+                autocomplete="off"
+            />
+            <label class="label">
+                <span class="label-text-alt text-error" id="delete-input-error"></span>
+            </label>
+        </div>
+        
+        <div class="modal-action">
+            <button 
+                type="button" 
+                id="confirm-delete-btn"
+                class="btn btn-error" 
+                disabled
+                onclick="confirmDelete()"
+            >
+                <i class="fas fa-trash mr-2"></i>Delete Project
+            </button>
+            <button type="button" onclick="closeDeleteModal()" class="btn btn-ghost">Cancel</button>
+        </div>
+    </div>
+</div>
+
 <!-- Create Project Modal -->
 <div id="create-project-modal" class="modal" onclick="if(event.target === this) closeCreateProjectModal()">
     <div class="modal-box max-w-md">
@@ -349,12 +398,17 @@ function closeCreateProjectModal() {
     modal.classList.remove('modal-open');
 }
 
-// Close modal on Escape key
+// Close modals on Escape key
 document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') {
-        const modal = document.getElementById('create-project-modal');
-        if (modal.classList.contains('modal-open')) {
+        const createModal = document.getElementById('create-project-modal');
+        const deleteModal = document.getElementById('delete-project-modal');
+        
+        if (createModal.classList.contains('modal-open')) {
             closeCreateProjectModal();
+        }
+        if (deleteModal.classList.contains('modal-open')) {
+            closeDeleteModal();
         }
     }
 });
@@ -494,13 +548,78 @@ async function toggleProjectActive(projectId, currentActive) {
 }
 
 
-async function deleteProject(projectId, domain) {
-    if (!confirm(`Are you sure you want to delete the project "${domain}"? This action cannot be undone.`)) {
-        return;
+// Delete modal state
+let deleteProjectId = null;
+let deleteProjectDomain = null;
+
+// Open delete modal
+function deleteProject(projectId, domain) {
+    deleteProjectId = projectId;
+    deleteProjectDomain = domain;
+    
+    // Reset modal state
+    const modal = document.getElementById('delete-project-modal');
+    const domainDisplay = document.getElementById('delete-project-domain');
+    const confirmInput = document.getElementById('delete-confirmation-input');
+    const confirmBtn = document.getElementById('confirm-delete-btn');
+    const errorLabel = document.getElementById('delete-input-error');
+    
+    domainDisplay.textContent = domain;
+    confirmInput.value = '';
+    confirmBtn.disabled = true;
+    errorLabel.textContent = '';
+    
+    modal.classList.add('modal-open');
+    confirmInput.focus();
+}
+
+// Close delete modal
+function closeDeleteModal() {
+    const modal = document.getElementById('delete-project-modal');
+    modal.classList.remove('modal-open');
+    deleteProjectId = null;
+    deleteProjectDomain = null;
+}
+
+// Handle delete confirmation input
+document.getElementById('delete-confirmation-input').addEventListener('input', function(e) {
+    const confirmBtn = document.getElementById('confirm-delete-btn');
+    const errorLabel = document.getElementById('delete-input-error');
+    
+    if (e.target.value.toLowerCase() === 'delete') {
+        confirmBtn.disabled = false;
+        e.target.classList.remove('input-error');
+        errorLabel.textContent = '';
+    } else {
+        confirmBtn.disabled = true;
+        if (e.target.value.length > 0) {
+            e.target.classList.add('input-error');
+            errorLabel.textContent = 'Please type "delete" exactly to confirm';
+        } else {
+            e.target.classList.remove('input-error');
+            errorLabel.textContent = '';
+        }
     }
+});
+
+// Handle Enter key in delete confirmation input
+document.getElementById('delete-confirmation-input').addEventListener('keypress', function(e) {
+    if (e.key === 'Enter' && e.target.value.toLowerCase() === 'delete') {
+        confirmDelete();
+    }
+});
+
+// Confirm and execute deletion
+async function confirmDelete() {
+    if (!deleteProjectId || !deleteProjectDomain) return;
+    
+    const confirmBtn = document.getElementById('confirm-delete-btn');
+    const originalText = confirmBtn.innerHTML;
+    confirmBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Deleting...';
+    confirmBtn.disabled = true;
     
     try {
-        const response = await fetch(`/projects/${projectId}/delete/`, {
+        const response = await fetch(`/projects/${deleteProjectId}/delete/`, {
             method: 'POST',
             headers: {
                 'X-CSRFToken': getCookie('csrftoken')
@@ -510,35 +629,53 @@ async function deleteProject(projectId, domain) {
         const data = await response.json();
         
         if (data.success) {
+            // Close modal
+            closeDeleteModal();
+            
             // Show success message
             const toast = document.createElement('div');
-            toast.className = 'alert alert-success fixed top-4 right-4 w-auto z-50';
-            toast.innerHTML = `<i class="fas fa-check"></i> ${data.message}`;
+            toast.className = 'alert alert-success fixed top-4 right-4 w-auto z-50 shadow-lg';
+            toast.innerHTML = `
+                <i class="fas fa-check-circle mr-2"></i>
+                <span>${data.message || `Project "${deleteProjectDomain}" has been deleted successfully.`}</span>
+            `;
             document.body.appendChild(toast);
+            
+            // Animate and remove project card
+            const projectCard = document.querySelector(`[data-project-id="${deleteProjectId}"]`);
+            if (projectCard) {
+                projectCard.style.transition = 'opacity 0.3s, transform 0.3s';
+                projectCard.style.opacity = '0';
+                projectCard.style.transform = 'scale(0.95)';
+                
+                setTimeout(() => {
+                    projectCard.remove();
+                    
+                    // Check if any projects remain
+                    const remainingProjects = document.querySelectorAll('[data-project-id]');
+                    if (remainingProjects.length === 0) {
+                        // Reload to show empty state
+                        window.location.reload();
+                    }
+                }, 300);
+            }
             
             setTimeout(() => {
                 toast.remove();
-            }, 3000);
-            
-            // Remove the project card from DOM
-            const projectCard = document.querySelector(`[data-project-id="${projectId}"]`);
-            if (projectCard) {
-                projectCard.remove();
-            }
-            
-            // Refresh page if no projects left visible
-            const remainingProjects = document.querySelectorAll('[data-project-id]');
-            if (remainingProjects.length === 0) {
-                setTimeout(() => {
-                    window.location.reload();
-                }, 1000);
-            }
+            }, 5000);
         } else {
-            alert(data.message);
+            // Show error message
+            const errorLabel = document.getElementById('delete-input-error');
+            errorLabel.textContent = data.message || 'Failed to delete project. Please try again.';
+            confirmBtn.innerHTML = originalText;
+            confirmBtn.disabled = false;
         }
     } catch (error) {
-        alert('An error occurred. Please try again.');
         console.error('Error:', error);
+        const errorLabel = document.getElementById('delete-input-error');
+        errorLabel.textContent = 'An error occurred. Please try again.';
+        confirmBtn.innerHTML = originalText;
+        confirmBtn.disabled = false;
     }
 }
 </script>
