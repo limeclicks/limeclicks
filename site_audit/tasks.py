@@ -656,7 +656,7 @@ def collect_pagespeed_insights(self, site_audit_id: int) -> dict:
     max_retries=3,
     time_limit=1800,
     soft_time_limit=1500,
-    queue='high_priority'  # Use high priority queue for new projects
+    queue='audit_high_priority'  # Use high priority queue for new projects
 )
 def create_site_audit_for_new_project(self, project_id: int) -> dict:
     """
@@ -703,7 +703,7 @@ def create_site_audit_for_new_project(self, project_id: int) -> dict:
         # Trigger the site audit
         result = run_site_audit.apply_async(
             args=[site_audit.id],
-            queue='high_priority'  # Use high priority queue
+            queue='audit_high_priority'  # Use high priority queue
         )
         
         logger.info(f"Triggered HIGH PRIORITY site audit task {result.id} for project {project.domain}")

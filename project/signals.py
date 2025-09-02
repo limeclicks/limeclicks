@@ -21,7 +21,10 @@ def auto_queue_audits_on_project_creation(sender, instance, created, **kwargs):
             from site_audit.tasks import create_site_audit_for_new_project
             
             # Queue HIGH PRIORITY OnPage audit for new domain  
-            onpage_result = create_site_audit_for_new_project.delay(instance.id)
+            onpage_result = create_site_audit_for_new_project.apply_async(
+                args=[instance.id],
+                queue='audit_high_priority'
+            )
             logger.info(f"Auto-queued HIGH PRIORITY OnPage audit for new project {instance.domain}: Task ID={onpage_result.id}")
             
             logger.info(f"Successfully auto-queued HIGH PRIORITY audit for new project: {instance.domain}")
