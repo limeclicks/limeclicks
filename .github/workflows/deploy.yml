@@ -51,9 +51,13 @@ jobs:
             echo "Upgrading pip..."
             python -m pip install --upgrade pip
             
-            # Install/update Python dependencies
+            # Install/update Python dependencies including gevent
             echo "Installing Python dependencies..."
             pip install -r requirements.txt
+            
+            # Ensure gevent and related packages are installed
+            echo "Installing gevent workers..."
+            pip install gevent greenlet psycogreen
             
             # Setup Node.js with nvm
             echo "Setting up Node.js environment..."
@@ -79,8 +83,21 @@ jobs:
             echo "Running database migrations..."
             python manage.py migrate
             
+            # Copy production gunicorn config if it doesn't exist
+            echo "Ensuring gunicorn config exists..."
+            if [ ! -f "/home/ubuntu/new-limeclicks/gunicorn_config_production.py" ]; then
+              cp /home/ubuntu/new-limeclicks/gunicorn_config_production.py /home/ubuntu/new-limeclicks/gunicorn_config_production.py 2>/dev/null || true
+            fi
+            
+            # Copy systemd service file if updated
+            echo "Updating systemd service files..."
+            if [ -f "/home/ubuntu/new-limeclicks/limeclicks.service" ]; then
+              sudo cp /home/ubuntu/new-limeclicks/limeclicks.service /etc/systemd/system/limeclicks-gunicorn.service
+              sudo systemctl daemon-reload
+            fi
+            
             # Restart services
-            echo "Restarting services..."
+            echo "Restarting services with gevent workers..."
             sudo systemctl restart limeclicks-gunicorn
             sudo systemctl restart limeclicks-celery
             sudo systemctl restart limeclicks-celerybeat
@@ -90,6 +107,10 @@ jobs:
             sudo systemctl status limeclicks-gunicorn --no-pager
             sudo systemctl status limeclicks-celery --no-pager
             sudo systemctl status limeclicks-celerybeat --no-pager
+            
+            # Verify gevent is running
+            echo "Verifying gevent workers..."
+            ps aux | grep -i gevent | head -5
             
             echo "Deployment completed successfully!"
           ENDSSH

@@ -1,0 +1,50 @@
+[Unit]
+Description=LimeClicks Gunicorn Application with Gevent
+After=network.target postgresql.service redis.service
+Requires=postgresql.service redis.service
+
+[Service]
+Type=notify
+User=www-data
+Group=www-data
+RuntimeDirectory=gunicorn
+WorkingDirectory=/home/muaaz/enterprise/limeclicks
+Environment="PATH=/home/muaaz/enterprise/limeclicks/venv/bin:/usr/local/bin:/usr/bin:/bin"
+Environment="DJANGO_SETTINGS_MODULE=limeclicks.settings"
+Environment="SERVER_SOFTWARE=gevent"
+
+# Create necessary directories
+ExecStartPre=/bin/mkdir -p /var/log/gunicorn
+ExecStartPre=/bin/mkdir -p /var/run/gunicorn
+ExecStartPre=/bin/chown -R www-data:www-data /var/log/gunicorn
+ExecStartPre=/bin/chown -R www-data:www-data /var/run/gunicorn
+
+# Start Gunicorn with gevent configuration
+ExecStart=/home/muaaz/enterprise/limeclicks/venv/bin/gunicorn \
+    --config /home/muaaz/enterprise/limeclicks/gunicorn_config_production.py \
+    limeclicks.wsgi:application
+
+# Reload and stop commands
+ExecReload=/bin/kill -s HUP $MAINPID
+ExecStop=/bin/kill -s TERM $MAINPID
+
+# Process management
+Restart=on-failure
+RestartSec=5s
+KillMode=mixed
+KillSignal=SIGQUIT
+PrivateTmp=true
+
+# Resource limits for gevent workers
+LimitNOFILE=65536
+LimitNPROC=4096
+
+# Security hardening
+NoNewPrivileges=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/log/gunicorn /var/run/gunicorn /home/muaaz/enterprise/limeclicks/media /home/muaaz/enterprise/limeclicks/staticfiles
+
+[Install]
+WantedBy=multi-user.target
