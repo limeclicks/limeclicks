@@ -28,11 +28,182 @@
         border-left-color: #ef4444;
     }
     
+    /* Modern Tab Styles */
+    .modern-tabs {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(10px);
+        border-radius: 16px;
+        padding: 6px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.1);
+        border: 1px solid rgba(0, 0, 0, 0.05);
+        display: flex;
+        gap: 4px;
+    }
+    
+    .modern-tab {
+        position: relative;
+        padding: 12px 24px;
+        border-radius: 12px;
+        background: transparent;
+        border: none;
+        color: #64748b;
+        font-weight: 500;
+        font-size: 14px;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    
+    .modern-tab:hover {
+        color: #334155;
+        background: rgba(0, 0, 0, 0.02);
+    }
+    
+    .modern-tab.tab-active {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    }
+    
+    .modern-tab .tab-badge {
+        background: rgba(0, 0, 0, 0.1);
+        color: inherit;
+        padding: 2px 8px;
+        border-radius: 999px;
+        font-size: 11px;
+        font-weight: 600;
+        margin-left: 4px;
+    }
+    
+    .modern-tab.tab-active .tab-badge {
+        background: rgba(255, 255, 255, 0.2);
+    }
+    
+    /* Issue Distribution Cards */
+    .issue-dist-container {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 16px;
+        margin-top: 24px;
+    }
+    
+    @media (max-width: 1024px) {
+        .issue-dist-container {
+            grid-template-columns: repeat(2, 1fr);
+        }
+    }
+    
+    @media (max-width: 640px) {
+        .issue-dist-container {
+            grid-template-columns: 1fr;
+        }
+    }
+    
+    .issue-dist-card {
+        background: white;
+        border-radius: 16px;
+        padding: 24px;
+        position: relative;
+        overflow: hidden;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        border: 1px solid rgba(0, 0, 0, 0.05);
+    }
+    
+    .issue-dist-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+    }
+    
+    .issue-dist-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 4px;
+    }
+    
+    .issue-dist-card.total::before {
+        background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+    }
+    
+    .issue-dist-card.new::before {
+        background: linear-gradient(90deg, #10b981 0%, #059669 100%);
+    }
+    
+    .issue-dist-card.persisting::before {
+        background: linear-gradient(90deg, #f59e0b 0%, #d97706 100%);
+    }
+    
+    .issue-dist-card.resolved::before {
+        background: linear-gradient(90deg, #3b82f6 0%, #2563eb 100%);
+    }
+    
+    .issue-dist-label {
+        font-size: 12px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: #94a3b8;
+        margin-bottom: 8px;
+    }
+    
+    .issue-dist-value {
+        font-size: 36px;
+        font-weight: 700;
+        line-height: 1;
+        margin-bottom: 4px;
+    }
+    
+    .issue-dist-icon {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        width: 40px;
+        height: 40px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 20px;
+    }
+    
+    .issue-dist-card.total .issue-dist-value { color: #667eea; }
+    .issue-dist-card.total .issue-dist-icon { 
+        background: rgba(102, 126, 234, 0.1);
+        color: #667eea;
+    }
+    
+    .issue-dist-card.new .issue-dist-value { color: #10b981; }
+    .issue-dist-card.new .issue-dist-icon { 
+        background: rgba(16, 185, 129, 0.1);
+        color: #10b981;
+    }
+    
+    .issue-dist-card.persisting .issue-dist-value { color: #f59e0b; }
+    .issue-dist-card.persisting .issue-dist-icon { 
+        background: rgba(245, 158, 11, 0.1);
+        color: #f59e0b;
+    }
+    
+    .issue-dist-card.resolved .issue-dist-value { color: #3b82f6; }
+    .issue-dist-card.resolved .issue-dist-icon { 
+        background: rgba(59, 130, 246, 0.1);
+        color: #3b82f6;
+    }
+    
     .tab-content {
-        /* Remove animation that might be causing issues */
         opacity: 1 !important;
         visibility: visible !important;
         display: block !important;
+        animation: fadeIn 0.3s ease-in-out;
+    }
+    
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
     }
     
     .issue-row:hover {
@@ -45,6 +216,35 @@
     
     .progress-ring-circle {
         transition: stroke-dashoffset 0.5s ease-in-out;
+    }
+    
+    /* Custom badge styles for issue counts */
+    .issue-badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 2px 8px;
+        border-radius: 9999px;
+        font-size: 11px;
+        font-weight: 600;
+        white-space: nowrap;
+        line-height: 1.2;
+        min-height: 18px;
+    }
+    
+    .issue-badge-critical,
+    .issue-badge-high {
+        background-color: rgba(239, 68, 68, 0.1);
+        color: rgb(239, 68, 68);
+    }
+    
+    .issue-badge-medium {
+        background-color: rgba(245, 158, 11, 0.1);
+        color: rgb(245, 158, 11);
+    }
+    
+    .issue-badge-low {
+        background-color: rgba(59, 130, 246, 0.1);
+        color: rgb(59, 130, 246);
     }
 </style>
 {% endblock %}
@@ -129,19 +329,27 @@
                 <p class="text-4xl font-bold {% if audit.get_total_issues_count > 50 %}text-error{% elif audit.get_total_issues_count > 20 %}text-warning{% else %}text-success{% endif %}">
                     {{ audit.get_total_issues_count|default:0 }}
                 </p>
-                <div class="flex gap-1 justify-center mt-3">
+                <div class="flex flex-wrap gap-1 justify-center mt-3">
                     {% with issues=audit.get_issues_by_priority %}
                     {% if issues.Critical > 0 %}
-                    <span class="badge badge-error badge-xs">{{ issues.Critical }} Critical</span>
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                        {{ issues.Critical }} Critical
+                    </span>
                     {% endif %}
                     {% if issues.High > 0 %}
-                    <span class="badge badge-error badge-xs">{{ issues.High }} High</span>
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                        {{ issues.High }} High
+                    </span>
                     {% endif %}
                     {% if issues.Medium > 0 %}
-                    <span class="badge badge-warning badge-xs">{{ issues.Medium }} Med</span>
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                        {{ issues.Medium }} Med
+                    </span>
                     {% endif %}
                     {% if issues.Low > 0 %}
-                    <span class="badge badge-info badge-xs">{{ issues.Low }} Low</span>
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                        {{ issues.Low }} Low
+                    </span>
                     {% endif %}
                     {% endwith %}
                 </div>
@@ -177,36 +385,71 @@
         </div>
     </div>
     
-    <!-- Tabs Navigation -->
-    <div class="tabs tabs-boxed bg-base-200 mb-6">
-        <button class="tab tab-active" 
+    <!-- Modern Tabs Navigation -->
+    <div class="modern-tabs mb-6">
+        <button class="modern-tab tab-active" 
                 onclick="showTab('overview', this)"
                 hx-get="{% url 'site_audit:detail' audit.id %}?tab=overview"
                 hx-target="#tab-content"
                 hx-swap="innerHTML"
                 hx-push-url="false">
-            <i class="fas fa-chart-line mr-2"></i>
-            Overview
+            <i class="fas fa-chart-line"></i>
+            <span>Overview</span>
         </button>
-        <button class="tab" 
+        <button class="modern-tab" 
                 onclick="showTab('issues', this)"
                 hx-get="{% url 'site_audit:detail' audit.id %}?tab=issues"
                 hx-target="#tab-content"
                 hx-swap="innerHTML"
                 hx-push-url="false">
-            <i class="fas fa-exclamation-triangle mr-2"></i>
-            Issues
-            <span class="badge badge-sm ml-2">{{ audit.get_total_issues_count }}</span>
+            <i class="fas fa-exclamation-triangle"></i>
+            <span>Issues</span>
+            <span class="tab-badge">{{ audit.get_total_issues_count }}</span>
         </button>
-        <button class="tab" 
+        <button class="modern-tab" 
                 onclick="showTab('performance', this)"
                 hx-get="{% url 'site_audit:detail' audit.id %}?tab=performance"
                 hx-target="#tab-content"
                 hx-swap="innerHTML"
                 hx-push-url="false">
-            <i class="fas fa-tachometer-alt mr-2"></i>
-            Performance
+            <i class="fas fa-tachometer-alt"></i>
+            <span>Performance</span>
         </button>
+    </div>
+    
+    <!-- Issue Distribution Cards -->
+    <div class="issue-dist-container mb-6">
+        <div class="issue-dist-card total">
+            <div class="issue-dist-label">Total Issues</div>
+            <div class="issue-dist-value">{{ audit.get_total_issues_count|default:0 }}</div>
+            <div class="issue-dist-icon">
+                <i class="fas fa-exclamation-triangle"></i>
+            </div>
+        </div>
+        
+        <div class="issue-dist-card new">
+            <div class="issue-dist-label">New Issues</div>
+            <div class="issue-dist-value">{{ audit.get_total_issues_count|default:0 }}</div>
+            <div class="issue-dist-icon">
+                <i class="fas fa-plus-circle"></i>
+            </div>
+        </div>
+        
+        <div class="issue-dist-card persisting">
+            <div class="issue-dist-label">Persisting</div>
+            <div class="issue-dist-value">0</div>
+            <div class="issue-dist-icon">
+                <i class="fas fa-sync-alt"></i>
+            </div>
+        </div>
+        
+        <div class="issue-dist-card resolved">
+            <div class="issue-dist-label">Resolved</div>
+            <div class="issue-dist-value">0</div>
+            <div class="issue-dist-icon">
+                <i class="fas fa-check-circle"></i>
+            </div>
+        </div>
     </div>
     
     <!-- Tab Content -->
@@ -224,8 +467,8 @@
 
 <script>
     function showTab(tabName, element) {
-        // Update active tab styling
-        document.querySelectorAll('.tab').forEach(tab => {
+        // Update active tab styling for modern tabs
+        document.querySelectorAll('.modern-tab').forEach(tab => {
             tab.classList.remove('tab-active');
         });
         element.classList.add('tab-active');

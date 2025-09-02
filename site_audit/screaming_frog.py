@@ -32,9 +32,13 @@ class ScreamingFrogCLI:
         temp_dir = tempfile.mkdtemp(prefix='sf_crawl_')
         
         try:
+            # Get the config file path (binary config with crawl limits)
+            config_file = os.path.join(os.path.dirname(__file__), 'spider_custom_config.seospiderconfig')
+            
             # Build the command with all reports and exports
             cmd = [
                 self.sf_path,
+                '--config', config_file,
                 '--headless',
                 '--crawl', url,
                 '--save-crawl',

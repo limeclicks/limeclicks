@@ -64,6 +64,74 @@
         align-items: center;
         margin-left: 4px;
     }
+    
+    /* Ensure table columns are always visible - specific to keywords table only */
+    #keywords-table table th,
+    #keywords-table table td {
+        display: table-cell !important;
+        visibility: visible !important;
+    }
+    
+    /* Ensure rank cell is visible */
+    #keywords-table .rank-cell {
+        display: table-cell !important;
+        visibility: visible !important;
+    }
+    
+    /* Ensure rank badges in table are visible */
+    #keywords-table .rank-badge {
+        display: inline-flex !important;
+        visibility: visible !important;
+    }
+    
+    /* Ensure tags in keyword table cells are visible */
+    #keywords-table tbody td .badge {
+        display: inline-flex !important;
+        visibility: visible !important;
+    }
+    
+    /* Prevent any hiding of table content based on sidebar state */
+    .sidebar-collapsed #keywords-table table th,
+    .sidebar-collapsed #keywords-table table td {
+        display: table-cell !important;
+        visibility: visible !important;
+    }
+    
+    /* Specific fix for rank cell when sidebar is collapsed */
+    .sidebar-collapsed #keywords-table .rank-cell {
+        display: table-cell !important;
+        visibility: visible !important;
+    }
+    
+    /* Override any responsive table behavior */
+    @media screen and (max-width: 1280px) {
+        #keywords-table table th,
+        #keywords-table table td {
+            display: table-cell !important;
+            visibility: visible !important;
+        }
+        
+        /* Prevent responsive table from hiding columns */
+        #keywords-table .overflow-x-auto {
+            overflow-x: auto !important;
+        }
+        
+        /* Ensure Current Rank column header and cells are visible */
+        #keywords-table table th:nth-child(2),
+        #keywords-table table td:nth-child(2) {
+            display: table-cell !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+        }
+    }
+    
+    /* Force visibility for Current Rank column in keywords table only */
+    #keywords-table table th:nth-child(2),
+    #keywords-table table td.rank-cell {
+        display: table-cell !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+    }
 </style>
 {% endblock %}
 
