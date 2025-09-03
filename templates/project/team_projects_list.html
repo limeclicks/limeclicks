@@ -1,0 +1,181 @@
+{% extends "dashboard_base.html" %}
+{% load static %}
+
+{% block title %}Team Projects - LimeClicks{% endblock %}
+{% block page_title %}Team Projects{% endblock %}
+
+{% block extra_head %}
+<style>
+    .team-card {
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .team-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+    }
+    
+    .loading-spinner {
+        animation: spin 1s linear infinite;
+    }
+    
+    @keyframes spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+    }
+    
+    .member-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+        padding: 0.125rem 0.5rem;
+        border-radius: 9999px;
+        font-size: 0.75rem;
+        font-weight: 500;
+    }
+    
+    .role-badge {
+        padding: 0.125rem 0.5rem;
+        border-radius: 0.25rem;
+        font-size: 0.7rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+    
+    .team-stats {
+        display: flex;
+        gap: 1rem;
+        padding: 0.75rem;
+        background: var(--fallback-b2, oklch(var(--b2)));
+        border-radius: 0.5rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto">
+    <!-- Header Section -->
+    <div class="mb-8">
+        <div class="flex items-center justify-between mb-6">
+            <div>
+                <h1 class="text-3xl font-bold text-base-content">Team Projects</h1>
+                <p class="text-base-content/60 mt-1">Manage your team collaborations and project access</p>
+            </div>
+            <div class="flex items-center gap-2">
+                <button onclick="openCreateProjectModal()" class="btn btn-primary">
+                    <i class="fas fa-plus mr-2"></i>
+                    Create Project
+                </button>
+                <button onclick="location.reload()" class="btn btn-circle btn-ghost">
+                    <i class="fas fa-sync-alt"></i>
+                </button>
+            </div>
+        </div>
+        
+        <!-- Stats Overview -->
+        {% if has_projects %}
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+            <div class="card bg-base-100 border border-base-300">
+                <div class="card-body p-4">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-base-content/60 text-sm">Total Projects</p>
+                            <p class="text-2xl font-bold text-base-content">{{ total_projects }}</p>
+                        </div>
+                        <div class="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-folder text-primary"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card bg-base-100 border border-base-300">
+                <div class="card-body p-4">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-base-content/60 text-sm">You Own</p>
+                            <p class="text-2xl font-bold text-base-content">
+                                {{ projects_with_info|length }}
+                            </p>
+                        </div>
+                        <div class="w-10 h-10 bg-success/10 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-crown text-success"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card bg-base-100 border border-base-300">
+                <div class="card-body p-4">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-base-content/60 text-sm">Shared With You</p>
+                            <p class="text-2xl font-bold text-base-content">
+                                {% with shared_count=0 %}
+                                {% for item in projects_with_info %}
+                                    {% if not item.is_owner %}
+                                        {% with shared_count=shared_count|add:1 %}{% endwith %}
+                                    {% endif %}
+                                {% endfor %}
+                                {{ shared_count|default:0 }}
+                                {% endwith %}
+                            </p>
+                        </div>
+                        <div class="w-10 h-10 bg-info/10 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-users text-info"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    
+    <!-- Projects List -->
+    <div id="team-projects-list">
+        {% if has_projects %}
+            {% include "project/partials/team_project_cards.html" %}
+        {% else %}
+            <!-- Empty State -->
+            <div class="card bg-base-100 shadow-sm border border-base-300 hover:shadow-lg transition-all duration-300">
+                <div class="card-body p-12 text-center">
+                    <div class="flex justify-center mb-6">
+                        <div class="w-24 h-24 bg-primary/10 rounded-full flex items-center justify-center">
+                            <i class="fas fa-users text-primary text-3xl"></i>
+                        </div>
+                    </div>
+                    
+                    <h3 class="text-2xl font-bold text-base-content mb-2">No Team Projects Yet</h3>
+                    <p class="text-base-content/60 mb-8 max-w-md mx-auto">
+                        Start collaborating with your team by creating a project and inviting team members.
+                    </p>
+                    
+                    <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                        <button onclick="openCreateProjectModal()" class="btn btn-primary">
+                            <i class="fas fa-plus mr-2"></i>
+                            Create Your First Project
+                        </button>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Include the unified create project modal -->
+{% include "partials/create_project_modal.html" %}
+
+<script>
+function openCreateProjectModal() {
+    document.getElementById('create-project-modal').classList.add('modal-open');
+}
+
+// Initialize HTMX event handlers
+document.addEventListener('htmx:afterSwap', function(event) {
+    // Reinitialize any necessary components after HTMX swap
+});
+</script>
+{% endblock %}

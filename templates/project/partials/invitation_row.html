@@ -1,0 +1,48 @@
+<tr id="invitation-{{ invitation.id }}">
+    <td>
+        <div class="flex items-center gap-3">
+            <div class="avatar placeholder">
+                <div class="bg-warning text-warning-content rounded-full w-10">
+                    <span class="text-xl">{{ invitation.email.0|upper }}</span>
+                </div>
+            </div>
+            <div>
+                <div class="font-bold">{{ invitation.email }}</div>
+                <div class="text-sm opacity-50">Invited by {{ invitation.invited_by.email }}</div>
+            </div>
+        </div>
+    </td>
+    <td>
+        <span class="badge badge-outline">{{ invitation.get_role_display }}</span>
+    </td>
+    <td>{{ invitation.created_at|date:"M d, Y" }}</td>
+    <td>
+        {% if invitation.is_expired %}
+        <span class="badge badge-error">Expired</span>
+        {% else %}
+        <span class="text-sm">{{ invitation.expires_at|date:"M d, Y" }}</span>
+        {% endif %}
+    </td>
+    {% if can_manage %}
+    <td>
+        <div class="flex gap-2">
+            <button class="btn btn-sm btn-ghost"
+                    hx-post="{% url 'project:resend_invitation' project.id invitation.id %}"
+                    hx-target="#invitation-{{ invitation.id }}"
+                    hx-swap="outerHTML">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                </svg>
+                Resend
+            </button>
+            <button class="btn btn-sm btn-ghost text-error"
+                    onclick="revokeInvitation({{ invitation.id }})">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+                Revoke
+            </button>
+        </div>
+    </td>
+    {% endif %}
+</tr>

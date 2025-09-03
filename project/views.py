@@ -2,12 +2,17 @@ from django.shortcuts import render, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
 from django.core.paginator import Paginator
-from django.db.models import Q
+from django.db.models import Q, Count, Prefetch, Max
 from django.views.decorators.http import require_http_methods
+from django.contrib.auth import get_user_model
 import json
-from .models import Project
+from .models import Project, ProjectMember, ProjectRole, ProjectInvitation
 from .forms import ProjectForm
+from .permissions import ProjectPermission, user_can_view_project, user_can_delete_project, user_can_edit_project
+from .email_service import send_project_invitation
 from common.utils import create_ajax_response, get_logger
+
+User = get_user_model()
 
 logger = get_logger(__name__)
 
@@ -16,7 +21,18 @@ logger = get_logger(__name__)
 def project_list(request):
     """List user's projects with search functionality"""
     search_query = request.GET.get('search', '').strip()
-    projects = Project.objects.filter(user=request.user)
+    
+    # Get projects where user is owner or member with related data
+    projects = Project.objects.filter(
+        Q(user=request.user) | Q(memberships__user=request.user)
+    ).distinct().prefetch_related(
+        Prefetch('site_audits'),
+        Prefetch('keywords'),
+        Prefetch('memberships')
+    ).annotate(
+        keyword_count=Count('keywords', distinct=True),
+        member_count=Count('memberships', distinct=True)
+    )
     
     if search_query:
         projects = projects.filter(
@@ -24,15 +40,67 @@ def project_list(request):
             Q(title__icontains=search_query)
         )
     
+    # Order by creation date
+    projects = projects.order_by('-created_at')
+    
     # Pagination
-    paginator = Paginator(projects, 10)  # 10 projects per page
+    paginator = Paginator(projects, 12)  # 12 projects per page
     page_number = request.GET.get('page')
     projects_page = paginator.get_page(page_number)
     
-    return render(request, 'project/project_list.html', {
+    # Add role and additional information to each project
+    projects_with_info = []
+    for project in projects_page:
+        role = ProjectPermission.get_user_role(request.user, project)
+        
+        # Get latest site audit
+        latest_audit = project.site_audits.order_by('-created_at').first()
+        audit_score = None
+        audit_status = None
+        audit_id = None
+        if latest_audit:
+            audit_status = latest_audit.status
+            audit_id = latest_audit.id
+            # Use overall_site_health_score field - handle 0 scores properly
+            if latest_audit.overall_site_health_score is not None:
+                audit_score = int(latest_audit.overall_site_health_score)
+            else:
+                # If score is None but audit is completed, set to 0
+                if audit_status == 'completed':
+                    audit_score = 0
+        
+        # Get keyword statistics
+        keywords = project.keywords.all()
+        keywords_in_top_10 = keywords.filter(rank__lte=10, rank__gt=0).count()
+        keywords_tracked = keywords.filter(rank__gt=0).count()
+        
+        projects_with_info.append({
+            'project': project,
+            'role': role,
+            'is_owner': role == ProjectRole.OWNER,
+            'can_delete': user_can_delete_project(request.user, project),
+            'can_edit': user_can_edit_project(request.user, project),
+            'audit_score': audit_score,
+            'audit_status': audit_status,
+            'audit_id': audit_id,
+            'keyword_count': project.keyword_count,
+            'keywords_in_top_10': keywords_in_top_10,
+            'keywords_tracked': keywords_tracked,
+            'member_count': project.member_count,
+        })
+    
+    # Check if it's an HTMX request for partial updates
+    if request.headers.get('HX-Request'):
+        template = 'project/partials/project_table_rows.html'
+    else:
+        template = 'project/project_list.html'
+    
+    return render(request, template, {
         'projects': projects_page,
+        'projects_with_info': projects_with_info,
         'search_query': search_query,
-        'total_projects': Project.objects.filter(user=request.user).count()
+        'total_projects': projects.count(),
+        'page_obj': projects_page
     })
 
 
@@ -48,6 +116,58 @@ def project_create(request):
             project = form.save(commit=False)
             project.user = request.user
             project.save()  # This will trigger the signal to auto-queue audits
+            
+            # Create owner membership
+            ProjectMember.objects.create(
+                project=project,
+                user=request.user,
+                role=ProjectRole.OWNER
+            )
+            
+            # Handle sharing if emails provided
+            share_emails = data.get('share_emails', '').strip()
+            if share_emails:
+                email_list = [email.strip().lower() for email in share_emails.split(',')]
+                for email in email_list:
+                    if not email:
+                        continue
+                    
+                    try:
+                        # Check if user exists
+                        try:
+                            existing_user = User.objects.get(email__iexact=email)
+                            # Add existing user as member
+                            ProjectMember.objects.create(
+                                project=project,
+                                user=existing_user,
+                                role=ProjectRole.MEMBER
+                            )
+                            # Send notification email
+                            send_project_invitation(
+                                email=email,
+                                project=project,
+                                inviter=request.user,
+                                is_existing_user=True,
+                                user_name=existing_user.get_full_name() or existing_user.username
+                            )
+                        except User.DoesNotExist:
+                            # Create invitation for new user
+                            invitation = ProjectInvitation.objects.create(
+                                project=project,
+                                email=email,
+                                role=ProjectRole.MEMBER,
+                                invited_by=request.user
+                            )
+                            # Send invitation email
+                            send_project_invitation(
+                                email=email,
+                                project=project,
+                                inviter=request.user,
+                                is_existing_user=False,
+                                invitation_token=invitation.token
+                            )
+                    except Exception as e:
+                        logger.error(f"Error inviting {email} during project creation: {str(e)}")
             
             return create_ajax_response(
                 success=True,
@@ -88,7 +208,14 @@ def project_create(request):
 def project_delete(request, project_id):
     """Delete a project via AJAX"""
     try:
-        project = get_object_or_404(Project, id=project_id, user=request.user)
+        project = get_object_or_404(Project, id=project_id)
+        
+        # Check if user has permission to delete
+        if not user_can_delete_project(request.user, project):
+            return create_ajax_response(
+                success=False,
+                message='You do not have permission to delete this project.'
+            )
         domain = project.domain
         project.delete()
         
@@ -115,7 +242,14 @@ def project_delete(request, project_id):
 def project_toggle_active(request, project_id):
     """Toggle project active status via AJAX"""
     try:
-        project = get_object_or_404(Project, id=project_id, user=request.user)
+        project = get_object_or_404(Project, id=project_id)
+        
+        # Check if user has permission to edit
+        if not user_can_edit_project(request.user, project):
+            return JsonResponse({
+                'success': False,
+                'message': 'You do not have permission to modify this project.'
+            })
         project.active = not project.active
         project.save()
         

@@ -1,0 +1,129 @@
+<div class="grid grid-cols-1 gap-4" id="team-cards-container">
+    {% for item in projects_with_info %}
+    <div class="card bg-base-100 shadow-sm border border-base-300 hover:shadow-lg transition-all duration-300 team-card">
+        <div class="card-body p-6">
+            <div class="flex items-start justify-between mb-4">
+                <!-- Project Info -->
+                <div class="flex-1">
+                    <div class="flex items-center gap-3 mb-2">
+                        <!-- Favicon -->
+                        <img 
+                            src="{% url 'project:favicon_proxy' item.project.domain %}"
+                            alt="{{ item.project.domain }} favicon"
+                            class="w-6 h-6 rounded"
+                            onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\' fill=\'%236B7280\'%3E%3Cpath d=\'M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z\'/%3E%3C/svg%3E'"
+                        >
+                        
+                        <!-- Domain and Title -->
+                        <div>
+                            <h3 class="text-lg font-semibold text-base-content">
+                                {{ item.project.domain }}
+                            </h3>
+                            {% if item.project.title %}
+                            <p class="text-sm text-base-content/60">{{ item.project.title }}</p>
+                            {% endif %}
+                        </div>
+                        
+                        <!-- Your Role Badge -->
+                        {% if item.is_owner %}
+                        <span class="role-badge bg-success/20 text-success">
+                            <i class="fas fa-crown mr-1"></i> Owner
+                        </span>
+                        {% else %}
+                        <span class="role-badge bg-info/20 text-info">
+                            <i class="fas fa-user mr-1"></i> Member
+                        </span>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <!-- Action Button -->
+                <div>
+                    <a href="{% url 'project:team_management' item.project.id %}" class="btn btn-sm btn-primary btn-outline">
+                        <i class="fas fa-cog mr-1"></i>
+                        Manage Team
+                    </a>
+                </div>
+            </div>
+            
+            <!-- Team Stats -->
+            <div class="team-stats">
+                <div class="flex-1">
+                    <div class="flex items-center gap-2">
+                        <i class="fas fa-users text-base-content/40 text-sm"></i>
+                        <div>
+                            <p class="text-xs text-base-content/60">Team Members</p>
+                            <p class="text-lg font-bold text-base-content">{{ item.member_count }}</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="flex-1">
+                    <div class="flex items-center gap-2">
+                        <i class="fas fa-envelope text-base-content/40 text-sm"></i>
+                        <div>
+                            <p class="text-xs text-base-content/60">Pending Invites</p>
+                            <p class="text-lg font-bold text-base-content">{{ item.pending_invitations }}</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="flex-1">
+                    <div class="flex items-center gap-2">
+                        <i class="fas fa-user-friends text-base-content/40 text-sm"></i>
+                        <div>
+                            <p class="text-xs text-base-content/60">Total Team Size</p>
+                            <p class="text-lg font-bold text-base-content">{{ item.total_team_size }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Team Members Preview -->
+            <div class="mt-4 pt-4 border-t border-base-300">
+                <p class="text-sm text-base-content/60 mb-2">Team Members:</p>
+                <div class="flex flex-wrap gap-2">
+                    {% if item.member_display %}
+                    <div class="text-sm text-base-content">
+                        {{ item.member_display }}
+                    </div>
+                    {% else %}
+                    <span class="text-sm text-base-content/40 italic">No team members yet</span>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- Quick Actions -->
+            <div class="mt-4 flex gap-2">
+                {% if item.is_owner %}
+                <a href="{% url 'project:team_management' item.project.id %}" 
+                   class="btn btn-xs btn-ghost text-base-content/60">
+                    <i class="fas fa-user-plus mr-1"></i>
+                    Invite Members
+                </a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+{% if page_obj.has_next %}
+<!-- Load More Button -->
+<div class="text-center mt-8" id="load-more-container">
+    <button 
+        class="btn btn-primary btn-outline"
+        hx-get="{% url 'project:team_projects_list' %}?page={{ page_obj.next_page_number }}"
+        hx-trigger="click"
+        hx-target="#team-cards-container"
+        hx-select=".team-card"
+        hx-swap="beforeend"
+        hx-indicator="#load-more-spinner"
+    >
+        <span id="load-more-text">Load More</span>
+        <span id="load-more-spinner" class="htmx-indicator">
+            <i class="fas fa-spinner loading-spinner ml-2"></i>
+        </span>
+    </button>
+</div>
+{% endif %}

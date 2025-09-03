@@ -1,0 +1,154 @@
+{% extends "dashboard_base.html" %}
+{% block title %}Team Management - {{ project.domain }} - LimeClicks{% endblock %}
+{% block page_title %}Team Management - {{ project.domain }}{% endblock %}
+
+{% block extra_head %}
+<script src="https://unpkg.com/htmx.org@1.9.10"></script>
+<style>
+    .team-section {
+        margin-bottom: 2rem;
+    }
+    .member-row {
+        display: flex;
+        align-items: center;
+        padding: 0.75rem;
+        border-bottom: 1px solid #e5e7eb;
+    }
+    .member-row:hover {
+        background-color: #f9fafb;
+    }
+    .member-info {
+        flex: 1;
+    }
+    .member-actions {
+        display: flex;
+        gap: 0.5rem;
+    }
+    .role-badge {
+        padding: 0.25rem 0.75rem;
+        border-radius: 9999px;
+        font-size: 0.875rem;
+        font-weight: 500;
+    }
+    .role-owner {
+        background-color: #fee2e2;
+        color: #991b1b;
+    }
+    .role-member {
+        background-color: #dbeafe;
+        color: #1e40af;
+    }
+    .invitation-pending {
+        background-color: #fef3c7;
+        color: #92400e;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mx-auto max-w-6xl">
+    <!-- Back to Projects -->
+    <div class="mb-4">
+        <a href="{% url 'project:project_list' %}" class="btn btn-sm btn-ghost">
+            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+            </svg>
+            Back to Projects
+        </a>
+    </div>
+
+    <!-- Project Info Card -->
+    <div class="card bg-base-100 shadow-xl mb-6">
+        <div class="card-body">
+            <div class="flex items-center gap-4">
+                <img src="{{ project.get_cached_favicon_url }}" alt="{{ project.domain }}" class="w-12 h-12 rounded">
+                <div>
+                    <h2 class="card-title">{{ project.domain }}</h2>
+                    <p class="text-sm text-gray-600">{{ project.title|default:"Untitled" }}</p>
+                </div>
+                <div class="ml-auto">
+                    <span class="role-badge role-{{ user_role|lower }}">
+                        Your Role: {{ user_role }}
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Invite Members Section (only for owners) -->
+    {% if can_manage %}
+    <div class="card bg-base-100 shadow-xl team-section">
+        <div class="card-body">
+            <h3 class="card-title">Invite Team Members</h3>
+            <form hx-post="{% url 'project:invite_users' project.id %}"
+                  hx-target="#team-members-list"
+                  hx-swap="outerHTML"
+                  class="space-y-4">
+                {% csrf_token %}
+                <div class="form-control">
+                    <label class="label">
+                        <span class="label-text">Email addresses (comma-separated)</span>
+                    </label>
+                    <input type="text" name="emails" 
+                           placeholder="user1@example.com, user2@example.com" 
+                           class="input input-bordered w-full"
+                           required>
+                    <label class="label">
+                        <span class="label-text-alt">Team members can manage keywords and view site audits</span>
+                    </label>
+                </div>
+                <button type="submit" class="btn btn-primary">Send Invitations</button>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Team Members List -->
+    <div id="team-members-list">
+        {% include 'project/partials/team_members_list.html' %}
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<dialog id="delete_modal" class="modal">
+    <div class="modal-box">
+        <h3 class="font-bold text-lg">Remove Team Member</h3>
+        <p class="py-4">Are you sure you want to remove this member from the project?</p>
+        <div class="modal-action">
+            <form method="dialog">
+                <button class="btn btn-ghost">Cancel</button>
+            </form>
+            <button id="confirm-delete" class="btn btn-error">Remove</button>
+        </div>
+    </div>
+</dialog>
+
+<script>
+    // Handle member removal with confirmation
+    function confirmRemoveMember(memberId) {
+        const modal = document.getElementById('delete_modal');
+        const confirmBtn = document.getElementById('confirm-delete');
+        
+        modal.showModal();
+        
+        confirmBtn.onclick = function() {
+            // Send HTMX delete request
+            htmx.ajax('DELETE', `/project/{{ project.id }}/team/member/${memberId}/remove/`, {
+                target: '#team-members-list',
+                swap: 'outerHTML'
+            });
+            modal.close();
+        };
+    }
+    
+    // Handle invitation revocation
+    function revokeInvitation(invitationId) {
+        if (confirm('Are you sure you want to revoke this invitation?')) {
+            htmx.ajax('DELETE', `/project/{{ project.id }}/team/invitation/${invitationId}/revoke/`, {
+                target: `#invitation-${invitationId}`,
+                swap: 'outerHTML'
+            });
+        }
+    }
+</script>
+{% endblock %}

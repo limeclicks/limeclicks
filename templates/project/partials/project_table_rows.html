@@ -1,0 +1,176 @@
+<div class="grid grid-cols-1 gap-4" id="project-cards-container">
+    {% for item in projects_with_info %}
+    <div class="card bg-base-100 shadow-sm border border-base-300 hover:shadow-lg transition-all duration-300 project-card">
+        <div class="card-body p-6">
+            <div class="flex items-start justify-between mb-4">
+                <!-- Project Info -->
+                <div class="flex-1">
+                    <div class="flex items-center gap-3 mb-2">
+                        <!-- Favicon -->
+                        <img 
+                            src="{% url 'project:favicon_proxy' item.project.domain %}"
+                            alt="{{ item.project.domain }} favicon"
+                            class="w-6 h-6 rounded"
+                            onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\' fill=\'%236B7280\'%3E%3Cpath d=\'M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z\'/%3E%3C/svg%3E'"
+                        >
+                        
+                        <!-- Domain and Title -->
+                        <div class="flex-1">
+                            <h3 class="text-lg font-semibold text-base-content">
+                                {{ item.project.domain }}
+                            </h3>
+                            {% if item.project.title %}
+                            <p class="text-sm text-base-content/60">{{ item.project.title }}</p>
+                            {% endif %}
+                        </div>
+                        
+                        <!-- Your Role Badge -->
+                        {% if item.is_owner %}
+                        <span class="role-badge bg-success/20 text-success">
+                            <i class="fas fa-crown mr-1"></i> Owner
+                        </span>
+                        {% else %}
+                        <span class="role-badge bg-info/20 text-info">
+                            <i class="fas fa-user mr-1"></i> Member
+                        </span>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <!-- Actions -->
+                <div class="dropdown dropdown-end">
+                    <div tabindex="0" role="button" class="btn btn-ghost btn-sm btn-circle">
+                        <i class="fas fa-ellipsis-v"></i>
+                    </div>
+                    <ul tabindex="0" class="dropdown-content z-[100] menu p-2 shadow-lg bg-base-100 rounded-box w-48">
+                        <li>
+                            <a href="{% url 'project:team_management' item.project.id %}">
+                                <i class="fas fa-users"></i> Manage Team
+                            </a>
+                        </li>
+                        {% if item.can_delete %}
+                        <li>
+                            <a class="text-error" onclick="deleteProject({{ item.project.id }}, '{{ item.project.domain }}')">
+                                <i class="fas fa-trash"></i> Delete Project
+                            </a>
+                        </li>
+                        {% endif %}
+                    </ul>
+                </div>
+            </div>
+            
+            <!-- Metrics Grid -->
+            <div class="stats-grid mb-4">
+                <!-- Site Audit Score -->
+                <div class="metric-card">
+                    <p class="text-xs text-base-content/60 mb-1">Audit Score</p>
+                    {% if item.audit_score %}
+                    <div class="flex items-center justify-center">
+                        <div class="score-badge {% if item.audit_score >= 90 %}score-excellent{% elif item.audit_score >= 70 %}score-good{% elif item.audit_score >= 50 %}score-average{% else %}score-poor{% endif %}">
+                            {{ item.audit_score }}
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="flex items-center justify-center">
+                        <div class="score-badge score-none">
+                            --
+                        </div>
+                    </div>
+                    {% endif %}
+                    <p class="text-xs text-base-content/40 mt-1">
+                        {% if item.audit_status == 'completed' %}
+                            Completed
+                        {% elif item.audit_status == 'pending' %}
+                            Pending
+                        {% elif item.audit_status == 'running' %}
+                            Running
+                        {% else %}
+                            No audit
+                        {% endif %}
+                    </p>
+                </div>
+                
+                <!-- Keywords -->
+                <div class="metric-card">
+                    <p class="text-xs text-base-content/60 mb-1">Keywords</p>
+                    <p class="text-2xl font-bold text-base-content">{{ item.keyword_count }}</p>
+                    <p class="text-xs text-base-content/40 mt-1">Total tracked</p>
+                </div>
+                
+                <!-- Top 10 Rankings -->
+                <div class="metric-card">
+                    <p class="text-xs text-base-content/60 mb-1">Top 10</p>
+                    <p class="text-2xl font-bold text-success">{{ item.keywords_in_top_10 }}</p>
+                    <p class="text-xs text-base-content/40 mt-1">Keywords</p>
+                </div>
+                
+                <!-- Team Members -->
+                <div class="metric-card">
+                    <p class="text-xs text-base-content/60 mb-1">Team</p>
+                    <p class="text-2xl font-bold text-base-content">{{ item.member_count }}</p>
+                    <p class="text-xs text-base-content/40 mt-1">Members</p>
+                </div>
+            </div>
+            
+            <!-- Progress Bar for Keywords -->
+            {% if item.keyword_count > 0 %}
+            <div class="mb-4">
+                <div class="flex justify-between text-xs text-base-content/60 mb-1">
+                    <span>Keyword Rankings</span>
+                    <span>{{ item.keywords_tracked }} of {{ item.keyword_count }} tracked</span>
+                </div>
+                <progress class="progress progress-primary h-2" value="{{ item.keywords_tracked }}" max="{{ item.keyword_count }}"></progress>
+            </div>
+            {% endif %}
+            
+            <!-- Quick Actions -->
+            <div class="flex gap-2">
+                <a href="{% url 'site_audit:list' %}" class="btn btn-sm btn-outline flex-1">
+                    <i class="fas fa-chart-line mr-1"></i>
+                    View Audit
+                </a>
+                <a href="{% url 'keywords:list' %}" class="btn btn-sm btn-outline flex-1">
+                    <i class="fas fa-key mr-1"></i>
+                    Keywords
+                </a>
+                <a href="{% url 'project:team_management' item.project.id %}" class="btn btn-sm btn-primary">
+                    <i class="fas fa-users mr-1"></i>
+                    Team
+                </a>
+            </div>
+            
+            <!-- Footer Info -->
+            <div class="flex justify-between items-center text-xs text-base-content/40 mt-4 pt-4 border-t border-base-300">
+                <span>
+                    <i class="fas fa-calendar mr-1"></i>
+                    Created {{ item.project.created_at|date:"M d, Y" }}
+                </span>
+                <span>
+                    <i class="fas fa-clock mr-1"></i>
+                    Updated {{ item.project.updated_at|timesince }} ago
+                </span>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+{% if page_obj.has_next %}
+<!-- Load More Button -->
+<div class="text-center mt-8" id="load-more-container">
+    <button 
+        class="btn btn-primary btn-outline"
+        hx-get="{% url 'project:project_list' %}?page={{ page_obj.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}"
+        hx-trigger="click"
+        hx-target="#project-cards-container"
+        hx-select=".project-card"
+        hx-swap="beforeend"
+        hx-indicator="#load-more-spinner"
+    >
+        <span id="load-more-text">Load More</span>
+        <span id="load-more-spinner" class="htmx-indicator">
+            <i class="fas fa-spinner loading-spinner ml-2"></i>
+        </span>
+    </button>
+</div>
+{% endif %}

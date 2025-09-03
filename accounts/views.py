@@ -10,6 +10,7 @@ from django.urls import reverse
 from django.http import Http404, HttpResponseRedirect
 from .forms import RegisterForm, LoginForm, PasswordResetForm, ResendConfirmationForm
 from .email_backend import BrevoTemplateEmailMessage
+from project.models import ProjectInvitation
 import logging
 
 logger = logging.getLogger(__name__)
@@ -17,7 +18,21 @@ logger = logging.getLogger(__name__)
 User = get_user_model()
 
 def register_view(request):
-    form = RegisterForm(request.POST or None)
+    # Check if there's an invitation token in the session
+    invitation_token = request.session.get('invitation_token')
+    invitation = None
+    
+    if invitation_token:
+        try:
+            invitation = ProjectInvitation.objects.get(token=invitation_token)
+            if not invitation.is_valid():
+                invitation = None
+                del request.session['invitation_token']
+                messages.warning(request, "The invitation link has expired or is no longer valid.")
+        except ProjectInvitation.DoesNotExist:
+            del request.session['invitation_token']
+    
+    form = RegisterForm(request.POST or None, initial={'email': invitation.email} if invitation else {})
     if request.method == "POST" and form.is_valid():
         name = form.cleaned_data["name"].strip()
         email = form.cleaned_data["email"].lower()
@@ -57,6 +72,18 @@ def register_view(request):
         # Send the email
         connection = get_connection()
         connection.send_messages([email_message])
+
+        # Accept invitation if exists and email matches
+        if invitation and invitation.email.lower() == email:
+            try:
+                invitation.accept(user)
+                messages.success(request, f"You've successfully joined the project {invitation.project.domain}!")
+            except Exception as e:
+                logger.error(f"Error accepting invitation: {str(e)}")
+            
+            # Clear invitation from session
+            if 'invitation_token' in request.session:
+                del request.session['invitation_token']
 
         # Store user info for success page
         request.session['registration_success'] = {

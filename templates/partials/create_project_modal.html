@@ -1,0 +1,248 @@
+<!-- Unified Project Creation Modal Component -->
+<!-- Usage: Include this template using the include tag -->
+
+<div id="create-project-modal" class="modal">
+    <div class="modal-box max-w-2xl">
+        <div class="flex justify-between items-center mb-6">
+            <h3 class="font-bold text-lg">Create New Project</h3>
+            <button onclick="closeCreateProjectModal()" class="btn btn-sm btn-circle btn-ghost">✕</button>
+        </div>
+        
+        <form id="unified-project-create-form">
+            {% csrf_token %}
+            
+            <!-- Domain Input Section -->
+            <div class="form-control w-full mb-4">
+                <label class="label">
+                    <span class="label-text font-medium">Domain</span>
+                    <span class="label-text-alt text-error">*Required</span>
+                </label>
+                <input 
+                    type="text" 
+                    id="domain-input"
+                    name="domain"
+                    placeholder="example.com or blog.example.com" 
+                    class="input input-bordered w-full" 
+                    required 
+                    autocomplete="off"
+                />
+                <div id="domain-error" class="text-error text-sm mt-1 hidden"></div>
+                <label class="label">
+                    <span class="label-text-alt text-base-content/60">Enter domain or subdomain. Protocol and paths will be removed automatically.</span>
+                </label>
+            </div>
+            
+            <!-- Title Input -->
+            <div class="form-control w-full mb-4">
+                <label class="label">
+                    <span class="label-text font-medium">Project Name</span>
+                    <span class="label-text-alt text-base-content/60">(optional)</span>
+                </label>
+                <input 
+                    type="text" 
+                    id="title-input"
+                    name="title"
+                    placeholder="My Website (auto-generated if left blank)" 
+                    class="input input-bordered w-full" 
+                />
+            </div>
+            
+            <!-- Sharing Section -->
+            <div class="divider">Team Sharing (Optional)</div>
+            
+            <div class="form-control w-full mb-4">
+                <label class="label">
+                    <span class="label-text font-medium">Invite Team Members</span>
+                </label>
+                <textarea 
+                    id="share-emails-input"
+                    name="share_emails"
+                    placeholder="Enter email addresses separated by commas (e.g., user1@example.com, user2@example.com)" 
+                    class="textarea textarea-bordered w-full h-20"
+                ></textarea>
+                <label class="label">
+                    <span class="label-text-alt text-base-content/60">Team members can manage keywords and view site audits. Site audit will run automatically after project creation.</span>
+                </label>
+            </div>
+            
+            <!-- Success/Error Messages -->
+            <div id="create-project-messages" class="mb-4"></div>
+            
+            <div class="modal-action">
+                <button type="submit" class="btn btn-primary" id="create-btn">
+                    <span id="create-btn-text">Create Project</span>
+                    <span id="create-btn-spinner" class="loading loading-spinner loading-sm ml-2 hidden"></span>
+                </button>
+                <button type="button" onclick="closeCreateProjectModal()" class="btn btn-ghost">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+// Unified Project Creation Modal Logic
+(function() {
+    // Get CSRF token
+    function getCookie(name) {
+        const m = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
+        return m ? m.pop() : '';
+    }
+
+    // Domain validation functions
+    function cleanDomain(domain) {
+        let cleaned = domain.toLowerCase().trim();
+        cleaned = cleaned.replace(/^https?:\/\//, '');
+        cleaned = cleaned.replace(/\/$/, '');
+        // Keep www if present, will be handled by checkbox
+        cleaned = cleaned.split('/')[0];
+        cleaned = cleaned.split('?')[0];
+        cleaned = cleaned.split('#')[0];
+        cleaned = cleaned.split(':')[0];
+        return cleaned;
+    }
+
+    function validateDomain(domain) {
+        if (!domain) {
+            return { valid: false, message: 'Domain is required.' };
+        }
+        
+        // Must contain at least one dot
+        if (!domain.includes('.')) {
+            return { valid: false, message: 'Please enter a valid domain (must contain at least one dot).' };
+        }
+        
+        // Check for invalid characters
+        if (!/^[a-zA-Z0-9.-]+$/.test(domain)) {
+            return { valid: false, message: 'Domain contains invalid characters.' };
+        }
+        
+        // Check domain format
+        const domainPattern = /^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)*[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$/;
+        if (!domainPattern.test(domain)) {
+            return { valid: false, message: 'Please enter a valid domain.' };
+        }
+        
+        return { valid: true };
+    }
+
+    // Domain validation on input
+    const domainInput = document.getElementById('domain-input');
+    
+    domainInput?.addEventListener('input', function() {
+        const cleaned = cleanDomain(this.value);
+        
+        // Validate domain
+        const validation = validateDomain(cleaned);
+        const errorDiv = document.getElementById('domain-error');
+        
+        if (!validation.valid && this.value) {
+            errorDiv.textContent = validation.message;
+            errorDiv.classList.remove('hidden');
+        } else {
+            errorDiv.classList.add('hidden');
+        }
+    });
+
+    // Form submission
+    const form = document.getElementById('unified-project-create-form');
+    form?.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const submitBtn = document.getElementById('create-btn');
+        const btnText = document.getElementById('create-btn-text');
+        const btnSpinner = document.getElementById('create-btn-spinner');
+        const messagesDiv = document.getElementById('create-project-messages');
+        
+        // Clean and validate domain
+        let domain = cleanDomain(domainInput.value);
+        const validation = validateDomain(domain);
+        
+        if (!validation.valid) {
+            messagesDiv.innerHTML = `<div class="alert alert-error">${validation.message}</div>`;
+            return;
+        }
+        
+        // Show loading state
+        submitBtn.disabled = true;
+        btnText.textContent = 'Creating...';
+        btnSpinner.classList.remove('hidden');
+        messagesDiv.innerHTML = '';
+        
+        // Prepare data
+        const formData = {
+            domain: domain,
+            title: document.getElementById('title-input').value,
+            share_emails: document.getElementById('share-emails-input').value
+        };
+        
+        try {
+            // Create main project
+            const response = await fetch('/project/create/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: JSON.stringify(formData)
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                messagesDiv.innerHTML = `<div class="alert alert-success">Project created successfully! Site audit will run automatically.</div>`;
+                
+                // Redirect or refresh after a short delay
+                setTimeout(() => {
+                    if (window.location.pathname.includes('site_audit')) {
+                        // If on site audit page, reload to show new project
+                        window.location.reload();
+                    } else {
+                        // Otherwise go to projects page
+                        window.location.href = '/project/';
+                    }
+                }, 1500);
+                
+            } else {
+                messagesDiv.innerHTML = `<div class="alert alert-error">${data.message || 'Error creating project'}</div>`;
+                submitBtn.disabled = false;
+                btnText.textContent = 'Create Project';
+                btnSpinner.classList.add('hidden');
+            }
+        } catch (error) {
+            messagesDiv.innerHTML = `<div class="alert alert-error">Network error: ${error.message}</div>`;
+            submitBtn.disabled = false;
+            btnText.textContent = 'Create Project';
+            btnSpinner.classList.add('hidden');
+        }
+    });
+})();
+
+// Global modal functions
+window.openCreateProjectModal = function() {
+    const modal = document.getElementById('create-project-modal');
+    modal.classList.add('modal-open');
+    document.getElementById('unified-project-create-form').reset();
+    document.getElementById('domain-error').classList.add('hidden');
+    document.getElementById('create-project-messages').innerHTML = '';
+    
+    // Focus on domain input
+    setTimeout(() => {
+        document.getElementById('domain-input')?.focus();
+    }, 100);
+}
+
+window.closeCreateProjectModal = function() {
+    const modal = document.getElementById('create-project-modal');
+    modal.classList.remove('modal-open');
+}
+
+// Close modal on Escape key
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        const modal = document.getElementById('create-project-modal');
+        if (modal?.classList.contains('modal-open')) {
+            closeCreateProjectModal();
+        }
+    }
+});
+</script>

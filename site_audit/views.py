@@ -442,26 +442,13 @@ def add_project(request):
         # Check if this is the user's first project
         user_project_count = Project.objects.filter(user=request.user).count()
         
-        # Prepare the response HTML
-        if user_project_count == 1:
-            # First project - include both the project card and the "Add New Project" card
-            project_html = render_to_string('site_audit/partials/audit_card.html', {
-                'item': {
-                    'project': project,
-                    'audit': site_audit
-                }
-            })
-            add_card_html = render_to_string('site_audit/partials/add_project_card.html')
-            # Combine both cards
-            html = project_html + add_card_html
-        else:
-            # Not the first project - just return the project card
-            html = render_to_string('site_audit/partials/audit_card.html', {
-                'item': {
-                    'project': project,
-                    'audit': site_audit
-                }
-            })
+        # Prepare the response HTML - just return the project card
+        html = render_to_string('site_audit/partials/audit_card.html', {
+            'item': {
+                'project': project,
+                'audit': site_audit
+            }
+        })
         
         # Add HX-Trigger header to close modal
         response = HttpResponse(html)

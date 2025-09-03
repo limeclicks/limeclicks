@@ -18,16 +18,11 @@
             <!-- Action Buttons -->
             <div class="flex flex-col sm:flex-row gap-4 justify-center">
                 <button 
-                    hx-get="{% url 'site_audit:add_project_modal' %}"
-                    hx-trigger="click"
-                    hx-target="#modal-container"
-                    hx-swap="innerHTML"
-                    hx-indicator=".htmx-indicator"
+                    onclick="openCreateProjectModal()"
                     class="btn btn-primary"
                 >
                     <i class="fas fa-plus mr-2"></i>
                     Add Your First Project
-                    <span class="htmx-indicator loading loading-spinner loading-sm ml-2"></span>
                 </button>
                 <a href="#" class="btn btn-ghost">
                     <i class="fas fa-book mr-2"></i>

@@ -68,9 +68,15 @@
                 <h1 class="text-3xl font-bold text-base-content">Site Audits</h1>
                 <p class="text-base-content/60 mt-1">Monitor and analyze your website's SEO health</p>
             </div>
-            <button onclick="location.reload()" class="btn btn-circle btn-ghost">
-                <i class="fas fa-sync-alt"></i>
-            </button>
+            <div class="flex items-center gap-2">
+                <button onclick="openCreateProjectModal()" class="btn btn-primary">
+                    <i class="fas fa-plus mr-2"></i>
+                    Create Project
+                </button>
+                <button onclick="location.reload()" class="btn btn-circle btn-ghost">
+                    <i class="fas fa-sync-alt"></i>
+                </button>
+            </div>
         </div>
         
         <!-- Search and Filter Card -->
@@ -248,9 +254,6 @@
     <div id="audit-list">
         <div class="grid grid-cols-1 gap-4" id="audit-cards-container">
             {% if projects_with_audits %}
-                <!-- Add New Project Card at the top -->
-                {% include "site_audit/partials/add_project_card.html" %}
-                
                 <!-- Existing Projects -->
                 {% for item in projects_with_audits %}
                     {% include "site_audit/partials/audit_card.html" %}
@@ -284,6 +287,10 @@
 </div>
 
 <!-- Modal Container for HTMX -->
+<!-- Include Unified Create Project Modal -->
+{% include 'partials/create_project_modal.html' %}
+
+<!-- Modal container for HTMX (if still needed for other modals) -->
 <div id="modal-container"></div>
 
 <!-- Minimal JavaScript for real-time updates using native EventSource -->

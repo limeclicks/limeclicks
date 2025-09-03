@@ -1,720 +1,300 @@
 {% extends "dashboard_base.html" %}
+{% load static %}
+
 {% block title %}Projects - LimeClicks{% endblock %}
 {% block page_title %}Projects{% endblock %}
 
 {% block extra_head %}
-<!-- Preload favicons for better performance -->
-{% for project in projects %}
-<link rel="preload" href="{{ project.get_cached_favicon_url }}" as="image">
-{% endfor %}
-
-<!-- Fix dropdown overflow issues -->
 <style>
-    /* Ensure dropdowns can overflow the card boundaries */
-    .card {
+    .project-card {
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .project-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+    }
+    
+    .loading-spinner {
+        animation: spin 1s linear infinite;
+    }
+    
+    @keyframes spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+    }
+    
+    .health-bar {
+        transition: width 1s ease-out;
+    }
+    
+    .pulse-dot {
+        animation: pulse 2s infinite;
+    }
+    
+    @keyframes pulse {
+        0% {
+            box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7);
+        }
+        70% {
+            box-shadow: 0 0 0 10px rgba(34, 197, 94, 0);
+        }
+        100% {
+            box-shadow: 0 0 0 0 rgba(34, 197, 94, 0);
+        }
+    }
+    
+    .stat-card {
+        background: linear-gradient(135deg, var(--fallback-b1, oklch(var(--b1))) 0%, var(--fallback-b2, oklch(var(--b2))) 100%);
+    }
+    
+    .domain-text {
+        font-weight: 600;
+        color: var(--fallback-bc, oklch(var(--bc)));
+    }
+    
+    .metric-value {
+        font-size: 1.5rem;
+        font-weight: bold;
+        line-height: 1.2;
+    }
+    
+    .metric-label {
+        font-size: 0.75rem;
+        opacity: 0.7;
+        margin-top: 0.25rem;
+    }
+    
+    .score-circle {
+        width: 56px;
+        height: 56px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        font-size: 1.125rem;
+        color: white;
         position: relative;
     }
     
-    /* Prevent grid from clipping dropdown content */
-    .grid {
-        overflow: visible !important;
+    .score-excellent {
+        background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
     }
     
-    /* Ensure dropdown menu appears above other elements */
-    .dropdown-content {
-        position: absolute !important;
-        z-index: 1000 !important;
+    .score-good {
+        background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
     }
     
-    /* Add scrollbar for long dropdown menus */
-    .dropdown-content.menu {
-        max-height: 200px;
-        overflow-y: auto;
+    .score-average {
+        background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
     }
     
-    /* Optional: Style the scrollbar */
-    .dropdown-content.menu::-webkit-scrollbar {
-        width: 4px;
+    .score-poor {
+        background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
     }
     
-    .dropdown-content.menu::-webkit-scrollbar-track {
-        background: rgba(0, 0, 0, 0.1);
-        border-radius: 2px;
+    .score-none {
+        background: linear-gradient(135deg, #9ca3af 0%, #6b7280 100%);
     }
     
-    .dropdown-content.menu::-webkit-scrollbar-thumb {
-        background: rgba(0, 0, 0, 0.3);
-        border-radius: 2px;
+    .metric-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 1rem;
     }
     
-    .dropdown-content.menu::-webkit-scrollbar-thumb:hover {
-        background: rgba(0, 0, 0, 0.5);
+    @media (max-width: 768px) {
+        .metric-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+    }
+    
+    .status-badge {
+        padding: 0.125rem 0.5rem;
+        border-radius: 9999px;
+        font-size: 0.7rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+    }
+    
+    .skeleton {
+        background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+        background-size: 200% 100%;
+        animation: shimmer 1.5s infinite;
+    }
+    
+    @keyframes shimmer {
+        0% { background-position: 200% 0; }
+        100% { background-position: -200% 0; }
     }
 </style>
 {% endblock %}
 
 {% block content %}
-<!-- Header Section -->
-<div class="flex justify-between items-center mb-6">
-    <div>
-        <h2 class="text-2xl font-bold text-base-content">Projects</h2>
-        <p class="text-base-content/60 mt-1">Manage your domain projects ({{ total_projects }} total)</p>
-    </div>
-    <button class="btn btn-primary" onclick="openCreateProjectModal()">
-        <i class="fas fa-plus mr-2"></i>Create Project
-    </button>
-</div>
-
-<!-- Search Bar -->
-<div class="card bg-base-100 shadow-sm mb-6">
-    <div class="card-body py-4">
-        <form method="GET" class="flex gap-3">
-            <div class="flex-1">
-                <input 
-                    type="text" 
-                    name="search" 
-                    value="{{ search_query }}"
-                    placeholder="Search projects by domain or title..."
-                    class="input input-bordered w-full"
-                />
+<div class="max-w-7xl mx-auto">
+    <!-- Header Section -->
+    <div class="mb-8">
+        <div class="flex items-center justify-between mb-6">
+            <div>
+                <h1 class="text-3xl font-bold text-base-content">Projects</h1>
+                <p class="text-base-content/60 mt-1">Manage your domain projects ({{ total_projects }} total)</p>
             </div>
-            <button type="submit" class="btn btn-outline">
-                <i class="fas fa-search mr-2"></i>Search
-            </button>
-            {% if search_query %}
-            <a href="{% url 'project:list' %}" class="btn btn-ghost">
-                <i class="fas fa-times mr-2"></i>Clear
-            </a>
-            {% endif %}
-        </form>
-    </div>
-</div>
-
-<!-- Projects Grid -->
-{% if projects %}
-<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6 relative">
-    {% for project in projects %}
-    <div class="card bg-base-100 shadow-md hover:shadow-lg transition-shadow overflow-visible" data-project-id="{{ project.id }}">
-        <div class="card-body">
-            <!-- Header with Domain and Menu -->
-            <div class="flex items-start justify-between gap-2 mb-3">
-                <div class="flex items-center gap-3 flex-1">
-                    <img src="{{ project.get_cached_favicon_url }}" alt="{{ project.domain }} favicon" 
-                         class="w-8 h-8 rounded-sm flex-shrink-0" 
-                         loading="lazy"
-                         onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
-                    <div class="w-8 h-8 bg-base-300 rounded-sm flex items-center justify-center flex-shrink-0" style="display: none;">
-                        <i class="fas fa-globe text-base-content/60 text-sm"></i>
-                    </div>
-                    <div class="flex-1">
-                        <h3 class="font-bold text-lg text-primary break-all">{{ project.domain }}</h3>
-                        <p class="text-base-content/70 text-sm">{{ project.title|default:"Untitled" }}</p>
-                    </div>
-                </div>
-                <div class="dropdown dropdown-end">
-                    <div tabindex="0" role="button" class="btn btn-ghost btn-xs btn-circle">
-                        <i class="fas fa-ellipsis-v"></i>
-                    </div>
-                    <ul tabindex="0" class="dropdown-content z-[100] menu p-2 shadow-lg bg-base-100 rounded-box w-48 max-h-96 overflow-y-auto">
-                        <li>
-                            <a class="text-error" onclick="deleteProject({{ project.id }}, '{{ project.domain }}')">
-                                <i class="fas fa-trash"></i>Delete
-                            </a>
-                        </li>
-                    </ul>
-                </div>
-            </div>
-            
-            <!-- Stats -->
-            <div class="flex justify-between items-center text-sm text-base-content/60 mb-3">
-                <span>
-                    <i class="fas fa-calendar mr-1"></i>
-                    {{ project.created_at|date:"M d, Y" }}
-                </span>
-                <span>
-                    <i class="fas fa-clock mr-1"></i>
-                    {{ project.updated_at|timesince }} ago
-                </span>
-            </div>
-            
-            <!-- Quick Actions -->
-            <div class="flex gap-2">
-                <button class="btn btn-sm btn-outline flex-1">
-                    <i class="fas fa-chart-line mr-1"></i>Analytics
+            <div class="flex items-center gap-2">
+                <button onclick="openCreateProjectModal()" class="btn btn-primary">
+                    <i class="fas fa-plus mr-2"></i>
+                    Create Project
                 </button>
-                <button class="btn btn-sm btn-outline">
-                    <i class="fas fa-external-link-alt"></i>
+                <button onclick="location.reload()" class="btn btn-circle btn-ghost">
+                    <i class="fas fa-sync-alt"></i>
                 </button>
             </div>
         </div>
-    </div>
-    {% endfor %}
-</div>
-
-<!-- Pagination -->
-{% if projects.has_other_pages %}
-<div class="flex justify-center">
-    <div class="join">
-        {% if projects.has_previous %}
-        <a href="?page={{ projects.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}" 
-           class="join-item btn btn-outline">
-            <i class="fas fa-chevron-left"></i>
-        </a>
-        {% endif %}
         
-        {% for page_num in projects.paginator.page_range %}
-        {% if page_num == projects.number %}
-        <button class="join-item btn btn-active">{{ page_num }}</button>
-        {% elif page_num == 1 or page_num == projects.paginator.num_pages or page_num >= projects.number|add:'-2' and page_num <= projects.number|add:'2' %}
-        <a href="?page={{ page_num }}{% if search_query %}&search={{ search_query }}{% endif %}" 
-           class="join-item btn btn-outline">{{ page_num }}</a>
-        {% elif page_num == projects.number|add:'-3' or page_num == projects.number|add:'3' %}
-        <button class="join-item btn btn-disabled">...</button>
-        {% endif %}
-        {% endfor %}
-        
-        {% if projects.has_next %}
-        <a href="?page={{ projects.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}" 
-           class="join-item btn btn-outline">
-            <i class="fas fa-chevron-right"></i>
-        </a>
-        {% endif %}
-    </div>
-</div>
-{% endif %}
-
-{% else %}
-<!-- Empty State -->
-<div class="text-center py-16">
-    <div class="mb-6">
-        <div class="w-24 h-24 bg-base-300 rounded-full flex items-center justify-center mx-auto mb-4">
-            <i class="fas fa-folder-open text-4xl text-base-content/40"></i>
+        <!-- Search and Filter Card -->
+        <div class="card bg-base-100 shadow-sm border border-base-300">
+            <div class="card-body p-4">
+                <!-- Search Bar -->
+                <div class="relative">
+                    <input 
+                        type="text" 
+                        id="search-input"
+                        name="search"
+                        placeholder="Search projects by domain or title..." 
+                        class="input input-bordered w-full pl-12 pr-4 h-12"
+                        value="{{ search_query }}"
+                        hx-get="{% url 'project:project_list' %}"
+                        hx-trigger="keyup changed delay:500ms"
+                        hx-target="#project-cards-container"
+                        hx-swap="innerHTML"
+                        hx-indicator="#search-spinner"
+                    >
+                    <div class="absolute left-4 top-1/2 -translate-y-1/2">
+                        <i class="fas fa-search text-base-content/40"></i>
+                    </div>
+                    <div id="search-spinner" class="htmx-indicator absolute right-4 top-1/2 -translate-y-1/2">
+                        <i class="fas fa-spinner loading-spinner text-base-content/40"></i>
+                    </div>
+                </div>
+            </div>
         </div>
-        <h3 class="text-xl font-semibold mb-2">
-            {% if search_query %}No projects found{% else %}No projects yet{% endif %}
-        </h3>
-        <p class="text-base-content/60 mb-6">
-            {% if search_query %}
-                No projects match your search "{{ search_query }}". Try a different search term.
+    </div>
+    
+    <!-- Projects List -->
+    <div id="project-list">
+        <div class="grid grid-cols-1 gap-4" id="project-cards-container">
+            {% if projects_with_info %}
+                {% include "project/partials/project_cards_clean.html" %}
             {% else %}
-                Create your first project to get started with domain management.
+                <!-- Empty State -->
+                <div class="card bg-base-100 shadow-sm border border-base-300 hover:shadow-lg transition-all duration-300">
+                    <div class="card-body p-12 text-center">
+                        <div class="flex justify-center mb-6">
+                            <div class="w-24 h-24 bg-primary/10 rounded-full flex items-center justify-center">
+                                <i class="fas fa-folder-plus text-primary text-3xl"></i>
+                            </div>
+                        </div>
+                        
+                        <h3 class="text-2xl font-bold text-base-content mb-2">No Projects Yet</h3>
+                        <p class="text-base-content/60 mb-8 max-w-md mx-auto">
+                            Start monitoring your website's SEO performance by creating your first project.
+                        </p>
+                        
+                        <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                            <button onclick="openCreateProjectModal()" class="btn btn-primary">
+                                <i class="fas fa-plus mr-2"></i>
+                                Create Your First Project
+                            </button>
+                        </div>
+                    </div>
+                </div>
             {% endif %}
-        </p>
-        {% if search_query %}
-        <a href="{% url 'project:list' %}" class="btn btn-outline">Clear Search</a>
-        {% else %}
-        <button class="btn btn-primary" onclick="openCreateProjectModal()">
-            <i class="fas fa-plus mr-2"></i>Create Your First Project
-        </button>
+        </div>
+        
+        {% if page_obj and page_obj.has_other_pages %}
+        <!-- Traditional Pagination -->
+        <div class="flex justify-center mt-8">
+            <div class="join">
+                {% if page_obj.has_previous %}
+                <a href="?page={{ page_obj.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}" 
+                   class="join-item btn">
+                    <i class="fas fa-chevron-left"></i>
+                </a>
+                {% else %}
+                <button class="join-item btn btn-disabled">
+                    <i class="fas fa-chevron-left"></i>
+                </button>
+                {% endif %}
+                
+                {% for num in page_obj.paginator.page_range %}
+                    {% if page_obj.number == num %}
+                        <button class="join-item btn btn-active">{{ num }}</button>
+                    {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                        <a href="?page={{ num }}{% if search_query %}&search={{ search_query }}{% endif %}" 
+                           class="join-item btn">{{ num }}</a>
+                    {% elif num == page_obj.number|add:'-3' or num == page_obj.number|add:'3' %}
+                        <button class="join-item btn btn-disabled">...</button>
+                    {% elif num == 1 or num == page_obj.paginator.num_pages %}
+                        <a href="?page={{ num }}{% if search_query %}&search={{ search_query }}{% endif %}" 
+                           class="join-item btn">{{ num }}</a>
+                    {% endif %}
+                {% endfor %}
+                
+                {% if page_obj.has_next %}
+                <a href="?page={{ page_obj.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}" 
+                   class="join-item btn">
+                    <i class="fas fa-chevron-right"></i>
+                </a>
+                {% else %}
+                <button class="join-item btn btn-disabled">
+                    <i class="fas fa-chevron-right"></i>
+                </button>
+                {% endif %}
+            </div>
+        </div>
         {% endif %}
     </div>
 </div>
-{% endif %}
 
-<!-- Delete Project Modal -->
-<div id="delete-project-modal" class="modal">
-    <div class="modal-box max-w-md">
-        <div class="flex justify-between items-center mb-6">
-            <h3 class="font-bold text-lg text-error">Delete Project</h3>
-            <button onclick="closeDeleteModal()" class="btn btn-sm btn-circle btn-ghost">✕</button>
-        </div>
-        
-        <div class="alert alert-warning mb-4">
-            <i class="fas fa-exclamation-triangle"></i>
-            <span>This action cannot be undone. All project data will be permanently deleted.</span>
-        </div>
-        
-        <div class="mb-4">
-            <p class="text-base-content mb-2">You are about to delete the project:</p>
-            <p class="font-bold text-lg" id="delete-project-domain"></p>
-        </div>
-        
-        <div class="form-control w-full mb-6">
-            <label class="label">
-                <span class="label-text">Type <span class="font-bold text-error">delete</span> to confirm</span>
-            </label>
-            <input 
-                type="text" 
-                id="delete-confirmation-input"
-                placeholder="Type 'delete' here" 
-                class="input input-bordered w-full" 
-                autocomplete="off"
-            />
-            <label class="label">
-                <span class="label-text-alt text-error" id="delete-input-error"></span>
-            </label>
-        </div>
-        
-        <div class="modal-action">
-            <button 
-                type="button" 
-                id="confirm-delete-btn"
-                class="btn btn-error" 
-                disabled
-                onclick="confirmDelete()"
-            >
-                <i class="fas fa-trash mr-2"></i>Delete Project
-            </button>
-            <button type="button" onclick="closeDeleteModal()" class="btn btn-ghost">Cancel</button>
-        </div>
-    </div>
-</div>
-
-<!-- Create Project Modal -->
-<div id="create-project-modal" class="modal" onclick="if(event.target === this) closeCreateProjectModal()">
-    <div class="modal-box max-w-md">
-        <div class="flex justify-between items-center mb-6">
-            <h3 class="font-bold text-lg">Create project</h3>
-            <button onclick="closeCreateProjectModal()" class="btn btn-sm btn-circle btn-ghost">✕</button>
-        </div>
-        
-        <form id="project-create-form">
-            <div class="form-control w-full mb-4">
-                <label class="label">
-                    <span class="label-text font-medium">Domain</span>
-                </label>
-                <input 
-                    type="text" 
-                    id="domain-input"
-                    name="domain"
-                    placeholder="domain.com" 
-                    class="input input-bordered w-full" 
-                    required 
-                />
-                <div id="domain-error" class="text-error text-sm mt-1 hidden"></div>
-                <label class="label">
-                    <span class="label-text-alt text-base-content/60">Enter a domain or subdomain. Subfolders not supported.</span>
-                </label>
-            </div>
-            
-            <div class="form-control w-full mb-4">
-                <label class="label">
-                    <span class="label-text font-medium">Project Name</span>
-                    <span class="label-text-alt text-base-content/60">(optional)</span>
-                </label>
-                <input 
-                    type="text" 
-                    id="title-input"
-                    name="title"
-                    placeholder="Auto-generated if left blank" 
-                    class="input input-bordered w-full" 
-                />
-            </div>
-            
-            <div class="form-control mb-6">
-                <label class="label cursor-pointer justify-start gap-3">
-                    <input type="checkbox" id="active-input" name="active" class="checkbox" checked />
-                    <span class="label-text">Share once created</span>
-                </label>
-            </div>
-            
-            <div class="modal-action">
-                <button type="submit" class="btn btn-primary" id="create-btn">
-                    Create project
-                </button>
-                <button type="button" onclick="closeCreateProjectModal()" class="btn btn-ghost">Cancel</button>
-            </div>
-        </form>
-    </div>
-</div>
+<!-- Include the unified create project modal -->
+{% include "partials/create_project_modal.html" %}
 
 <script>
-// Get CSRF token
+function openCreateProjectModal() {
+    document.getElementById('create-project-modal').classList.add('modal-open');
+}
+
+// Initialize HTMX event handlers
+document.addEventListener('htmx:afterSwap', function(event) {
+    // Reinitialize any necessary components after HTMX swap
+});
+
+// Delete project function
+function deleteProject(projectId, domain) {
+    if (confirm(`Are you sure you want to delete ${domain}?`)) {
+        fetch(`/projects/${projectId}/delete/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken')
+            }
+        }).then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            }
+        });
+    }
+}
+
 function getCookie(name) {
     const m = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
     return m ? m.pop() : '';
-}
-
-// Domain validation functions
-function cleanDomain(domain) {
-    // Remove protocol and convert to lowercase
-    let cleaned = domain.toLowerCase().trim();
-    cleaned = cleaned.replace(/^https?:\/\//, '');
-    cleaned = cleaned.replace(/\/$/, ''); // Remove trailing slash
-    cleaned = cleaned.replace(/^www\./, ''); // Remove www. prefix
-    return cleaned;
-}
-
-function validateDomain(domain) {
-    if (!domain) {
-        return { valid: false, message: 'Domain is required.' };
-    }
-    
-    // Must contain at least one dot
-    if (!domain.includes('.')) {
-        return { valid: false, message: 'Please enter a valid domain or subdomain name (must contain at least one dot).' };
-    }
-    
-    // Check for invalid characters
-    if (!/^[a-zA-Z0-9.-]+$/.test(domain)) {
-        return { valid: false, message: 'Domain name contains invalid characters. Only letters, numbers, dots, and hyphens are allowed.' };
-    }
-    
-    // Check domain format
-    const domainPattern = /^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)*[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$/;
-    if (!domainPattern.test(domain)) {
-        return { valid: false, message: 'Please enter a valid domain or subdomain name.' };
-    }
-    
-    // Additional validations
-    if (domain.startsWith('.') || domain.endsWith('.')) {
-        return { valid: false, message: 'Domain cannot start or end with a dot.' };
-    }
-    
-    if (domain.includes('..')) {
-        return { valid: false, message: 'Domain cannot contain consecutive dots.' };
-    }
-    
-    if (domain.startsWith('-') || domain.endsWith('-')) {
-        return { valid: false, message: 'Domain cannot start or end with a hyphen.' };
-    }
-    
-    return { valid: true };
-}
-
-// Modal functions
-function openCreateProjectModal() {
-    const modal = document.getElementById('create-project-modal');
-    modal.classList.add('modal-open');
-    document.getElementById('project-create-form').reset();
-    document.getElementById('domain-error').classList.add('hidden');
-    document.getElementById('active-input').checked = true;
-}
-
-function closeCreateProjectModal() {
-    const modal = document.getElementById('create-project-modal');
-    modal.classList.remove('modal-open');
-}
-
-// Close modals on Escape key
-document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape') {
-        const createModal = document.getElementById('create-project-modal');
-        const deleteModal = document.getElementById('delete-project-modal');
-        
-        if (createModal.classList.contains('modal-open')) {
-            closeCreateProjectModal();
-        }
-        if (deleteModal.classList.contains('modal-open')) {
-            closeDeleteModal();
-        }
-    }
-});
-
-// Real-time domain validation
-document.getElementById('domain-input').addEventListener('input', function(e) {
-    const domain = cleanDomain(e.target.value);
-    e.target.value = domain;
-    
-    const errorDiv = document.getElementById('domain-error');
-    if (domain) {
-        const validation = validateDomain(domain);
-        if (!validation.valid) {
-            errorDiv.textContent = validation.message;
-            errorDiv.classList.remove('hidden');
-            e.target.classList.add('input-error');
-        } else {
-            errorDiv.classList.add('hidden');
-            e.target.classList.remove('input-error');
-        }
-    } else {
-        errorDiv.classList.add('hidden');
-        e.target.classList.remove('input-error');
-    }
-});
-
-// Form submission
-document.getElementById('project-create-form').addEventListener('submit', async function(e) {
-    e.preventDefault();
-    
-    const formData = new FormData(e.target);
-    const domain = cleanDomain(formData.get('domain'));
-    
-    // Validate domain
-    const validation = validateDomain(domain);
-    if (!validation.valid) {
-        const errorDiv = document.getElementById('domain-error');
-        errorDiv.textContent = validation.message;
-        errorDiv.classList.remove('hidden');
-        return;
-    }
-    
-    const createBtn = document.getElementById('create-btn');
-    const originalText = createBtn.textContent;
-    createBtn.textContent = 'Creating...';
-    createBtn.disabled = true;
-    
-    try {
-        const response = await fetch('{% url "project:create" %}', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': getCookie('csrftoken')
-            },
-            body: JSON.stringify({
-                domain: domain,
-                title: formData.get('title') || '',
-                active: formData.get('active') === 'on'
-            })
-        });
-        
-        const data = await response.json();
-        
-        if (data.success) {
-            // Close modal and refresh page
-            closeCreateProjectModal();
-            
-            // Show success message
-            const toast = document.createElement('div');
-            toast.className = 'alert alert-success fixed top-4 right-4 w-auto z-50';
-            toast.innerHTML = `<i class="fas fa-check"></i> ${data.message}`;
-            document.body.appendChild(toast);
-            
-            setTimeout(() => {
-                toast.remove();
-            }, 3000);
-            
-            // Refresh page to show new project
-            setTimeout(() => {
-                window.location.reload();
-            }, 1000);
-        } else {
-            // Show errors
-            if (data.errors.domain) {
-                const errorDiv = document.getElementById('domain-error');
-                errorDiv.textContent = data.errors.domain[0];
-                errorDiv.classList.remove('hidden');
-            }
-            
-            if (data.errors.__all__) {
-                alert(data.errors.__all__[0]);
-            }
-        }
-    } catch (error) {
-        alert('An error occurred. Please try again.');
-        console.error('Error:', error);
-    } finally {
-        createBtn.textContent = originalText;
-        createBtn.disabled = false;
-    }
-});
-
-// Project actions
-async function toggleProjectActive(projectId, currentActive) {
-    try {
-        const response = await fetch(`/projects/${projectId}/toggle-active/`, {
-            method: 'POST',
-            headers: {
-                'X-CSRFToken': getCookie('csrftoken')
-            }
-        });
-        
-        const data = await response.json();
-        
-        if (data.success) {
-            // Show success message
-            const toast = document.createElement('div');
-            toast.className = 'alert alert-success fixed top-4 right-4 w-auto z-50';
-            toast.innerHTML = `<i class="fas fa-check"></i> ${data.message}`;
-            document.body.appendChild(toast);
-            
-            setTimeout(() => {
-                toast.remove();
-            }, 3000);
-            
-            // Refresh page to update UI
-            setTimeout(() => {
-                window.location.reload();
-            }, 1000);
-        } else {
-            alert(data.message);
-        }
-    } catch (error) {
-        alert('An error occurred. Please try again.');
-        console.error('Error:', error);
-    }
-}
-
-
-// Delete modal state
-let deleteProjectId = null;
-let deleteProjectDomain = null;
-
-// Open delete modal
-function deleteProject(projectId, domain) {
-    deleteProjectId = projectId;
-    deleteProjectDomain = domain;
-    
-    // Reset modal state
-    const modal = document.getElementById('delete-project-modal');
-    const domainDisplay = document.getElementById('delete-project-domain');
-    const confirmInput = document.getElementById('delete-confirmation-input');
-    const confirmBtn = document.getElementById('confirm-delete-btn');
-    const errorLabel = document.getElementById('delete-input-error');
-    
-    domainDisplay.textContent = domain;
-    confirmInput.value = '';
-    confirmBtn.disabled = true;
-    errorLabel.textContent = '';
-    
-    modal.classList.add('modal-open');
-    confirmInput.focus();
-}
-
-// Close delete modal
-function closeDeleteModal() {
-    const modal = document.getElementById('delete-project-modal');
-    modal.classList.remove('modal-open');
-    deleteProjectId = null;
-    deleteProjectDomain = null;
-}
-
-// Handle delete confirmation input
-document.getElementById('delete-confirmation-input').addEventListener('input', function(e) {
-    const confirmBtn = document.getElementById('confirm-delete-btn');
-    const errorLabel = document.getElementById('delete-input-error');
-    
-    if (e.target.value.toLowerCase() === 'delete') {
-        confirmBtn.disabled = false;
-        e.target.classList.remove('input-error');
-        errorLabel.textContent = '';
-    } else {
-        confirmBtn.disabled = true;
-        if (e.target.value.length > 0) {
-            e.target.classList.add('input-error');
-            errorLabel.textContent = 'Please type "delete" exactly to confirm';
-        } else {
-            e.target.classList.remove('input-error');
-            errorLabel.textContent = '';
-        }
-    }
-});
-
-// Handle Enter key in delete confirmation input
-document.getElementById('delete-confirmation-input').addEventListener('keypress', function(e) {
-    if (e.key === 'Enter' && e.target.value.toLowerCase() === 'delete') {
-        confirmDelete();
-    }
-});
-
-// Confirm and execute deletion
-async function confirmDelete() {
-    if (!deleteProjectId || !deleteProjectDomain) return;
-    
-    const confirmBtn = document.getElementById('confirm-delete-btn');
-    const originalText = confirmBtn.innerHTML;
-    confirmBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Deleting...';
-    confirmBtn.disabled = true;
-    
-    try {
-        const response = await fetch(`/projects/${deleteProjectId}/delete/`, {
-            method: 'POST',
-            headers: {
-                'X-CSRFToken': getCookie('csrftoken')
-            }
-        });
-        
-        const data = await response.json();
-        
-        if (data.success) {
-            // Close modal
-            closeDeleteModal();
-            
-            // Show success message
-            const toast = document.createElement('div');
-            toast.className = 'alert alert-success fixed top-4 right-4 w-auto z-50 shadow-lg';
-            toast.innerHTML = `
-                <i class="fas fa-check-circle mr-2"></i>
-                <span>${data.message || `Project "${deleteProjectDomain}" has been deleted successfully.`}</span>
-            `;
-            document.body.appendChild(toast);
-            
-            // Animate and remove project card
-            const projectCard = document.querySelector(`[data-project-id="${deleteProjectId}"]`);
-            if (projectCard) {
-                projectCard.style.transition = 'opacity 0.3s, transform 0.3s';
-                projectCard.style.opacity = '0';
-                projectCard.style.transform = 'scale(0.95)';
-                
-                setTimeout(() => {
-                    projectCard.remove();
-                    
-                    // Update the project count in header
-                    const countElement = document.querySelector('.text-base-content\\/60.mt-1');
-                    if (countElement) {
-                        const currentText = countElement.textContent;
-                        const match = currentText.match(/\((\d+) total\)/);
-                        if (match) {
-                            const currentCount = parseInt(match[1]);
-                            const newCount = currentCount - 1;
-                            countElement.textContent = `Manage your domain projects (${newCount} total)`;
-                        }
-                    }
-                    
-                    // Check if any projects remain
-                    const remainingProjects = document.querySelectorAll('[data-project-id]');
-                    if (remainingProjects.length === 0) {
-                        // Show empty state without reloading
-                        const projectsGrid = document.querySelector('.grid');
-                        if (projectsGrid) {
-                            projectsGrid.remove();
-                        }
-                        
-                        // Remove pagination if exists
-                        const pagination = document.querySelector('.join');
-                        if (pagination && pagination.closest('.flex.justify-center')) {
-                            pagination.closest('.flex.justify-center').remove();
-                        }
-                        
-                        // Create and insert empty state
-                        const emptyStateHTML = `
-                            <div class="text-center py-16">
-                                <div class="mb-6">
-                                    <div class="w-24 h-24 bg-base-300 rounded-full flex items-center justify-center mx-auto mb-4">
-                                        <i class="fas fa-folder-open text-4xl text-base-content/40"></i>
-                                    </div>
-                                    <h3 class="text-xl font-semibold mb-2">No projects yet</h3>
-                                    <p class="text-base-content/60 mb-6">
-                                        Create your first project to get started with domain management.
-                                    </p>
-                                    <button class="btn btn-primary" onclick="openCreateProjectModal()">
-                                        <i class="fas fa-plus mr-2"></i>Create Your First Project
-                                    </button>
-                                </div>
-                            </div>
-                        `;
-                        
-                        // Insert empty state after the search bar
-                        const searchCard = document.querySelector('.card.bg-base-100.shadow-sm.mb-6');
-                        if (searchCard) {
-                            searchCard.insertAdjacentHTML('afterend', emptyStateHTML);
-                        }
-                    }
-                }, 300);
-            } else {
-                // If card not found, reload the page as fallback
-                setTimeout(() => {
-                    window.location.reload();
-                }, 1000);
-            }
-            
-            setTimeout(() => {
-                toast.remove();
-            }, 5000);
-        } else {
-            // Show error message
-            const errorLabel = document.getElementById('delete-input-error');
-            errorLabel.textContent = data.message || 'Failed to delete project. Please try again.';
-            confirmBtn.innerHTML = originalText;
-            confirmBtn.disabled = false;
-        }
-    } catch (error) {
-        console.error('Error:', error);
-        const errorLabel = document.getElementById('delete-input-error');
-        errorLabel.textContent = 'An error occurred. Please try again.';
-        confirmBtn.innerHTML = originalText;
-        confirmBtn.disabled = false;
-    }
 }
 </script>
 {% endblock %}

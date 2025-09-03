@@ -392,26 +392,9 @@
             </main>
             
             <!-- Footer -->
-            <footer class="footer footer-center bg-base-100 border-t border-base-300 p-6 mt-auto">
-                <div class="grid grid-flow-col gap-8 text-sm">
-                    <div class="grid grid-flow-col gap-4">
-                        <a href="#" class="link link-hover">About</a>
-                        <a href="#" class="link link-hover">Contact</a>
-                        <a href="#" class="link link-hover">Help Center</a>
-                    </div>
-                    <div class="grid grid-flow-col gap-4">
-                        <a href="#" class="link link-hover">Privacy Policy</a>
-                        <a href="#" class="link link-hover">Terms of Service</a>
-                        <a href="#" class="link link-hover">API Docs</a>
-                    </div>
-                    <div class="grid grid-flow-col gap-4">
-                        <a href="#" class="link link-hover">Status</a>
-                        <a href="#" class="link link-hover">Blog</a>
-                        <a href="#" class="link link-hover">Changelog</a>
-                    </div>
-                </div>
-                <div class="mt-4">
-                    <p class="text-base-content/60">© 2025 LimeClicks. All rights reserved.</p>
+            <footer class="bg-base-100 border-t border-base-300 px-6 py-3 mt-auto">
+                <div class="text-base-content/60 text-sm text-right">
+                    © 2025 LimeClicks. All rights reserved.
                 </div>
             </footer>
         </div>
@@ -444,7 +427,7 @@
                         </a>
                     </li>
                     <li>
-                        <a href="{% url 'project:list' %}" class="flex items-center gap-3 {% if request.resolver_match.app_name == 'project' %}active{% endif %}">
+                        <a href="{% url 'project:project_list' %}" class="flex items-center gap-3 {% if request.resolver_match.url_name == 'project_list' %}active{% endif %}">
                             <i class="fas fa-folder w-4"></i>
                             <span>Projects</span>
                         </a>
@@ -478,18 +461,12 @@
                         <span class="text-xs uppercase font-semibold text-base-content/60">Collaboration</span>
                     </li>
                     <li>
-                        <a href="#" class="flex items-center gap-3">
+                        <a href="{% url 'project:team_projects_list' %}" class="flex items-center gap-3 {% if request.resolver_match.url_name == 'team_projects_list' or request.resolver_match.url_name == 'team_management' %}active{% endif %}">
                             <i class="fas fa-users w-4"></i>
-                            <span>Team</span>
+                            <span>Team Projects</span>
                         </a>
                     </li>
-                    <li>
-                        <a href="#" class="flex items-center gap-3">
-                            <i class="fas fa-share-alt w-4"></i>
-                            <span>Shared Links</span>
-                        </a>
-                    </li>
-                    
+
                     <!-- Account -->
                     <li class="menu-title pt-4">
                         <span class="text-xs uppercase font-semibold text-base-content/60">Account</span>

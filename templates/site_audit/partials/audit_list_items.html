@@ -3,9 +3,6 @@
         {% for item in projects_with_audits %}
             {% include "site_audit/partials/audit_card.html" %}
         {% endfor %}
-        
-        <!-- Add New Project Card -->
-        {% include "site_audit/partials/add_project_card.html" %}
     {% else %}
         <!-- Empty State or No Results -->
         <div class="card bg-base-100 shadow-sm border border-base-300">

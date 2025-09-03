@@ -1,8 +1,5 @@
 <div class="audit-card card bg-base-100 shadow-sm border-2 border-dashed border-base-300 hover:border-primary hover:shadow-lg transition-all duration-300 cursor-pointer" 
-     hx-get="{% url 'site_audit:add_project_modal' %}"
-     hx-trigger="click"
-     hx-target="#modal-container"
-     hx-swap="innerHTML">
+     onclick="openCreateProjectModal()">
     <div class="card-body p-6">
         <div class="flex items-center justify-center h-32">
             <div class="text-center">
