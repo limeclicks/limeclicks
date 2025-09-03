@@ -146,19 +146,19 @@
         <div class="mt-4 flex items-center gap-4 text-xs">
             {% with issues=item.audit.get_issues_by_priority %}
             {% if issues.Critical > 0 %}
-            <span class="badge badge-error badge-sm">
+            <span class="badge badge-sm" style="background-color: #b91c1c; color: white;">
                 <i class="fas fa-exclamation-circle mr-1"></i>
                 {{ issues.Critical }} Critical
             </span>
             {% endif %}
             {% if issues.High > 0 %}
-            <span class="badge badge-error badge-sm">
+            <span class="badge badge-sm" style="background-color: #f87171; color: white;">
                 <i class="fas fa-exclamation-triangle mr-1"></i>
                 {{ issues.High }} High
             </span>
             {% endif %}
             {% if issues.Medium > 0 %}
-            <span class="badge badge-warning badge-sm">
+            <span class="badge badge-sm" style="background-color: #eab308; color: white;">
                 <i class="fas fa-exclamation mr-1"></i>
                 {{ issues.Medium }} Medium
             </span>

@@ -103,10 +103,20 @@
             <!-- Team -->
             <div class="flex items-center gap-3">
                 <div>
-                    <p class="text-xs text-base-content/60">Keywords Team</p>
+                    <p class="text-xs text-base-content/60">Team</p>
                     <div class="flex items-baseline gap-1 mt-1">
                         <span class="text-2xl font-bold text-base-content">{{ item.member_count|default:0 }}</span>
                         <span class="text-xs text-base-content/60">Members</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Created Date -->
+            <div class="flex items-center gap-3">
+                <div>
+                    <p class="text-xs text-base-content/60">Created</p>
+                    <div class="flex items-baseline gap-1 mt-1">
+                        <span class="text-sm font-semibold text-base-content">{{ item.project.created_at|date:"M d, Y" }}</span>
                     </div>
                 </div>
             </div>
@@ -140,18 +150,6 @@
                 <i class="fas fa-users"></i>
                 Team
             </a>
-        </div>
-        
-        <!-- Footer -->
-        <div class="flex items-center justify-between text-xs text-base-content/40 mt-4">
-            <span>
-                <i class="fas fa-calendar-alt mr-1"></i>
-                Created {{ item.project.created_at|date:"M d, Y" }}
-            </span>
-            <span>
-                <i class="fas fa-clock mr-1"></i>
-                Updated {{ item.project.updated_at|timesince }} ago
-            </span>
         </div>
     </div>
 </div>

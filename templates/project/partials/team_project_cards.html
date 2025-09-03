@@ -79,20 +79,6 @@
                 </div>
             </div>
             
-            <!-- Team Members Preview -->
-            <div class="mt-4 pt-4 border-t border-base-300">
-                <p class="text-sm text-base-content/60 mb-2">Team Members:</p>
-                <div class="flex flex-wrap gap-2">
-                    {% if item.member_display %}
-                    <div class="text-sm text-base-content">
-                        {{ item.member_display }}
-                    </div>
-                    {% else %}
-                    <span class="text-sm text-base-content/40 italic">No team members yet</span>
-                    {% endif %}
-                </div>
-            </div>
-            
             <!-- Quick Actions -->
             <div class="mt-4 flex gap-2">
                 {% if item.is_owner %}

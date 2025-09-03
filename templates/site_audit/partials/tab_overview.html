@@ -89,11 +89,11 @@
                 {% with issues=audit.get_issues_by_priority %}
                 <!-- Critical Issues -->
                 {% if issues.Critical > 0 %}
-                <div class="stat-card p-3 rounded-lg bg-red-50 border border-error/20">
+                <div class="stat-card p-3 rounded-lg border" style="background-color: #fef2f2; border-color: #b91c1c;">
                     <div class="flex justify-between items-center">
                         <div class="flex items-center gap-3">
-                            <div class="w-10 h-10 bg-error/20 rounded-lg flex items-center justify-center">
-                                <i class="fas fa-times-circle text-error"></i>
+                            <div class="w-10 h-10 rounded-lg flex items-center justify-center" style="background-color: rgba(185, 28, 28, 0.2);">
+                                <i class="fas fa-times-circle" style="color: #b91c1c;"></i>
                             </div>
                             <div>
                                 <p class="text-sm font-medium text-base-content">Critical</p>
@@ -101,23 +101,23 @@
                             </div>
                         </div>
                         <div class="text-right">
-                            <p class="text-2xl font-bold text-error">{{ issues.Critical|default:0 }}</p>
+                            <p class="text-2xl font-bold" style="color: #b91c1c;">{{ issues.Critical|default:0 }}</p>
                         </div>
                     </div>
                     <div class="mt-2">
-                        <div class="w-full bg-error/20 rounded-full h-2">
-                            <div class="bg-error h-2 rounded-full" style="width: {% widthratio issues.Critical audit.get_total_issues_count 100 %}%"></div>
+                        <div class="w-full rounded-full h-2" style="background-color: rgba(185, 28, 28, 0.2);">
+                            <div class="h-2 rounded-full" style="width: {% widthratio issues.Critical audit.get_total_issues_count 100 %}%; background-color: #b91c1c;"></div>
                         </div>
                     </div>
                 </div>
                 {% endif %}
                 
                 <!-- High Priority Issues -->
-                <div class="stat-card p-3 rounded-lg bg-base-200/50 {% if issues.High > 0 %}error{% endif %}">
+                <div class="stat-card p-3 rounded-lg {% if issues.High > 0 %}border{% else %}bg-base-200/50{% endif %}" {% if issues.High > 0 %}style="background-color: #fee2e2; border-color: #f87171;"{% endif %}>
                     <div class="flex justify-between items-center">
                         <div class="flex items-center gap-3">
-                            <div class="w-10 h-10 bg-error/10 rounded-lg flex items-center justify-center">
-                                <i class="fas fa-exclamation-circle text-error"></i>
+                            <div class="w-10 h-10 rounded-lg flex items-center justify-center" {% if issues.High > 0 %}style="background-color: rgba(248, 113, 113, 0.2);"{% else %}class="bg-base-300/50"{% endif %}>
+                                <i class="fas fa-exclamation-circle" {% if issues.High > 0 %}style="color: #f87171;"{% else %}class="text-base-content/50"{% endif %}></i>
                             </div>
                             <div>
                                 <p class="text-sm font-medium text-base-content">High Priority</p>
@@ -125,24 +125,24 @@
                             </div>
                         </div>
                         <div class="text-right">
-                            <p class="text-2xl font-bold text-error">{{ issues.High|default:0 }}</p>
+                            <p class="text-2xl font-bold" {% if issues.High > 0 %}style="color: #f87171;"{% else %}class="text-base-content/30"{% endif %}>{{ issues.High|default:0 }}</p>
                         </div>
                     </div>
                     {% if issues.High > 0 %}
                     <div class="mt-2">
-                        <div class="w-full bg-error/20 rounded-full h-2">
-                            <div class="bg-error h-2 rounded-full" style="width: {% widthratio issues.High audit.get_total_issues_count 100 %}%"></div>
+                        <div class="w-full rounded-full h-2" style="background-color: rgba(248, 113, 113, 0.2);">
+                            <div class="h-2 rounded-full" style="width: {% widthratio issues.High audit.get_total_issues_count 100 %}%; background-color: #f87171;"></div>
                         </div>
                     </div>
                     {% endif %}
                 </div>
                 
                 <!-- Medium Priority Issues -->
-                <div class="stat-card p-3 rounded-lg bg-base-200/50 {% if issues.Medium > 0 %}warning{% endif %}">
+                <div class="stat-card p-3 rounded-lg {% if issues.Medium > 0 %}border{% else %}bg-base-200/50{% endif %}" {% if issues.Medium > 0 %}style="background-color: #fef3c7; border-color: #eab308;"{% endif %}>
                     <div class="flex justify-between items-center">
                         <div class="flex items-center gap-3">
-                            <div class="w-10 h-10 bg-warning/10 rounded-lg flex items-center justify-center">
-                                <i class="fas fa-exclamation-triangle text-warning"></i>
+                            <div class="w-10 h-10 rounded-lg flex items-center justify-center" {% if issues.Medium > 0 %}style="background-color: rgba(234, 179, 8, 0.2);"{% else %}class="bg-base-300/50"{% endif %}>
+                                <i class="fas fa-exclamation-triangle" {% if issues.Medium > 0 %}style="color: #eab308;"{% else %}class="text-base-content/50"{% endif %}></i>
                             </div>
                             <div>
                                 <p class="text-sm font-medium text-base-content">Medium Priority</p>
@@ -150,24 +150,24 @@
                             </div>
                         </div>
                         <div class="text-right">
-                            <p class="text-2xl font-bold text-warning">{{ issues.Medium|default:0 }}</p>
+                            <p class="text-2xl font-bold" {% if issues.Medium > 0 %}style="color: #eab308;"{% else %}class="text-base-content/30"{% endif %}>{{ issues.Medium|default:0 }}</p>
                         </div>
                     </div>
                     {% if issues.Medium > 0 %}
                     <div class="mt-2">
-                        <div class="w-full bg-warning/20 rounded-full h-2">
-                            <div class="bg-warning h-2 rounded-full" style="width: {% widthratio issues.Medium audit.get_total_issues_count 100 %}%"></div>
+                        <div class="w-full rounded-full h-2" style="background-color: rgba(234, 179, 8, 0.2);">
+                            <div class="h-2 rounded-full" style="width: {% widthratio issues.Medium audit.get_total_issues_count 100 %}%; background-color: #eab308;"></div>
                         </div>
                     </div>
                     {% endif %}
                 </div>
                 
                 <!-- Low Priority Issues -->
-                <div class="stat-card p-3 rounded-lg bg-base-200/50 {% if issues.Low > 0 %}success{% endif %}">
+                <div class="stat-card p-3 rounded-lg {% if issues.Low > 0 %}border{% else %}bg-base-200/50{% endif %}" {% if issues.Low > 0 %}style="background-color: #dbeafe; border-color: #3b82f6;"{% endif %}>
                     <div class="flex justify-between items-center">
                         <div class="flex items-center gap-3">
-                            <div class="w-10 h-10 bg-info/10 rounded-lg flex items-center justify-center">
-                                <i class="fas fa-info-circle text-info"></i>
+                            <div class="w-10 h-10 rounded-lg flex items-center justify-center" {% if issues.Low > 0 %}style="background-color: rgba(59, 130, 246, 0.2);"{% else %}class="bg-base-300/50"{% endif %}>
+                                <i class="fas fa-info-circle" {% if issues.Low > 0 %}style="color: #3b82f6;"{% else %}class="text-base-content/50"{% endif %}></i>
                             </div>
                             <div>
                                 <p class="text-sm font-medium text-base-content">Low Priority</p>
@@ -175,13 +175,13 @@
                             </div>
                         </div>
                         <div class="text-right">
-                            <p class="text-2xl font-bold text-info">{{ issues.Low|default:0 }}</p>
+                            <p class="text-2xl font-bold" {% if issues.Low > 0 %}style="color: #3b82f6;"{% else %}class="text-base-content/30"{% endif %}>{{ issues.Low|default:0 }}</p>
                         </div>
                     </div>
                     {% if issues.Low > 0 %}
                     <div class="mt-2">
-                        <div class="w-full bg-info/20 rounded-full h-2">
-                            <div class="bg-info h-2 rounded-full" style="width: {% widthratio issues.Low audit.get_total_issues_count 100 %}%"></div>
+                        <div class="w-full rounded-full h-2" style="background-color: rgba(59, 130, 246, 0.2);">
+                            <div class="h-2 rounded-full" style="width: {% widthratio issues.Low audit.get_total_issues_count 100 %}%; background-color: #3b82f6;"></div>
                         </div>
                     </div>
                     {% endif %}

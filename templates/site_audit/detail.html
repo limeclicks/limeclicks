@@ -332,12 +332,12 @@
                 <div class="flex flex-wrap gap-1 justify-center mt-3">
                     {% with issues=audit.get_issues_by_priority %}
                     {% if issues.Critical > 0 %}
-                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium" style="background-color: #fef2f2; color: #b91c1c;">
                         {{ issues.Critical }} Critical
                     </span>
                     {% endif %}
                     {% if issues.High > 0 %}
-                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium" style="background-color: #fee2e2; color: #f87171;">
                         {{ issues.High }} High
                     </span>
                     {% endif %}
