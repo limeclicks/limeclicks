@@ -5,6 +5,7 @@ Utility functions for keywords app
 import logging
 from datetime import datetime
 from typing import Dict, Any, Optional, List
+from django.utils import timezone
 from services.r2_storage import get_r2_service
 from services.scrape_do import ScrapeDoService
 from services.google_search_parser import GoogleSearchParser
@@ -83,7 +84,7 @@ class KeywordRankTracker:
                 parsed_results
             )
             
-            # Create rank entry
+            # Create rank entry (fixed to match actual Rank model fields)
             rank = Rank.objects.create(
                 keyword=keyword,
                 rank=domain_rank['position'] if domain_rank else 0,
@@ -91,9 +92,7 @@ class KeywordRankTracker:
                 has_map_result=bool(parsed_results.get('local_pack')),
                 has_video_result=bool(parsed_results.get('video_results')),
                 has_image_result=bool(parsed_results.get('image_results')),
-                number_of_results=parsed_results.get('total_results', 0),
-                search_results_file=storage_result.get('results_key', ''),
-                rank_file=rank_data_key
+                search_results_file=storage_result.get('results_key', '')
             )
             
             # Update keyword stats
@@ -108,12 +107,15 @@ class KeywordRankTracker:
             
             keyword.save()
             
+            # Track competitor rankings for this keyword
+            self._track_competitors(keyword, parsed_results)
+            
             return {
                 'success': True,
                 'rank': rank.rank,
                 'is_organic': rank.is_organic,
                 'storage_keys': storage_result,
-                'total_results': rank.number_of_results
+                'total_results': parsed_results.get('total_results', 0)
             }
             
         except Exception as e:
@@ -246,7 +248,7 @@ class KeywordRankTracker:
             results.get('results_key'),
             results.get('html_key')
         ])
-        keyword.scrape_do_at = datetime.now()
+        keyword.scrape_do_at = timezone.now()
         keyword.save()
         
         return results
@@ -308,6 +310,82 @@ class KeywordRankTracker:
         else:
             logger.error(f"Failed to store rank data: {result.get('error')}")
             return ''
+    
+    def _track_competitors(self, keyword: Keyword, parsed_results: Dict[str, Any]) -> None:
+        """
+        Track competitor rankings for a keyword
+        
+        Args:
+            keyword: Keyword model instance
+            parsed_results: Parsed search results
+        """
+        try:
+            # Import here to avoid circular imports
+            from competitors.models import Target, TargetKeywordRank
+            
+            # Get competitors for this project
+            competitors = Target.objects.filter(project=keyword.project)
+            
+            if not competitors.exists():
+                return
+            
+            logger.info(f"Tracking {competitors.count()} competitors for keyword: {keyword.keyword}")
+            
+            # Get organic results
+            organic_results = parsed_results.get('organic_results', [])
+            
+            for competitor in competitors:
+                # Clean competitor domain for matching
+                comp_domain = competitor.domain.lower().replace('www.', '').replace('http://', '').replace('https://', '')
+                found = False
+                
+                # Search for competitor in results
+                for i, result in enumerate(organic_results, 1):
+                    result_url = result.get('url', '').lower()
+                    
+                    if comp_domain in result_url:
+                        # Found competitor ranking
+                        logger.info(f"Found {competitor.domain} at position {i} for keyword {keyword.keyword}")
+                        
+                        # Create or update TargetKeywordRank
+                        target_rank, created = TargetKeywordRank.objects.update_or_create(
+                            target=competitor,
+                            keyword=keyword,
+                            defaults={
+                                'rank': i,
+                                'rank_url': result.get('url', ''),
+                                'scraped_at': timezone.now()
+                            }
+                        )
+                        
+                        if created:
+                            logger.info(f"Created new rank entry for {competitor.domain}")
+                        else:
+                            logger.info(f"Updated rank entry for {competitor.domain}")
+                        
+                        found = True
+                        break
+                
+                if not found:
+                    # Competitor not found in results - create entry with rank 0
+                    logger.info(f"{competitor.domain} not found in top 100 for keyword {keyword.keyword}")
+                    
+                    target_rank, created = TargetKeywordRank.objects.update_or_create(
+                        target=competitor,
+                        keyword=keyword,
+                        defaults={
+                            'rank': 0,
+                            'rank_url': '',
+                            'scraped_at': timezone.now()
+                        }
+                    )
+                    
+                    if created:
+                        logger.info(f"Created not-ranking entry for {competitor.domain}")
+                        
+        except Exception as e:
+            logger.error(f"Error tracking competitors: {str(e)}")
+            # Don't raise - competitor tracking shouldn't break main keyword tracking
 
 
 def bulk_track_keywords(keyword_ids: List[int]) -> Dict[str, Any]:

@@ -437,5 +437,5 @@ SCRAPE_DO_TIMEOUT = int(os.getenv('SCRAPE_DO_TIMEOUT', '60'))
 SCRAPE_DO_RETRIES = int(os.getenv('SCRAPE_DO_RETRIES', '3'))
 SERP_HISTORY_DAYS = int(os.getenv('SERP_HISTORY_DAYS', '7'))
 FETCH_MIN_INTERVAL_HOURS = int(os.getenv('FETCH_MIN_INTERVAL_HOURS', '24'))
-# Site URL for generating absolute links
+# Site URL for generating absolute links (must be set in production environment)
 SITE_URL = os.environ.get('SITE_URL', 'http://localhost:8000')
