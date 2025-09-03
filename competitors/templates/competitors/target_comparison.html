@@ -1,0 +1,270 @@
+{% extends "dashboard_base.html" %}
+{% load static %}
+
+{% block title %}Target Comparison - {{ project.domain }} - LimeClicks{% endblock %}
+{% block page_title %}Target Comparison{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto">
+    {% if error %}
+    <div class="alert alert-error mb-6">
+        <i class="fas fa-exclamation-triangle"></i>
+        <span>{{ error }}</span>
+    </div>
+    {% else %}
+    
+    <!-- Header -->
+    <div class="bg-base-100 rounded-lg shadow-sm border border-base-300 p-6 mb-6">
+        <div class="flex flex-col lg:flex-row justify-between items-start gap-4">
+            <div>
+                <div class="flex items-center gap-2 mb-2">
+                    <a href="{% url 'competitors:target' %}" class="btn btn-ghost btn-sm">
+                        <i class="fas fa-arrow-left"></i>
+                    </a>
+                    <h2 class="text-2xl font-bold">{{ project.domain }}</h2>
+                </div>
+                <p class="text-base-content/70">
+                    Comparing keyword rankings with {{ targets|length }} target competitor{{ targets|length|pluralize }}
+                </p>
+            </div>
+            
+            <!-- Search and Filters -->
+            <div class="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
+                <div class="form-control">
+                    <div class="relative">
+                        <input type="text" 
+                               id="search-input" 
+                               value="{{ search_query }}"
+                               placeholder="Search keywords..." 
+                               class="input input-bordered w-full sm:w-64 pr-10" />
+                        <button class="btn btn-ghost btn-sm absolute right-1 top-1/2 -translate-y-1/2" 
+                                onclick="performSearch()">
+                            <i class="fas fa-search"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <select id="per-page" class="select select-bordered" onchange="changePerPage()">
+                    <option value="25" {% if per_page == 25 %}selected{% endif %}>25 per page</option>
+                    <option value="50" {% if per_page == 50 %}selected{% endif %}>50 per page</option>
+                    <option value="100" {% if per_page == 100 %}selected{% endif %}>100 per page</option>
+                    <option value="200" {% if per_page == 200 %}selected{% endif %}>200 per page</option>
+                </select>
+            </div>
+        </div>
+    </div>
+    
+    {% if targets %}
+    <!-- Info Message about tracking -->
+    <div class="alert mb-6">
+        <i class="fas fa-info-circle"></i>
+        <div>
+            <p class="text-sm">
+                <strong>Note:</strong> Target rankings are collected automatically when you run keyword rank checks. 
+                If you see "NR" (Not Ranking) for targets, it means either the domain isn't ranking in top 100 or 
+                the keywords haven't been scraped yet since adding the targets.
+            </p>
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- Comparison Table -->
+    <div class="bg-base-100 rounded-lg shadow-sm border border-base-300">
+        <div class="overflow-x-auto">
+            <table class="table table-zebra">
+                <thead>
+                    <tr>
+                        <th class="min-w-[200px]">Keyword</th>
+                        <th class="text-center bg-primary/10">
+                            <div class="font-bold">{{ project.domain }}</div>
+                            <div class="text-xs text-base-content/60">(Your Site)</div>
+                        </th>
+                        {% for target in targets %}
+                        <th class="text-center">
+                            <div class="font-bold">{{ target.domain }}</div>
+                            {% if target.name %}
+                            <div class="text-xs text-base-content/60">{{ target.name }}</div>
+                            {% endif %}
+                        </th>
+                        {% endfor %}
+                        <th>Last Updated</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in comparison_data %}
+                    <tr>
+                        <td>
+                            <div class="font-medium">{{ row.keyword }}</div>
+                        </td>
+                        <td class="text-center bg-primary/5">
+                            {% if row.project_rank == 'NR' %}
+                                <span class="badge badge-ghost">NR</span>
+                            {% else %}
+                                <span class="badge badge-primary">#{{ row.project_rank }}</span>
+                            {% endif %}
+                        </td>
+                        {% for target_rank in row.target_ranks %}
+                        <td class="text-center">
+                            {% if target_rank.rank == 'NR' %}
+                                <span class="badge badge-ghost">NR</span>
+                            {% else %}
+                                <span class="badge badge-outline">#{{ target_rank.rank }}</span>
+                            {% endif %}
+                        </td>
+                        {% endfor %}
+                        <td class="text-sm text-base-content/70">
+                            {% if row.scraped_at %}
+                                {{ row.scraped_at|date:"Y-m-d H:i" }}
+                            {% else %}
+                                Never
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="{{ targets|length|add:3 }}" class="text-center py-8">
+                            <div class="text-base-content/60">
+                                <i class="fas fa-search text-3xl mb-2"></i>
+                                <p>No keywords found{% if search_query %} matching "{{ search_query }}"{% endif %}</p>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Pagination -->
+        {% if pagination.total_pages > 1 %}
+        <div class="p-4 border-t border-base-300">
+            <div class="flex flex-col md:flex-row justify-between items-center gap-4">
+                <div class="text-sm text-base-content/70">
+                    Showing 
+                    <span class="font-medium">{{ keywords_page.start_index }}</span> to 
+                    <span class="font-medium">{{ keywords_page.end_index }}</span> of 
+                    <span class="font-medium">{{ pagination.total_items }}</span> keywords
+                </div>
+                
+                <div class="join">
+                    {% if pagination.has_previous %}
+                        <a href="?page={{ keywords_page.previous_page_number }}&per_page={{ per_page }}&search={{ search_query|urlencode }}" 
+                           class="join-item btn btn-sm">«</a>
+                    {% else %}
+                        <button class="join-item btn btn-sm btn-disabled">«</button>
+                    {% endif %}
+                    
+                    {% for page_num in pagination.page_range %}
+                        {% if page_num == '...' %}
+                            <button class="join-item btn btn-sm btn-disabled">...</button>
+                        {% elif page_num == pagination.current_page %}
+                            <button class="join-item btn btn-sm btn-active">{{ page_num }}</button>
+                        {% else %}
+                            <a href="?page={{ page_num }}&per_page={{ per_page }}&search={{ search_query|urlencode }}" 
+                               class="join-item btn btn-sm">{{ page_num }}</a>
+                        {% endif %}
+                    {% endfor %}
+                    
+                    {% if pagination.has_next %}
+                        <a href="?page={{ keywords_page.next_page_number }}&per_page={{ per_page }}&search={{ search_query|urlencode }}" 
+                           class="join-item btn btn-sm">»</a>
+                    {% else %}
+                        <button class="join-item btn btn-sm btn-disabled">»</button>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    
+    <!-- Summary Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
+        <div class="card bg-base-100 shadow-sm border border-base-300">
+            <div class="card-body p-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-xs text-base-content/60 uppercase">Total Keywords</p>
+                        <p class="text-2xl font-bold">{{ pagination.total_items }}</p>
+                    </div>
+                    <i class="fas fa-key text-2xl text-primary/30"></i>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card bg-base-100 shadow-sm border border-base-300">
+            <div class="card-body p-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-xs text-base-content/60 uppercase">Active Targets</p>
+                        <p class="text-2xl font-bold">{{ targets|length }}/3</p>
+                    </div>
+                    <i class="fas fa-bullseye text-2xl text-success/30"></i>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card bg-base-100 shadow-sm border border-base-300">
+            <div class="card-body p-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-xs text-base-content/60 uppercase">Your Domain</p>
+                        <p class="text-lg font-semibold truncate">{{ project.domain }}</p>
+                    </div>
+                    <i class="fas fa-globe text-2xl text-info/30"></i>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card bg-base-100 shadow-sm border border-base-300">
+            <div class="card-body p-4">
+                <a href="{% url 'competitors:target' %}" class="btn btn-primary btn-sm btn-block">
+                    <i class="fas fa-cog mr-2"></i>Manage Targets
+                </a>
+            </div>
+        </div>
+    </div>
+    
+    {% endif %}
+</div>
+
+<script>
+function performSearch() {
+    const searchInput = document.getElementById('search-input');
+    const perPage = document.getElementById('per-page').value;
+    const searchQuery = searchInput.value.trim();
+    
+    const params = new URLSearchParams({
+        page: 1,
+        per_page: perPage,
+        search: searchQuery
+    });
+    
+    window.location.href = `?${params}`;
+}
+
+function changePerPage() {
+    const perPage = document.getElementById('per-page').value;
+    const searchInput = document.getElementById('search-input');
+    const searchQuery = searchInput.value.trim();
+    
+    const params = new URLSearchParams({
+        page: 1,
+        per_page: perPage,
+        search: searchQuery
+    });
+    
+    window.location.href = `?${params}`;
+}
+
+// Handle Enter key in search input
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('search-input');
+    if (searchInput) {
+        searchInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                performSearch();
+            }
+        });
+    }
+});
+</script>
+{% endblock %}

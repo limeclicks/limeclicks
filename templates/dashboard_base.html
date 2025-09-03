@@ -455,6 +455,23 @@
                         </a>
                     </li>
                     
+                    <!-- Competitors -->
+                    <li class="menu-title pt-4">
+                        <span class="text-xs uppercase font-semibold text-base-content/60">Competitors</span>
+                    </li>
+                    <li>
+                        <a href="{% url 'competitors:target' %}" class="flex items-center gap-3 {% if request.resolver_match.url_name == 'target' %}active{% endif %}">
+                            <i class="fas fa-bullseye w-4"></i>
+                            <span>Target</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="{% url 'competitors:keywords' %}" class="flex items-center gap-3 {% if request.resolver_match.url_name == 'competitors_keywords' %}active{% endif %}">
+                            <i class="fas fa-chart-line w-4"></i>
+                            <span>Keywords</span>
+                        </a>
+                    </li>
+                    
                     <!-- Collaboration -->
                     <li class="menu-title pt-4">
                         <span class="text-xs uppercase font-semibold text-base-content/60">Collaboration</span>

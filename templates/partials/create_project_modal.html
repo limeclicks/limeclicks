@@ -28,7 +28,7 @@
                 />
                 <div id="domain-error" class="text-error text-sm mt-1 hidden"></div>
                 <label class="label">
-                    <span class="label-text-alt text-base-content/60">Enter domain or subdomain. Protocol and paths will be removed automatically.</span>
+                    <span class="label-text-alt text-base-content/60">Enter domain or subdomain. Protocol (http://), www, and paths will be removed automatically.</span>
                 </label>
             </div>
             
@@ -248,16 +248,20 @@ let emailTags = new Set();
     // Domain validation functions
     function cleanDomain(domain) {
         let cleaned = domain.toLowerCase().trim();
-        // Remove protocol (http://, https://)
-        cleaned = cleaned.replace(/^https?:\/\//, '');
-        // Remove trailing slash
-        cleaned = cleaned.replace(/\/$/, '');
-        // Keep www. if present - do not remove it
-        // Remove path, query params, hash, port
+        // Remove protocol (http://, https://, ftp://, etc.)
+        cleaned = cleaned.replace(/^[a-zA-Z]+:\/\//, '');
+        // Remove www. prefix
+        cleaned = cleaned.replace(/^www\./, '');
+        // Remove path, query params, hash
         cleaned = cleaned.split('/')[0];
         cleaned = cleaned.split('?')[0];
         cleaned = cleaned.split('#')[0];
-        cleaned = cleaned.split(':')[0];
+        // Remove port number if present (but not for IPv6)
+        if (cleaned.indexOf('[') === -1) {
+            cleaned = cleaned.split(':')[0];
+        }
+        // Remove trailing dots
+        cleaned = cleaned.replace(/\.+$/, '');
         return cleaned;
     }
 
@@ -289,16 +293,16 @@ let emailTags = new Set();
     const domainInput = document.getElementById('domain-input');
     
     domainInput?.addEventListener('input', function() {
-        const cleaned = cleanDomain(this.value);
+        const originalValue = this.value;
+        const cleaned = cleanDomain(originalValue);
         
-        // Update the input value to show the cleaned version
-        if (this.value !== cleaned && this.value.includes('://')) {
-            // Only update if user pasted a URL with protocol
+        // Always show the cleaned version in real-time
+        if (originalValue !== cleaned) {
             this.value = cleaned;
         }
         
         // Validate domain
-        const validation = validateDomain(cleaned);
+        const validation = validateDomain(this.value);
         const errorDiv = document.getElementById('domain-error');
         
         if (!validation.valid && this.value) {
@@ -306,6 +310,36 @@ let emailTags = new Set();
             errorDiv.classList.remove('hidden');
         } else {
             errorDiv.classList.add('hidden');
+        }
+    });
+    
+    // Clean domain on paste
+    domainInput?.addEventListener('paste', function(e) {
+        e.preventDefault();
+        const pastedText = (e.clipboardData || window.clipboardData).getData('text');
+        const cleaned = cleanDomain(pastedText);
+        this.value = cleaned;
+        
+        // Trigger input event for validation
+        const event = new Event('input', { bubbles: true });
+        this.dispatchEvent(event);
+    });
+    
+    // Clean domain on blur (when user clicks away)
+    domainInput?.addEventListener('blur', function() {
+        if (this.value) {
+            this.value = cleanDomain(this.value);
+            
+            // Validate domain
+            const validation = validateDomain(this.value);
+            const errorDiv = document.getElementById('domain-error');
+            
+            if (!validation.valid && this.value) {
+                errorDiv.textContent = validation.message;
+                errorDiv.classList.remove('hidden');
+            } else {
+                errorDiv.classList.add('hidden');
+            }
         }
     });
 

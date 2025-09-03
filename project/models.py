@@ -14,6 +14,51 @@ class Project(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     members = models.ManyToManyField(settings.AUTH_USER_MODEL, through='ProjectMember', related_name='shared_projects')
 
+    @staticmethod
+    def clean_domain_string(domain):
+        """Clean a domain string - remove protocol, www, path, etc."""
+        if not domain:
+            return domain
+            
+        domain = domain.strip().lower()
+        
+        # Remove protocol (http://, https://, ftp://, etc.)
+        if '://' in domain:
+            domain = domain.split('://')[-1]
+        
+        # Remove www. prefix
+        if domain.startswith('www.'):
+            domain = domain[4:]
+        
+        # Remove everything after the domain (path, query string, hash)
+        domain = domain.split('/')[0]
+        domain = domain.split('?')[0]
+        domain = domain.split('#')[0]
+        
+        # Remove port if present (but not for IPv6)
+        if ':' in domain and '[' not in domain:
+            domain = domain.split(':')[0]
+        
+        # Remove trailing dots
+        domain = domain.rstrip('.')
+        
+        return domain
+    
+    def clean(self):
+        """Clean and validate the domain"""
+        from django.core.exceptions import ValidationError
+        
+        if self.domain:
+            self.domain = self.clean_domain_string(self.domain)
+            
+            # Validate domain has at least one dot
+            if '.' not in self.domain:
+                raise ValidationError("Please enter a valid domain name (e.g., example.com)")
+    
+    def save(self, *args, **kwargs):
+        self.clean()
+        super().save(*args, **kwargs)
+
     def get_favicon_url(self, size=64):
         """Get Google favicon URL for this domain"""
         return f"https://www.google.com/s2/favicons?domain={self.domain}&sz={size}"

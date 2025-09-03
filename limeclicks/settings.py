@@ -65,6 +65,7 @@ INSTALLED_APPS = [
     "siteconfig",
     "keywords",
     "site_audit",
+    "competitors",
     "django_celery_beat"
 ]
 

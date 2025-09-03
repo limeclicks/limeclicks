@@ -1,0 +1,280 @@
+{% extends "dashboard_base.html" %}
+{% load static %}
+
+{% block title %}Target Competitors - LimeClicks{% endblock %}
+{% block page_title %}Target Competitors{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto">
+    <!-- Header -->
+    <div class="bg-base-100 rounded-lg shadow-sm border border-base-300 p-6 mb-6">
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div>
+                <h2 class="text-2xl font-bold">Manage Target Competitors</h2>
+                <p class="text-base-content/70 mt-1">
+                    Add up to 3 competitor domains per project to track their rankings alongside yours
+                </p>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Info Message -->
+    <div class="alert alert-info mb-6">
+        <i class="fas fa-info-circle text-lg"></i>
+        <div>
+            <h3 class="font-semibold">How Target Tracking Works</h3>
+            <p class="text-sm mt-1">
+                Target competitors will automatically start tracking ranks on the next keyword ranks are collected.
+                Each time keywords are scraped, we'll also collect ranking data for your target domains on the same keywords.
+            </p>
+        </div>
+    </div>
+
+    <!-- Projects Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {% for project in projects %}
+        <div class="card bg-base-100 shadow-sm border border-base-300 h-full">
+            <div class="card-body flex flex-col">
+                <div class="flex items-start justify-between mb-2">
+                    <div class="flex-1">
+                        <h3 class="card-title text-lg">{{ project.domain }}</h3>
+                        {% if project.title %}
+                            <p class="text-sm text-base-content/70 mt-1">{{ project.title }}</p>
+                        {% endif %}
+                    </div>
+                    <div class="badge badge-primary badge-outline">
+                        {{ project.targets_count }}/3 Targets
+                    </div>
+                </div>
+
+                <!-- Current Targets -->
+                <div class="flex-1 space-y-2 min-h-[100px]" id="targets-list-{{ project.id }}">
+                    {% for target in project.targets.all %}
+                    <div class="flex items-center justify-between p-2.5 bg-base-200 rounded-lg target-item hover:bg-base-300 transition-colors" data-target-id="{{ target.id }}">
+                        <div class="flex items-center gap-2">
+                            <i class="fas fa-bullseye text-primary text-sm"></i>
+                            <span class="text-sm font-medium">{{ target.domain }}</span>
+                            {% if target.name %}
+                                <span class="text-xs text-base-content/60">({{ target.name }})</span>
+                            {% endif %}
+                        </div>
+                        <button class="btn btn-ghost btn-xs btn-circle text-error hover:bg-error/20" onclick="removeTarget({{ target.id }}, {{ project.id }})">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    {% empty %}
+                    <p class="text-sm text-base-content/50 text-center py-4 no-targets-msg">No targets added yet</p>
+                    {% endfor %}
+                </div>
+
+                <!-- Add Target Form -->
+                {% if project.targets_count < 3 %}
+                <div class="mt-4" id="add-form-{{ project.id }}">
+                    <div class="flex gap-2">
+                        <input type="text" 
+                               id="domain-input-{{ project.id }}"
+                               placeholder="competitor.com" 
+                               class="input input-bordered input-sm flex-1" />
+                        <button class="btn btn-primary btn-sm px-6" onclick="addTarget({{ project.id }})">
+                            <i class="fas fa-plus mr-1"></i>Add
+                        </button>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Note about tracking -->
+                {% if project.targets_count > 0 %}
+                <div class="text-xs text-base-content/60 mt-3 p-2 bg-base-200 rounded">
+                    <i class="fas fa-clock mr-1"></i>
+                    Targets will be tracked when keywords are next scraped
+                </div>
+                {% endif %}
+                
+                <!-- Actions -->
+                <div class="mt-auto pt-4">
+                    <a href="{% url 'competitors:target_comparison' project.id %}" 
+                       class="btn btn-primary btn-block">
+                        <i class="fas fa-chart-bar mr-2"></i>
+                        View Comparison
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="col-span-full">
+            <div class="text-center py-12">
+                <i class="fas fa-folder-open text-6xl text-base-content/30 mb-4"></i>
+                <h3 class="text-xl font-semibold mb-2">No Projects Found</h3>
+                <p class="text-base-content/70 mb-4">
+                    Create a project first to start tracking competitor rankings
+                </p>
+                <a href="{% url 'project:project_list' %}" class="btn btn-primary">
+                    <i class="fas fa-plus mr-2"></i>Create Project
+                </a>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<script>
+function getCookie(name) {
+    const m = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
+    return m ? m.pop() : '';
+}
+
+function cleanDomain(domain) {
+    // Remove protocol (http://, https://, etc.)
+    domain = domain.replace(/^https?:\/\//i, '');
+    domain = domain.replace(/^.*:\/\//i, '');
+    
+    // Remove www.
+    domain = domain.replace(/^www\./i, '');
+    
+    // Remove path, query string, and hash
+    domain = domain.split('/')[0];
+    domain = domain.split('?')[0];
+    domain = domain.split('#')[0];
+    
+    // Remove trailing dots
+    domain = domain.replace(/\.+$/, '');
+    
+    // Convert to lowercase
+    domain = domain.toLowerCase();
+    
+    return domain.trim();
+}
+
+function addTarget(projectId) {
+    const domainInput = document.getElementById(`domain-input-${projectId}`);
+    let domain = domainInput.value.trim();
+    
+    if (!domain) {
+        alert('Please enter a domain');
+        return;
+    }
+    
+    // Clean the domain
+    domain = cleanDomain(domain);
+    
+    // Validate domain format
+    if (!domain || domain.indexOf('.') === -1) {
+        alert('Please enter a valid domain (e.g., example.com)');
+        return;
+    }
+    
+    fetch(`/competitors/target/add/${projectId}/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken'),
+            'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: `domain=${encodeURIComponent(domain)}`
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Clear input
+            domainInput.value = '';
+            
+            // Add to list
+            const targetsList = document.getElementById(`targets-list-${projectId}`);
+            const noTargetsMsg = targetsList.querySelector('.no-targets-msg');
+            if (noTargetsMsg) {
+                noTargetsMsg.remove();
+            }
+            
+            // Create new target element
+            const targetDiv = document.createElement('div');
+            targetDiv.className = 'flex items-center justify-between p-2.5 bg-base-200 rounded-lg target-item hover:bg-base-300 transition-colors';
+            targetDiv.dataset.targetId = data.target.id;
+            targetDiv.innerHTML = `
+                <div class="flex items-center gap-2">
+                    <i class="fas fa-bullseye text-primary text-sm"></i>
+                    <span class="text-sm font-medium">${data.target.domain}</span>
+                    ${data.target.name ? `<span class="text-xs text-base-content/60">(${data.target.name})</span>` : ''}
+                </div>
+                <button class="btn btn-ghost btn-xs btn-circle text-error hover:bg-error/20" onclick="removeTarget(${data.target.id}, ${projectId})">
+                    <i class="fas fa-times"></i>
+                </button>
+            `;
+            targetsList.appendChild(targetDiv);
+            
+            // Update counter
+            updateTargetCounter(projectId);
+            
+            // Hide add form if max reached
+            const targetsCount = targetsList.querySelectorAll('.target-item').length;
+            if (targetsCount >= 3) {
+                const addForm = document.getElementById(`add-form-${projectId}`);
+                if (addForm) {
+                    addForm.style.display = 'none';
+                }
+            }
+        } else {
+            alert(data.error || 'Failed to add target');
+        }
+    })
+    .catch(error => {
+        console.error('Error adding target:', error);
+        alert('An error occurred while adding the target');
+    });
+}
+
+function removeTarget(targetId, projectId) {
+    if (!confirm('Are you sure you want to remove this target?')) {
+        return;
+    }
+    
+    fetch(`/competitors/target/remove/${targetId}/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken')
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Remove from list
+            const targetElement = document.querySelector(`[data-target-id="${targetId}"]`);
+            if (targetElement) {
+                targetElement.remove();
+            }
+            
+            // Check if list is empty
+            const targetsList = document.getElementById(`targets-list-${projectId}`);
+            if (targetsList && targetsList.querySelectorAll('.target-item').length === 0) {
+                targetsList.innerHTML = '<p class="text-sm text-base-content/50 text-center py-4 no-targets-msg">No targets added yet</p>';
+            }
+            
+            // Update counter
+            updateTargetCounter(projectId);
+            
+            // Show add form if below max
+            const addForm = document.getElementById(`add-form-${projectId}`);
+            if (addForm) {
+                addForm.style.display = 'block';
+            }
+        } else {
+            alert(data.error || 'Failed to remove target');
+        }
+    })
+    .catch(error => {
+        console.error('Error removing target:', error);
+        alert('An error occurred while removing the target');
+    });
+}
+
+function updateTargetCounter(projectId) {
+    const targetsList = document.getElementById(`targets-list-${projectId}`);
+    const targetsCount = targetsList.querySelectorAll('.target-item').length;
+    
+    // Find and update the badge
+    const card = targetsList.closest('.card');
+    const badge = card.querySelector('.badge');
+    if (badge) {
+        badge.textContent = `${targetsCount}/3 Targets`;
+    }
+}
+</script>
+{% endblock %}

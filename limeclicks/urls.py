@@ -11,6 +11,7 @@ urlpatterns = [
     path("projects/", include("project.urls")),
     path("keywords/", include("keywords.urls")),
     path("site-audit/", include("site_audit.urls")),
+    path("competitors/", include("competitors.urls")),
 ]
 
 # Serve media files in development
