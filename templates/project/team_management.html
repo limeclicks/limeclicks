@@ -80,24 +80,47 @@
     <div class="card bg-base-100 shadow-xl team-section">
         <div class="card-body">
             <h3 class="card-title">Invite Team Members</h3>
-            <form hx-post="{% url 'project:invite_users' project.id %}"
+            <form id="invite-form" hx-post="{% url 'project:invite_users' project.id %}"
                   hx-target="#team-members-list"
                   hx-swap="outerHTML"
                   class="space-y-4">
                 {% csrf_token %}
                 <div class="form-control">
                     <label class="label">
-                        <span class="label-text">Email addresses (comma-separated)</span>
+                        <span class="label-text font-medium">Email addresses</span>
+                        <span class="label-text-alt text-base-content/60">Press Enter or comma to add</span>
                     </label>
-                    <input type="text" name="emails" 
-                           placeholder="user1@example.com, user2@example.com" 
-                           class="input input-bordered w-full"
-                           required>
+                    
+                    <!-- Email Tags Container -->
+                    <div class="min-h-[48px] p-2 border border-base-300 rounded-lg bg-base-100 focus-within:border-primary transition-colors">
+                        <div class="flex flex-wrap gap-2 items-center">
+                            <div id="team-email-tags-container" class="flex flex-wrap gap-2">
+                                <!-- Email tags will be added here dynamically -->
+                            </div>
+                            <input 
+                                type="email"
+                                id="team-email-input"
+                                placeholder="Enter email address" 
+                                class="flex-1 min-w-[200px] outline-none bg-transparent px-2 py-1"
+                                autocomplete="off"
+                            />
+                        </div>
+                    </div>
+                    
+                    <!-- Hidden input to store all emails for form submission -->
+                    <input type="hidden" name="emails" id="team-emails-hidden" value="" />
+                    
+                    <!-- Email validation error -->
+                    <div id="team-email-error" class="text-error text-sm mt-1 hidden"></div>
+                    
                     <label class="label">
-                        <span class="label-text-alt">Team members can manage keywords and view site audits</span>
+                        <span class="label-text-alt text-base-content/60">Team members can manage keywords and view site audits</span>
                     </label>
                 </div>
-                <button type="submit" class="btn btn-primary">Send Invitations</button>
+                <button type="submit" class="btn btn-primary" id="invite-btn">
+                    <span id="invite-btn-text">Send Invitations</span>
+                    <span id="invite-btn-spinner" class="loading loading-spinner loading-sm ml-2 hidden"></span>
+                </button>
             </form>
         </div>
     </div>
@@ -124,6 +147,153 @@
 </dialog>
 
 <script>
+    // Email tag system for team management
+    const teamEmailTags = new Set();
+    
+    function validateTeamEmail(email) {
+        // Comprehensive regex that supports + in emails
+        const emailRegex = /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/;
+        return emailRegex.test(email);
+    }
+    
+    function addTeamEmailTag(email) {
+        email = email.trim().toLowerCase();
+        
+        if (!email) return false;
+        
+        // Validate email
+        if (!validateTeamEmail(email)) {
+            showTeamEmailError(`Invalid email: ${email}`);
+            return false;
+        }
+        
+        // Check if already added
+        if (teamEmailTags.has(email)) {
+            showTeamEmailError(`Email already added: ${email}`);
+            return false;
+        }
+        
+        // Add to set
+        teamEmailTags.add(email);
+        
+        // Create tag element
+        const tag = document.createElement('div');
+        tag.className = 'badge badge-primary gap-2 px-3 py-2';
+        tag.innerHTML = `
+            <span>${email}</span>
+            <button type="button" class="text-xs hover:text-error" onclick="removeTeamEmailTag('${email}')">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" class="w-3 h-3">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+        `;
+        
+        document.getElementById('team-email-tags-container').appendChild(tag);
+        
+        // Update hidden input
+        updateTeamHiddenEmailInput();
+        
+        // Clear error
+        hideTeamEmailError();
+        
+        return true;
+    }
+    
+    function removeTeamEmailTag(email) {
+        teamEmailTags.delete(email);
+        
+        // Remove from DOM
+        const container = document.getElementById('team-email-tags-container');
+        const tags = container.querySelectorAll('.badge');
+        tags.forEach(tag => {
+            if (tag.querySelector('span').textContent === email) {
+                tag.remove();
+            }
+        });
+        
+        // Update hidden input
+        updateTeamHiddenEmailInput();
+    }
+    
+    function updateTeamHiddenEmailInput() {
+        document.getElementById('team-emails-hidden').value = Array.from(teamEmailTags).join(',');
+    }
+    
+    function showTeamEmailError(message) {
+        const errorDiv = document.getElementById('team-email-error');
+        errorDiv.textContent = message;
+        errorDiv.classList.remove('hidden');
+        
+        // Auto hide after 3 seconds
+        setTimeout(() => {
+            hideTeamEmailError();
+        }, 3000);
+    }
+    
+    function hideTeamEmailError() {
+        const errorDiv = document.getElementById('team-email-error');
+        errorDiv.classList.add('hidden');
+    }
+    
+    // Email input handling
+    const teamEmailInput = document.getElementById('team-email-input');
+    if (teamEmailInput) {
+        teamEmailInput.addEventListener('keydown', function(e) {
+            const email = this.value.trim();
+            
+            // Add on Enter or comma
+            if (e.key === 'Enter' || e.key === ',') {
+                e.preventDefault();
+                if (addTeamEmailTag(email)) {
+                    this.value = '';
+                }
+            }
+            
+            // Remove last tag on backspace if input is empty
+            if (e.key === 'Backspace' && !email && teamEmailTags.size > 0) {
+                const lastEmail = Array.from(teamEmailTags).pop();
+                removeTeamEmailTag(lastEmail);
+            }
+        });
+        
+        // Add on blur
+        teamEmailInput.addEventListener('blur', function() {
+            const email = this.value.trim();
+            if (email) {
+                if (addTeamEmailTag(email)) {
+                    this.value = '';
+                }
+            }
+        });
+        
+        // Handle paste event for multiple emails
+        teamEmailInput.addEventListener('paste', function(e) {
+            e.preventDefault();
+            const pastedText = (e.clipboardData || window.clipboardData).getData('text');
+            
+            // Split by comma, semicolon, or newline
+            const emails = pastedText.split(/[,;\n]+/);
+            
+            emails.forEach(email => {
+                addTeamEmailTag(email.trim());
+            });
+            
+            this.value = '';
+        });
+    }
+    
+    // Clear tags after successful form submission with HTMX
+    document.body.addEventListener('htmx:afterRequest', function(evt) {
+        if (evt.detail.xhr.status === 200 && evt.detail.elt.id === 'invite-form') {
+            // Clear all email tags after successful invitation
+            teamEmailTags.clear();
+            document.getElementById('team-email-tags-container').innerHTML = '';
+            document.getElementById('team-emails-hidden').value = '';
+            document.getElementById('team-email-input').value = '';
+            hideTeamEmailError();
+        }
+    });
+    
     // Handle member removal with confirmation
     function confirmRemoveMember(memberId) {
         const modal = document.getElementById('delete_modal');
