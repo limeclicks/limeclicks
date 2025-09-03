@@ -89,15 +89,9 @@ jobs:
               echo "Warning: gunicorn_config_production.py not found"
             fi
             
-            # Copy systemd service file if updated
-            echo "Updating systemd service files..."
-            if [ -f "/home/ubuntu/new-limeclicks/limeclicks.service" ]; then
-              sudo cp /home/ubuntu/new-limeclicks/limeclicks.service /etc/systemd/system/limeclicks-gunicorn.service
-              sudo systemctl daemon-reload
-            fi
-            
-            # Restart services
+            # Restart services (without copying service files)
             echo "Restarting services with gevent workers..."
+            sudo systemctl daemon-reload
             sudo systemctl restart limeclicks-gunicorn
             sudo systemctl restart limeclicks-celery
             sudo systemctl restart limeclicks-celerybeat
