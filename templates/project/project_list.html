@@ -639,13 +639,63 @@ async function confirmDelete() {
                 setTimeout(() => {
                     projectCard.remove();
                     
+                    // Update the project count in header
+                    const countElement = document.querySelector('.text-base-content\\/60.mt-1');
+                    if (countElement) {
+                        const currentText = countElement.textContent;
+                        const match = currentText.match(/\((\d+) total\)/);
+                        if (match) {
+                            const currentCount = parseInt(match[1]);
+                            const newCount = currentCount - 1;
+                            countElement.textContent = `Manage your domain projects (${newCount} total)`;
+                        }
+                    }
+                    
                     // Check if any projects remain
                     const remainingProjects = document.querySelectorAll('[data-project-id]');
                     if (remainingProjects.length === 0) {
-                        // Reload to show empty state
-                        window.location.reload();
+                        // Show empty state without reloading
+                        const projectsGrid = document.querySelector('.grid');
+                        if (projectsGrid) {
+                            projectsGrid.remove();
+                        }
+                        
+                        // Remove pagination if exists
+                        const pagination = document.querySelector('.join');
+                        if (pagination && pagination.closest('.flex.justify-center')) {
+                            pagination.closest('.flex.justify-center').remove();
+                        }
+                        
+                        // Create and insert empty state
+                        const emptyStateHTML = `
+                            <div class="text-center py-16">
+                                <div class="mb-6">
+                                    <div class="w-24 h-24 bg-base-300 rounded-full flex items-center justify-center mx-auto mb-4">
+                                        <i class="fas fa-folder-open text-4xl text-base-content/40"></i>
+                                    </div>
+                                    <h3 class="text-xl font-semibold mb-2">No projects yet</h3>
+                                    <p class="text-base-content/60 mb-6">
+                                        Create your first project to get started with domain management.
+                                    </p>
+                                    <button class="btn btn-primary" onclick="openCreateProjectModal()">
+                                        <i class="fas fa-plus mr-2"></i>Create Your First Project
+                                    </button>
+                                </div>
+                            </div>
+                        `;
+                        
+                        // Insert empty state after the search bar
+                        const searchCard = document.querySelector('.card.bg-base-100.shadow-sm.mb-6');
+                        if (searchCard) {
+                            searchCard.insertAdjacentHTML('afterend', emptyStateHTML);
+                        }
                     }
                 }, 300);
+            } else {
+                // If card not found, reload the page as fallback
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1000);
             }
             
             setTimeout(() => {
