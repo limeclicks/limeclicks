@@ -274,3 +274,8 @@ Desktop.ini
 # SERP HTML Storage (local)
 storage/
 *.tmp
+
+# Server-specific files
+monitor.sh
+input.css
+static/src/full.css

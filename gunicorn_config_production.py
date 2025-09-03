@@ -2,7 +2,7 @@ import multiprocessing
 import os
 
 # Server Socket
-bind = "127.0.0.1:8000"
+bind = "127.0.0.1:7650"
 backlog = 2048
 
 # Worker Processes - GEVENT CONFIGURATION for production
@@ -32,8 +32,8 @@ proc_name = "limeclicks_gunicorn"
 # Server Mechanics
 daemon = False
 pidfile = "/var/run/gunicorn/limeclicks.pid"
-user = "www-data"
-group = "www-data"
+user = "ubuntu"
+group = "ubuntu"
 tmp_upload_dir = None
 
 # Pre-loading application for better performance
