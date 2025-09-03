@@ -29,11 +29,16 @@ class ProjectForm(forms.ModelForm):
             domain = domain.lower().strip()
             domain = re.sub(r'^https?://', '', domain)
             
-            # Remove trailing slash if present
+            # Remove path, query params, and fragments
+            domain = domain.split('/')[0]
+            domain = domain.split('?')[0]
+            domain = domain.split('#')[0]
+            domain = domain.split(':')[0]  # Remove port
+            
+            # Remove trailing slash if any remains
             domain = domain.rstrip('/')
             
-            # Remove www. prefix if present
-            domain = re.sub(r'^www\.', '', domain)
+            # Keep www. if present - do not remove it
             
             # Validate domain format - must have at least one dot for proper domain/subdomain
             # Reject localhost and single words

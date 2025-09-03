@@ -91,9 +91,12 @@
     // Domain validation functions
     function cleanDomain(domain) {
         let cleaned = domain.toLowerCase().trim();
+        // Remove protocol (http://, https://)
         cleaned = cleaned.replace(/^https?:\/\//, '');
+        // Remove trailing slash
         cleaned = cleaned.replace(/\/$/, '');
-        // Keep www if present, will be handled by checkbox
+        // Keep www. if present - do not remove it
+        // Remove path, query params, hash, port
         cleaned = cleaned.split('/')[0];
         cleaned = cleaned.split('?')[0];
         cleaned = cleaned.split('#')[0];
@@ -130,6 +133,12 @@
     
     domainInput?.addEventListener('input', function() {
         const cleaned = cleanDomain(this.value);
+        
+        // Update the input value to show the cleaned version
+        if (this.value !== cleaned && this.value.includes('://')) {
+            // Only update if user pasted a URL with protocol
+            this.value = cleaned;
+        }
         
         // Validate domain
         const validation = validateDomain(cleaned);
