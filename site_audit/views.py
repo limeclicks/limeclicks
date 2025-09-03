@@ -1,6 +1,6 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
-from django.http import JsonResponse, HttpResponse, StreamingHttpResponse
+from django.http import JsonResponse, HttpResponse, StreamingHttpResponse, Http404
 from django.views.decorators.http import require_http_methods
 from django.db.models import Q, Count, Avg, F, Case, When, IntegerField
 from django.core.paginator import Paginator
@@ -15,6 +15,7 @@ import boto3
 from django.conf import settings
 
 from project.models import Project
+from project.permissions import user_can_view_project
 from .models import SiteAudit, SiteIssue
 from .tasks import trigger_manual_site_audit
 
@@ -81,8 +82,10 @@ def get_r2_presigned_url(r2_path):
 @login_required
 def site_audit_list(request):
     """List all site audits for the current user"""
-    # Get all projects for the current user
-    projects = Project.objects.filter(user=request.user).select_related()
+    # Get all projects where user is owner OR member
+    projects = Project.objects.filter(
+        Q(user=request.user) | Q(memberships__user=request.user)
+    ).distinct().select_related()
     
     # Get search query and filter
     search_query = request.GET.get('search', '').strip()
@@ -462,11 +465,12 @@ def add_project(request):
 @login_required
 def audit_detail(request, audit_id):
     """View detailed audit results with tabbed interface"""
-    audit = get_object_or_404(
-        SiteAudit,
-        id=audit_id,
-        project__user=request.user
-    )
+    # First get the audit
+    audit = get_object_or_404(SiteAudit, id=audit_id)
+    
+    # Check if user has permission to view this project
+    if not user_can_view_project(request.user, audit.project):
+        raise Http404("Audit not found")
     
     # Get the requested tab (default to overview)
     tab = request.GET.get('tab', 'overview')
