@@ -186,7 +186,7 @@
         
         try {
             // Create main project
-            const response = await fetch('/project/create/', {
+            const response = await fetch('/projects/create/', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -202,12 +202,12 @@
                 
                 // Redirect or refresh after a short delay
                 setTimeout(() => {
-                    if (window.location.pathname.includes('site_audit')) {
+                    if (window.location.pathname.includes('site-audit')) {
                         // If on site audit page, reload to show new project
                         window.location.reload();
                     } else {
                         // Otherwise go to projects page
-                        window.location.href = '/project/';
+                        window.location.href = '/projects/';
                     }
                 }, 1500);
                 
