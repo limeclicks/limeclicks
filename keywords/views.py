@@ -1228,3 +1228,38 @@ def keyword_detail(request, keyword_id):
     }
     
     return render(request, 'keywords/keyword_detail.html', context)
+
+
+@login_required
+@require_http_methods(["POST"])
+def api_delete_keyword(request, keyword_id):
+    """Delete a keyword and all its associated data"""
+    try:
+        # Get the keyword and verify ownership
+        keyword = get_object_or_404(Keyword, id=keyword_id, project__user=request.user)
+        
+        # Store keyword text for the response message
+        keyword_text = keyword.keyword
+        project = keyword.project
+        
+        # Delete the keyword (this will cascade delete all related data)
+        keyword.delete()
+        
+        # Log the deletion
+        logger.info(f"User {request.user.id} deleted keyword '{keyword_text}' from project {project.id}")
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'Keyword "{keyword_text}" has been deleted successfully.'
+        })
+    except Keyword.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'message': 'Keyword not found or you do not have permission to delete it.'
+        }, status=404)
+    except Exception as e:
+        logger.error(f"Error deleting keyword {keyword_id}: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'message': 'An error occurred while deleting the keyword. Please try again.'
+        }, status=500)

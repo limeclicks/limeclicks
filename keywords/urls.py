@@ -26,6 +26,7 @@ urlpatterns = [
     path('api/keyword/<int:keyword_id>/force-crawl/', views.api_force_crawl, name='api_force_crawl'),
     path('api/keyword/<int:keyword_id>/status/', views.api_keyword_status, name='api_keyword_status'),
     path('api/keyword/<int:keyword_id>/crawl-status/', views.api_crawl_status, name='api_crawl_status'),
+    path('api/keyword/<int:keyword_id>/delete/', views.api_delete_keyword, name='api_delete_keyword'),
     path('api/crawl-queue/', views.api_crawl_queue, name='api_crawl_queue'),
     path('api/project/<int:project_id>/updates-sse/', views.keyword_updates_sse, name='keyword_updates_sse'),
     

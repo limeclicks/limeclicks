@@ -97,10 +97,10 @@
                     </button>
                 </li>
                 <li>
-                    <a href="#" class="text-error">
+                    <button onclick="deleteKeyword({{ keyword.id }}, '{{ keyword.keyword|escapejs }}')" class="text-error w-full text-left">
                         <i class="fas fa-trash"></i>
                         Delete
-                    </a>
+                    </button>
                 </li>
             </ul>
         </div>
