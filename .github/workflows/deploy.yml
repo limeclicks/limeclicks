@@ -83,10 +83,10 @@ jobs:
             echo "Running database migrations..."
             python manage.py migrate
             
-            # Copy production gunicorn config if it doesn't exist
-            echo "Ensuring gunicorn config exists..."
+            # Ensure gunicorn config exists
+            echo "Checking gunicorn config..."
             if [ ! -f "/home/ubuntu/new-limeclicks/gunicorn_config_production.py" ]; then
-              cp /home/ubuntu/new-limeclicks/gunicorn_config_production.py /home/ubuntu/new-limeclicks/gunicorn_config_production.py 2>/dev/null || true
+              echo "Warning: gunicorn_config_production.py not found"
             fi
             
             # Copy systemd service file if updated
