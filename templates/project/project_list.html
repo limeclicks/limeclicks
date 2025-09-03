@@ -96,23 +96,26 @@
     {% for project in projects %}
     <div class="card bg-base-100 shadow-md hover:shadow-lg transition-shadow overflow-visible" data-project-id="{{ project.id }}">
         <div class="card-body">
-            <!-- Status Badge -->
-            <div class="flex justify-between items-start mb-3">
-                <div class="badge {% if project.active %}badge-success{% else %}badge-error{% endif %} badge-sm">
-                    <i class="fas {% if project.active %}fa-check{% else %}fa-times{% endif %} mr-1"></i>
-                    {% if project.active %}Active{% else %}Inactive{% endif %}
+            <!-- Header with Domain and Menu -->
+            <div class="flex items-start justify-between gap-2 mb-3">
+                <div class="flex items-center gap-3 flex-1">
+                    <img src="{{ project.get_cached_favicon_url }}" alt="{{ project.domain }} favicon" 
+                         class="w-8 h-8 rounded-sm flex-shrink-0" 
+                         loading="lazy"
+                         onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                    <div class="w-8 h-8 bg-base-300 rounded-sm flex items-center justify-center flex-shrink-0" style="display: none;">
+                        <i class="fas fa-globe text-base-content/60 text-sm"></i>
+                    </div>
+                    <div class="flex-1">
+                        <h3 class="font-bold text-lg text-primary break-all">{{ project.domain }}</h3>
+                        <p class="text-base-content/70 text-sm">{{ project.title|default:"Untitled" }}</p>
+                    </div>
                 </div>
                 <div class="dropdown dropdown-end">
                     <div tabindex="0" role="button" class="btn btn-ghost btn-xs btn-circle">
                         <i class="fas fa-ellipsis-v"></i>
                     </div>
                     <ul tabindex="0" class="dropdown-content z-[100] menu p-2 shadow-lg bg-base-100 rounded-box w-48 max-h-96 overflow-y-auto">
-                        <li>
-                            <a onclick="toggleProjectActive({{ project.id }}, {{ project.active|yesno:'true,false' }})">
-                                <i class="fas {% if project.active %}fa-pause{% else %}fa-play{% endif %}"></i>
-                                {% if project.active %}Deactivate{% else %}Activate{% endif %}
-                            </a>
-                        </li>
                         <li>
                             <a class="text-error" onclick="deleteProject({{ project.id }}, '{{ project.domain }}')">
                                 <i class="fas fa-trash"></i>Delete
@@ -121,21 +124,6 @@
                     </ul>
                 </div>
             </div>
-            
-            <!-- Domain with Favicon -->
-            <div class="flex items-center gap-3 mb-2">
-                <img src="{{ project.get_cached_favicon_url }}" alt="{{ project.domain }} favicon" 
-                     class="w-8 h-8 rounded-sm flex-shrink-0" 
-                     loading="lazy"
-                     onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
-                <div class="w-8 h-8 bg-base-300 rounded-sm flex items-center justify-center flex-shrink-0" style="display: none;">
-                    <i class="fas fa-globe text-base-content/60 text-sm"></i>
-                </div>
-                <h3 class="font-bold text-lg text-primary break-all flex-1">{{ project.domain }}</h3>
-            </div>
-            
-            <!-- Title -->
-            <p class="text-base-content/70 mb-3">{{ project.title|default:"Untitled" }}</p>
             
             <!-- Stats -->
             <div class="flex justify-between items-center text-sm text-base-content/60 mb-3">
