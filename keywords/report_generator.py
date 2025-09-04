@@ -209,27 +209,8 @@ class KeywordReportGenerator:
                     'created_at': rank.created_at
                 }
         
-        # Fill missing ranks if configured
-        if self.report.fill_missing_ranks:
-            self._fill_missing_ranks()
-        
+        # Don't fill missing ranks - show NR for missing data
         logger.info(f"Loaded ranking data for {len(self.ranking_data)} keywords")
-    
-    def _fill_missing_ranks(self):
-        """Fill missing rank data with previous day's rank"""
-        for keyword_id in self.ranking_data:
-            last_known_rank = None
-            
-            for date_obj in self.date_range:
-                if date_obj in self.ranking_data[keyword_id]:
-                    # We have data for this date
-                    last_known_rank = self.ranking_data[keyword_id][date_obj]['rank']
-                elif last_known_rank is not None:
-                    # Use last known rank
-                    self.ranking_data[keyword_id][date_obj] = {
-                        'rank': last_known_rank,
-                        'filled': True  # Mark as filled data
-                    }
     
     def _calculate_summary_stats(self):
         """Calculate summary statistics for the report"""

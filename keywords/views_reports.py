@@ -138,7 +138,6 @@ def create_report_view(request, project_id):
                 selected_tags = request.POST.getlist('tags')
             
             # Get report options
-            fill_missing_ranks = True  # Always fill missing ranks by default
             include_competitors = request.POST.get('include_competitors') == 'on' if report_type == 'keyword_rankings' else False
             include_graphs = request.POST.get('include_graphs') == 'on' if report_type == 'keyword_rankings' else False
             send_notification = request.POST.get('send_notification') == 'on'
@@ -164,7 +163,6 @@ def create_report_view(request, project_id):
                 start_date=start_date,
                 end_date=end_date,
                 report_format=report_format,
-                fill_missing_ranks=fill_missing_ranks,
                 include_competitors=include_competitors,
                 include_graphs=include_graphs,
                 send_email_notification=send_notification,

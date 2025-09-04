@@ -12,7 +12,7 @@
         <div>
             <h1 class="text-3xl font-bold text-base-content">{{ report.name }}</h1>
             <p class="text-base-content/60 mt-1">
-                {{ project.domain }} • {{ report.start_date|date:"M d" }} - {{ report.end_date|date:"M d, Y" }}
+                {{ project.domain }}{% if report.start_date and report.end_date %} • {{ report.start_date|date:"M d" }} - {{ report.end_date|date:"M d, Y" }}{% endif %}
             </p>
         </div>
         <div class="flex gap-3">
@@ -101,6 +101,7 @@
                             </span>
                         </div>
                         
+                        {% if report.start_date and report.end_date %}
                         <div class="flex justify-between items-center py-2 border-b">
                             <span class="text-base-content/60">Date Range</span>
                             <span>{{ report.start_date|date:"M d" }} - {{ report.end_date|date:"M d, Y" }}</span>
@@ -109,6 +110,24 @@
                         <div class="flex justify-between items-center py-2 border-b">
                             <span class="text-base-content/60">Report Period</span>
                             <span>{{ report.end_date|timeuntil:report.start_date|cut:" ago" }}</span>
+                        </div>
+                        {% endif %}
+                        
+                        <div class="flex justify-between items-center py-2 border-b">
+                            <span class="text-base-content/60">Report Type</span>
+                            <span>
+                                {% if report.report_type == 'keyword_rankings' %}
+                                    <span class="badge badge-primary">Keyword Rankings</span>
+                                {% elif report.report_type == 'page_rankings' %}
+                                    <span class="badge badge-info">Page Rankings</span>
+                                {% elif report.report_type == 'top_competitors' %}
+                                    <span class="badge badge-warning">Top Competitors</span>
+                                {% elif report.report_type == 'competitors_targets' %}
+                                    <span class="badge badge-success">Competitors Targets</span>
+                                {% else %}
+                                    <span class="badge">{{ report.get_report_type_display }}</span>
+                                {% endif %}
+                            </span>
                         </div>
                         
                         <div class="flex justify-between items-center py-2 border-b">
@@ -175,11 +194,6 @@
                     <h2 class="card-title mb-4">Report Options</h2>
                     
                     <div class="space-y-2">
-                        <div class="flex items-center gap-3">
-                            <i class="fas fa-check-circle text-success"></i>
-                            <span>Missing rank data filled with previous day's rank</span>
-                        </div>
-                        
                         {% if report.include_graphs %}
                         <div class="flex items-center gap-3">
                             <i class="fas fa-check-circle text-success"></i>
