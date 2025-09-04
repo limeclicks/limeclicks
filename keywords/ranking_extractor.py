@@ -379,6 +379,7 @@ class RankingExtractor:
                     domain=comp_data['domain'],
                     defaults={
                         'name': comp_data['domain'],
+                        'is_manual': False,  # Auto-discovered
                         'created_by': None  # System-generated
                     }
                 )

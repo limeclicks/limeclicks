@@ -10,6 +10,7 @@ class Target(models.Model):
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='targets')
     domain = models.CharField(max_length=255, help_text="Competitor domain to track (e.g., example.com)")
     name = models.CharField(max_length=255, blank=True, help_text="Optional name for this competitor")
+    is_manual = models.BooleanField(default=False, help_text="True if manually added by user, False if auto-discovered")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True)

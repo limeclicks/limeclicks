@@ -176,14 +176,14 @@ class TargetView(TemplateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         
-        # Get user's projects with targets count
+        # Get user's projects with manual targets count
         user_projects = Project.objects.filter(
             Q(user=self.request.user) | 
             Q(members=self.request.user)
         ).distinct().annotate(
-            targets_count=Count('targets')
+            targets_count=Count('targets', filter=Q(targets__is_manual=True))
         ).prefetch_related(
-            Prefetch('targets', queryset=Target.objects.all())
+            Prefetch('targets', queryset=Target.objects.filter(is_manual=True))
         )
         
         context['projects'] = user_projects
@@ -206,8 +206,8 @@ def add_target(request, project_id):
     if not domain:
         return JsonResponse({'success': False, 'error': 'Domain is required'})
     
-    # Check if already at max targets
-    if project.targets.count() >= 3:
+    # Check if already at max manual targets
+    if project.targets.filter(is_manual=True).count() >= 3:
         return JsonResponse({'success': False, 'error': 'Maximum 3 targets allowed per project'})
     
     try:
@@ -215,6 +215,7 @@ def add_target(request, project_id):
             project=project,
             domain=domain,
             name=name,
+            is_manual=True,
             created_by=request.user
         )
         return JsonResponse({
@@ -290,8 +291,8 @@ class TargetComparisonView(TemplateView):
         except EmptyPage:
             keywords_page = paginator.page(paginator.num_pages)
         
-        # Get targets for this project
-        targets = project.targets.all()[:3]  # Max 3 targets
+        # Get manual targets for this project
+        targets = project.targets.filter(is_manual=True)[:3]  # Max 3 manual targets
         
         # Build comparison data
         comparison_data = []

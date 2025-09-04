@@ -347,6 +347,11 @@ class KeywordRankTracker:
                         # Found competitor ranking
                         logger.info(f"Found {competitor.domain} at position {i} for keyword {keyword.keyword}")
                         
+                        # Ensure the target is marked as manual if it was created by a user
+                        if competitor.created_by:
+                            competitor.is_manual = True
+                            competitor.save(update_fields=['is_manual'])
+                        
                         # Create or update TargetKeywordRank
                         target_rank, created = TargetKeywordRank.objects.update_or_create(
                             target=competitor,
