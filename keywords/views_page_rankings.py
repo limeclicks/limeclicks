@@ -93,7 +93,7 @@ def page_rankings_data(request):
                 'keyword': keyword.keyword,
                 'rank': keyword.rank,
                 'rank_diff': keyword.rank_diff_from_last_time,
-                'cpc': float(keyword.cpc) if keyword.cpc else 0,
+                'cpc': 0,  # CPC field doesn't exist in current model
                 'search_volume': keyword.search_volume or 0,
                 'traffic': keyword.traffic or 0,
                 'country': keyword.country
@@ -113,9 +113,7 @@ def page_rankings_data(request):
             data['avg_position'] = round(
                 sum(k['rank'] for k in data['keywords']) / len(data['keywords']), 1
             )
-            data['avg_cpc'] = round(
-                sum(k['cpc'] for k in data['keywords']) / len(data['keywords']), 2
-            )
+            data['avg_cpc'] = 0  # CPC not available in current model
     
     # Convert to list and sort by total keywords
     pages_list = list(page_data.values())
@@ -253,7 +251,7 @@ def page_keywords_detail(request):
             'search_engine': 'Google',  # Assuming Google for now
             'country': keyword.country.upper() if keyword.country else 'US',
             'search_volume': keyword.search_volume or 0,
-            'cpc': float(keyword.cpc) if keyword.cpc else 0,
+            'cpc': 0,  # CPC not available in current model
             'traffic': keyword.traffic or 0
         })
     
