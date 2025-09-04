@@ -275,26 +275,219 @@ document.addEventListener('htmx:afterSwap', function(event) {
     // Reinitialize any necessary components after HTMX swap
 });
 
-// Delete project function
+// Delete project function - now opens modal
 function deleteProject(projectId, domain) {
-    if (confirm(`Are you sure you want to delete ${domain}?`)) {
-        fetch(`/projects/${projectId}/delete/`, {
-            method: 'POST',
-            headers: {
-                'X-CSRFToken': getCookie('csrftoken')
-            }
-        }).then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                location.reload();
-            }
-        });
-    }
+    openDeleteModal(projectId, domain);
 }
 
 function getCookie(name) {
     const m = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
     return m ? m.pop() : '';
 }
+
+// Delete modal state
+let deleteProjectId = null;
+let deleteProjectDomain = null;
+
+// Open delete confirmation modal
+function openDeleteModal(projectId, domain) {
+    deleteProjectId = projectId;
+    deleteProjectDomain = domain;
+    
+    // Reset modal state
+    const modal = document.getElementById('delete_project_modal');
+    const domainDisplay = document.getElementById('delete-project-domain');
+    const confirmInput = document.getElementById('delete-confirmation-input');
+    const confirmBtn = document.getElementById('confirm-delete-btn');
+    const errorLabel = document.getElementById('delete-input-error');
+    
+    // Set domain display
+    domainDisplay.textContent = domain;
+    
+    // Reset input and button state
+    confirmInput.value = '';
+    confirmBtn.disabled = true;
+    errorLabel.textContent = '';
+    
+    // Show modal
+    modal.showModal();
+}
+
+// Validate confirmation input
+function validateDeleteConfirmation() {
+    const input = document.getElementById('delete-confirmation-input');
+    const confirmBtn = document.getElementById('confirm-delete-btn');
+    const errorLabel = document.getElementById('delete-input-error');
+    
+    if (input.value.toLowerCase() === 'confirm') {
+        confirmBtn.disabled = false;
+        errorLabel.textContent = '';
+        input.classList.remove('input-error');
+    } else {
+        confirmBtn.disabled = true;
+        if (input.value.length > 0) {
+            errorLabel.textContent = 'Please type "confirm" to delete';
+            input.classList.add('input-error');
+        } else {
+            errorLabel.textContent = '';
+            input.classList.remove('input-error');
+        }
+    }
+}
+
+// Confirm and execute deletion
+async function confirmDeleteProject() {
+    if (!deleteProjectId || !deleteProjectDomain) return;
+    
+    const confirmBtn = document.getElementById('confirm-delete-btn');
+    const modal = document.getElementById('delete_project_modal');
+    
+    // Update button to show loading
+    const originalHTML = confirmBtn.innerHTML;
+    confirmBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Deleting...';
+    confirmBtn.disabled = true;
+    
+    try {
+        const response = await fetch(`/projects/${deleteProjectId}/delete/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            // Close modal
+            modal.close();
+            
+            // Show success message
+            const toast = document.createElement('div');
+            toast.className = 'toast toast-top toast-end';
+            toast.innerHTML = `
+                <div class="alert alert-success">
+                    <i class="fas fa-check-circle"></i>
+                    <span>Project "${deleteProjectDomain}" has been deleted successfully.</span>
+                </div>
+            `;
+            document.body.appendChild(toast);
+            
+            // Reload page after short delay
+            setTimeout(() => {
+                location.reload();
+            }, 1500);
+        } else {
+            // Show error message
+            const errorLabel = document.getElementById('delete-input-error');
+            errorLabel.textContent = data.message || 'Failed to delete project. Please try again.';
+            
+            // Restore button
+            confirmBtn.innerHTML = originalHTML;
+            confirmBtn.disabled = false;
+        }
+    } catch (error) {
+        console.error('Error deleting project:', error);
+        
+        // Show error message
+        const errorLabel = document.getElementById('delete-input-error');
+        errorLabel.textContent = 'An error occurred. Please try again.';
+        
+        // Restore button
+        confirmBtn.innerHTML = originalHTML;
+        confirmBtn.disabled = false;
+    }
+}
 </script>
+
+<!-- Delete Project Confirmation Modal -->
+<dialog id="delete_project_modal" class="modal">
+    <div class="modal-box max-w-md">
+        <!-- Modal Header with Icon -->
+        <div class="flex items-center gap-4 mb-4">
+            <div class="w-12 h-12 rounded-full bg-error/20 flex items-center justify-center">
+                <i class="fas fa-trash-alt text-error text-xl"></i>
+            </div>
+            <div>
+                <h3 class="font-bold text-lg">Delete Project</h3>
+                <p class="text-sm text-base-content/60">This action cannot be undone</p>
+            </div>
+        </div>
+        
+        <!-- Modal Content -->
+        <div class="py-4">
+            <div class="alert alert-error mb-4">
+                <i class="fas fa-exclamation-circle"></i>
+                <span>Warning: This will permanently delete all project data including keywords, audits, and reports.</span>
+            </div>
+            
+            <div class="mb-4">
+                <p class="text-base-content mb-2">You are about to delete the project:</p>
+                <p class="font-bold text-lg px-4 py-2 bg-base-200 rounded-lg" id="delete-project-domain"></p>
+            </div>
+            
+            <div class="divider"></div>
+            
+            <div class="space-y-3 mb-4">
+                <p class="text-sm text-base-content/80">This action will delete:</p>
+                <ul class="space-y-2 text-sm">
+                    <li class="flex items-center gap-2">
+                        <i class="fas fa-times-circle text-error"></i>
+                        <span>All keywords and ranking data</span>
+                    </li>
+                    <li class="flex items-center gap-2">
+                        <i class="fas fa-times-circle text-error"></i>
+                        <span>All site audits and reports</span>
+                    </li>
+                    <li class="flex items-center gap-2">
+                        <i class="fas fa-times-circle text-error"></i>
+                        <span>All competitor tracking data</span>
+                    </li>
+                    <li class="flex items-center gap-2">
+                        <i class="fas fa-times-circle text-error"></i>
+                        <span>All scheduled tasks and reports</span>
+                    </li>
+                </ul>
+            </div>
+            
+            <div class="form-control">
+                <label class="label">
+                    <span class="label-text font-semibold">Type <span class="text-error">"confirm"</span> to delete this project:</span>
+                </label>
+                <input 
+                    type="text" 
+                    id="delete-confirmation-input"
+                    class="input input-bordered" 
+                    placeholder="Type 'confirm' here"
+                    oninput="validateDeleteConfirmation()"
+                    autocomplete="off"
+                />
+                <label class="label">
+                    <span class="label-text-alt text-error" id="delete-input-error"></span>
+                </label>
+            </div>
+        </div>
+        
+        <!-- Modal Actions -->
+        <div class="modal-action">
+            <form method="dialog">
+                <button class="btn btn-ghost">Cancel</button>
+            </form>
+            <button 
+                id="confirm-delete-btn"
+                class="btn btn-error" 
+                disabled
+                onclick="confirmDeleteProject()"
+            >
+                <i class="fas fa-trash mr-2"></i>
+                Delete Project
+            </button>
+        </div>
+    </div>
+    
+    <!-- Click outside to close -->
+    <form method="dialog" class="modal-backdrop">
+        <button>close</button>
+    </form>
+</dialog>
 {% endblock %}
