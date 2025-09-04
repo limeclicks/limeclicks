@@ -10,24 +10,25 @@ logger = logging.getLogger(__name__)
 @receiver(post_save, sender=Project)
 def auto_queue_audits_on_project_creation(sender, instance, created, **kwargs):
     """
-    Automatically queue HIGH PRIORITY site and PageSpeed audits when a new project is created
+    Automatically queue HIGH PRIORITY OnPage audit when a new project is created
     from any source (admin, API, views, etc.)
     
-    Both audits are triggered simultaneously for parallel execution.
+    The task will be sent to the high priority queue for immediate processing.
+    PageSpeed audit will be triggered automatically after site audit completes.
     """
     if created:
         try:
-            # Import the task that handles both audits
+            # Import the HIGH PRIORITY task for new domains
             from site_audit.tasks import create_site_audit_for_new_project
             
-            # This task now triggers both site audit and PageSpeed audit simultaneously
+            # Queue HIGH PRIORITY OnPage audit for new domain
             onpage_result = create_site_audit_for_new_project.apply_async(
                 args=[instance.id],
                 queue='audit_high_priority'
             )
-            logger.info(f"Auto-queued HIGH PRIORITY site and PageSpeed audits for new project {instance.domain}: Task ID={onpage_result.id}")
+            logger.info(f"Auto-queued HIGH PRIORITY OnPage audit for new project {instance.domain}: Task ID={onpage_result.id}")
             
-            logger.info(f"Successfully auto-queued HIGH PRIORITY audits for new project: {instance.domain}")
+            logger.info(f"Successfully auto-queued HIGH PRIORITY audit for new project: {instance.domain}")
             
         except Exception as e:
             # Don't fail project creation if audit queuing fails
