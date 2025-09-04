@@ -133,41 +133,43 @@
         opacity: 1 !important;
     }
     
-    /* Table container with horizontal scroll only if needed */
+    /* Table container - simple wrapper for horizontal scroll on mobile */
     .table-container {
-        position: relative;
         overflow-x: auto;
     }
     
-    /* Make table responsive */
-    .table-container table {
+    /* Table styles */
+    .table {
         width: 100%;
-        min-width: 768px;
+        min-width: 768px; /* Ensure table maintains minimum width */
     }
     
     /* Table header styling */
-    .table-container thead th {
+    .table thead th {
         background: var(--fallback-b1, oklch(var(--b1)));
         border-bottom: 2px solid var(--fallback-b3, oklch(var(--b3)));
+        white-space: nowrap;
     }
     
-    /* Horizontal scrollbar styling if needed */
-    .table-container::-webkit-scrollbar {
-        height: 8px;
-    }
-    
-    .table-container::-webkit-scrollbar-track {
-        background: var(--fallback-b2, oklch(var(--b2)));
-        border-radius: 4px;
-    }
-    
-    .table-container::-webkit-scrollbar-thumb {
-        background: var(--fallback-bc, oklch(var(--bc) / 0.3));
-        border-radius: 4px;
-    }
-    
-    .table-container::-webkit-scrollbar-thumb:hover {
-        background: var(--fallback-bc, oklch(var(--bc) / 0.5));
+    /* Only show horizontal scrollbar when needed (on mobile) */
+    @media (max-width: 768px) {
+        .table-container::-webkit-scrollbar {
+            height: 8px;
+        }
+        
+        .table-container::-webkit-scrollbar-track {
+            background: var(--fallback-b2, oklch(var(--b2)));
+            border-radius: 4px;
+        }
+        
+        .table-container::-webkit-scrollbar-thumb {
+            background: var(--fallback-bc, oklch(var(--bc) / 0.3));
+            border-radius: 4px;
+        }
+        
+        .table-container::-webkit-scrollbar-thumb:hover {
+            background: var(--fallback-bc, oklch(var(--bc) / 0.5));
+        }
     }
     
 </style>
@@ -435,9 +437,9 @@
     <!-- Keywords Table -->
     <div class="card bg-base-100 shadow-sm border border-base-300">
         <div class="card-body p-0">
+            {% if keywords %}
             <div id="keywords-table" class="table-container">
-                {% if keywords %}
-                    <table class="table">
+                <table class="table">
                         <thead>
                             <tr>
                                 <th>
@@ -625,9 +627,10 @@
                             {% endfor %}
                         </tbody>
                     </table>
-                {% else %}
-                <!-- Empty State -->
-                <div class="p-12 text-center">
+            </div>
+            {% else %}
+            <!-- Empty State -->
+            <div class="p-12 text-center">
                     <div class="w-20 h-20 bg-base-200 rounded-full flex items-center justify-center mx-auto mb-4">
                         <i class="fas fa-key text-2xl text-base-content/40"></i>
                     </div>
@@ -643,9 +646,8 @@
                         <i class="fas fa-plus mr-2"></i>
                         Add Your First Keywords
                     </button>
-                </div>
-                {% endif %}
             </div>
+            {% endif %}
         </div>
     </div>
     
