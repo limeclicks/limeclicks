@@ -197,43 +197,32 @@
     </div>
 </div>
 
-<!-- Keywords Detail Modal -->
-<div id="keywordsModal" class="modal fade" tabindex="-1" style="display: none;">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="modalTitle">Page Keywords</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body" id="modalBody">
-                <!-- Content loaded via HTMX -->
-            </div>
+<!-- Keywords Detail Modal (DaisyUI) -->
+<dialog id="keywordsModal" class="modal">
+    <div class="modal-box max-w-4xl">
+        <form method="dialog">
+            <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">✕</button>
+        </form>
+        <h3 class="font-bold text-lg mb-4" id="modalTitle">Page Keywords</h3>
+        <div id="modalBody">
+            <!-- Content loaded via HTMX -->
         </div>
     </div>
-</div>
+    <form method="dialog" class="modal-backdrop">
+        <button>close</button>
+    </form>
+</dialog>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-    // Handle modal display
+    // Handle modal display with DaisyUI
     document.addEventListener('htmx:afterSwap', function(event) {
         if (event.detail.target.id === 'modalBody') {
             const modalElement = document.getElementById('keywordsModal');
             if (modalElement) {
-                // Show modal using Bootstrap's modal if available, otherwise use basic display
-                if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
-                    const modal = new bootstrap.Modal(modalElement);
-                    modal.show();
-                } else {
-                    modalElement.style.display = 'block';
-                    modalElement.classList.add('show');
-                    document.body.classList.add('modal-open');
-                    
-                    // Add backdrop
-                    const backdrop = document.createElement('div');
-                    backdrop.className = 'modal-backdrop fade show';
-                    document.body.appendChild(backdrop);
-                }
+                // Show modal using HTML5 dialog API
+                modalElement.showModal();
             }
         }
     });
@@ -242,26 +231,8 @@
     function closeModal() {
         const modalElement = document.getElementById('keywordsModal');
         if (modalElement) {
-            if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
-                const modal = bootstrap.Modal.getInstance(modalElement);
-                if (modal) modal.hide();
-            } else {
-                modalElement.style.display = 'none';
-                modalElement.classList.remove('show');
-                document.body.classList.remove('modal-open');
-                
-                // Remove backdrop
-                const backdrop = document.querySelector('.modal-backdrop');
-                if (backdrop) backdrop.remove();
-            }
+            modalElement.close();
         }
     }
-    
-    // Close modal on backdrop click
-    document.addEventListener('click', function(e) {
-        if (e.target.classList.contains('modal')) {
-            closeModal();
-        }
-    });
 </script>
 {% endblock %}
