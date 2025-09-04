@@ -65,7 +65,7 @@
                                     hx-get="{% url 'keywords:page_keywords_detail' %}?url={{ page.url|urlencode }}&project_id={{ page.project_id }}"
                                     hx-target="#modalBody"
                                     hx-trigger="click"
-                                    hx-swap="innerHTML">
+                                    hx-swap="innerHTML settle:100ms">
                                 <i class="fas fa-eye mr-1"></i>
                                 View Keywords
                             </button>

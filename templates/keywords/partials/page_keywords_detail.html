@@ -1,6 +1,20 @@
-<!-- Update modal title with HTMX -->
+<!-- Update modal title and trigger modal opening -->
 <script>
-    document.getElementById('modalTitle').textContent = 'Keywords for {{ page_title }}';
+    // Update title  
+    if (document.getElementById('modalTitle')) {
+        document.getElementById('modalTitle').textContent = 'Keywords for {{ page_title }}';
+    }
+    
+    // Open the modal using global function
+    if (window.openKeywordsModal) {
+        window.openKeywordsModal();
+    } else {
+        // Fallback: try to open directly
+        const modal = document.getElementById('keywordsModal');
+        if (modal) {
+            modal.showModal();
+        }
+    }
 </script>
 
 <div class="mb-4">
