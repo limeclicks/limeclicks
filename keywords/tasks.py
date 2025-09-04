@@ -267,6 +267,8 @@ def _handle_successful_fetch(keyword: Keyword, html_content: str) -> None:
         keyword.processing = False  # Reset processing flag
         keyword.ranking_pages = top_pages  # Update top 10 pages
         keyword.top_competitors = top_competitors  # Update top 3 competitors
+        keyword.scraped_at = timezone.now()
+        
         # Update file path if it's different
         if not keyword.scrape_do_file_path or keyword.scrape_do_file_path != relative_path:
             keyword.scrape_do_file_path = relative_path
@@ -276,15 +278,11 @@ def _handle_successful_fetch(keyword: Keyword, html_content: str) -> None:
                 file_list.insert(0, relative_path)
                 keyword.scrape_do_files = file_list[:settings.SERP_HISTORY_DAYS]
         
-        # Process for ranking first (which might update and save keyword)
+        # Save keyword updates before ranking process
+        keyword.save()
+        
+        # Process for ranking (which might update rank and track manual targets)
         _process_ranking_if_needed(keyword, html_content, date_str)
-        
-        # Reload keyword to get any changes from ranking process
-        keyword.refresh_from_db()
-        
-        # Always update scraped_at after ranking (to ensure it's set correctly)
-        keyword.scraped_at = timezone.now()
-        keyword.save(update_fields=['scraped_at'])
         return
     elif not is_new_file and is_force_crawl:
         logger.info(f"File exists but force crawl requested: {relative_path} (will overwrite)")
@@ -338,17 +336,13 @@ def _handle_successful_fetch(keyword: Keyword, html_content: str) -> None:
     keyword.processing = False  # Reset processing flag
     keyword.ranking_pages = top_pages  # Store top 10 pages
     keyword.top_competitors = top_competitors  # Store top 3 competitors
-    # Don't save yet - let ranking process first
-    
-    # Process ranking extraction for new file
-    _process_ranking_if_needed(keyword, html_content, date_str)
-    
-    # Reload keyword to get any changes from ranking process
-    keyword.refresh_from_db()
-    
-    # Now update scraped_at and save (after ranking which might also save)
     keyword.scraped_at = timezone.now()
-    keyword.save(update_fields=['scraped_at'])
+    
+    # Save keyword updates before ranking process
+    keyword.save()
+    
+    # Process ranking extraction for new file (this will update rank and track manual targets)
+    _process_ranking_if_needed(keyword, html_content, date_str)
     
     logger.info(
         f"SUCCESS: keyword_id={keyword.id}, status=200, "
