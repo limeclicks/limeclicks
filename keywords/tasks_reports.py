@@ -64,8 +64,15 @@ def generate_keyword_report(self, report_id: int) -> Dict[str, Any]:
                 csv_filename = f"{report.project.domain}_{report.report_type}_{timestamp}.csv"
             csv_key = f"{base_path}/{csv_filename}"
             
+            # Convert CSV string to bytes if needed
+            import io
+            if isinstance(results['csv_content'], str):
+                csv_bytes = io.BytesIO(results['csv_content'].encode('utf-8'))
+            else:
+                csv_bytes = io.BytesIO(results['csv_content'])
+            
             upload_result = r2_service.upload_file(
-                results['csv_content'],  # file_obj
+                csv_bytes,  # file_obj
                 csv_key,  # key
                 metadata={
                     'report_id': str(report.id),
