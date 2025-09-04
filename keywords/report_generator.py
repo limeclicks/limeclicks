@@ -43,11 +43,15 @@ class KeywordReportGenerator:
         """
         self.report = report
         self.project = report.project
+        self.report_type = report.report_type
         self.start_date = report.start_date
         self.end_date = report.end_date
         
-        # Calculate date range (list of dates)
-        self.date_range = self._generate_date_range()
+        # Calculate date range (list of dates) - only for keyword_rankings
+        if self.report_type == 'keyword_rankings' and self.start_date and self.end_date:
+            self.date_range = self._generate_date_range()
+        else:
+            self.date_range = []
         
         # Storage for processed data
         self.keywords_data = []
@@ -80,8 +84,35 @@ class KeywordReportGenerator:
         }
         
         try:
+            # Route to appropriate generator based on report type
+            if self.report_type == 'keyword_rankings':
+                return self._generate_keyword_rankings_report()
+            elif self.report_type == 'page_rankings':
+                return self._generate_page_rankings_report()
+            elif self.report_type == 'top_competitors':
+                return self._generate_top_competitors_report()
+            elif self.report_type == 'competitors_targets':
+                return self._generate_competitors_targets_report()
+            else:
+                raise ValueError(f"Unknown report type: {self.report_type}")
+            
+        except Exception as e:
+            logger.error(f"Error generating report: {e}", exc_info=True)
+            results['error'] = str(e)
+            return results
+    
+    def _generate_keyword_rankings_report(self) -> Dict[str, Any]:
+        """Generate traditional keyword rankings report"""
+        results = {
+            'success': False,
+            'csv_path': None,
+            'pdf_path': None,
+            'error': None
+        }
+        
+        try:
             # Load and process data
-            logger.info(f"Loading data for report {self.report.id}")
+            logger.info(f"Loading data for keyword rankings report {self.report.id}")
             self._load_keyword_data()
             self._load_ranking_data()
             self._calculate_summary_stats()
@@ -104,7 +135,7 @@ class KeywordReportGenerator:
             results['summary'] = self.summary_stats
             
         except Exception as e:
-            logger.error(f"Error generating report: {e}", exc_info=True)
+            logger.error(f"Error generating keyword rankings report: {e}", exc_info=True)
             results['error'] = str(e)
         
         return results
@@ -637,3 +668,475 @@ class KeywordReportGenerator:
         except Exception as e:
             logger.error(f"Error creating chart: {e}")
             return None
+    
+    def _generate_page_rankings_report(self) -> Dict[str, Any]:
+        """Generate page rankings report showing which pages rank for most keywords"""
+        results = {
+            'success': False,
+            'csv_path': None,
+            'pdf_path': None,
+            'error': None
+        }
+        
+        try:
+            logger.info(f"Generating page rankings report for project {self.project.id}")
+            from .models import Keyword
+            from collections import defaultdict
+            from urllib.parse import urlparse
+            
+            # Get all active keywords for the project
+            keywords = Keyword.objects.filter(
+                project=self.project,
+                archive=False
+            ).exclude(rank=0).exclude(rank__gt=100)
+            
+            # Apply keyword filters if set
+            if self.report.keywords.exists():
+                keywords = self.report.keywords.filter(archive=False)
+            
+            # Group keywords by ranking URL
+            page_data = defaultdict(lambda: {
+                'keywords': [],
+                'total_count': 0,
+                'avg_position': 0,
+                'top_3': 0,
+                'top_10': 0,
+                'top_30': 0
+            })
+            
+            for keyword in keywords:
+                if keyword.rank_url:
+                    # Normalize URL (remove query params for grouping)
+                    parsed_url = urlparse(keyword.rank_url)
+                    clean_url = f"{parsed_url.scheme}://{parsed_url.netloc}{parsed_url.path}"
+                    
+                    page_data[clean_url]['keywords'].append({
+                        'keyword': keyword.keyword,
+                        'rank': keyword.rank,
+                        'country': keyword.country
+                    })
+                    page_data[clean_url]['total_count'] += 1
+                    
+                    if keyword.rank <= 3:
+                        page_data[clean_url]['top_3'] += 1
+                    if keyword.rank <= 10:
+                        page_data[clean_url]['top_10'] += 1
+                    if keyword.rank <= 30:
+                        page_data[clean_url]['top_30'] += 1
+            
+            # Calculate average positions
+            for url, data in page_data.items():
+                if data['keywords']:
+                    total_rank = sum(k['rank'] for k in data['keywords'])
+                    data['avg_position'] = round(total_rank / len(data['keywords']), 1)
+            
+            # Sort by total keywords (descending)
+            sorted_pages = sorted(page_data.items(), key=lambda x: x[1]['total_count'], reverse=True)
+            
+            # Generate CSV if requested
+            if self.report.report_format in ['csv', 'both']:
+                csv_buffer = io.StringIO()
+                csv_writer = csv.writer(csv_buffer)
+                
+                # Write headers
+                csv_writer.writerow([
+                    'Page URL',
+                    'Total Keywords',
+                    'Avg. Position',
+                    'Top 3',
+                    'Top 10',
+                    'Top 30',
+                    'Keywords (Top 10)'
+                ])
+                
+                # Write data
+                for url, data in sorted_pages:
+                    # Get top 10 keywords for this page
+                    top_keywords = sorted(data['keywords'], key=lambda x: x['rank'])[:10]
+                    keywords_str = '; '.join([f"{k['keyword']} (#{k['rank']})" for k in top_keywords])
+                    
+                    csv_writer.writerow([
+                        url,
+                        data['total_count'],
+                        data['avg_position'],
+                        data['top_3'],
+                        data['top_10'],
+                        data['top_30'],
+                        keywords_str
+                    ])
+                
+                csv_content = csv_buffer.getvalue()
+                results['csv_content'] = csv_content
+                results['csv_size'] = len(csv_content)
+            
+            # Generate PDF if requested
+            if self.report.report_format in ['pdf', 'both']:
+                pdf_buffer = io.BytesIO()
+                doc = SimpleDocTemplate(pdf_buffer, pagesize=letter)
+                story = []
+                styles = getSampleStyleSheet()
+                
+                # Title
+                title_style = ParagraphStyle(
+                    'CustomTitle',
+                    parent=styles['Heading1'],
+                    fontSize=24,
+                    textColor=colors.HexColor('#1e40af'),
+                    spaceAfter=30,
+                    alignment=TA_CENTER
+                )
+                story.append(Paragraph(f"Page Rankings Report", title_style))
+                story.append(Paragraph(f"{self.project.domain}", styles['Heading2']))
+                story.append(Spacer(1, 0.5*inch))
+                
+                # Summary stats
+                story.append(Paragraph("Summary", styles['Heading2']))
+                summary_data = [
+                    ['Metric', 'Value'],
+                    ['Total Pages Ranking', len(sorted_pages)],
+                    ['Total Keywords', sum(d['total_count'] for _, d in sorted_pages)],
+                    ['Average Keywords per Page', round(sum(d['total_count'] for _, d in sorted_pages) / max(len(sorted_pages), 1), 1)]
+                ]
+                summary_table = Table(summary_data, colWidths=[3*inch, 2*inch])
+                summary_table.setStyle(TableStyle([
+                    ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                    ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                    ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                    ('FONTSIZE', (0, 0), (-1, 0), 12),
+                    ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                    ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                ]))
+                story.append(summary_table)
+                story.append(Spacer(1, 0.5*inch))
+                
+                # Top pages table
+                story.append(Paragraph("Top Ranking Pages", styles['Heading2']))
+                table_data = [['Page URL', 'Keywords', 'Avg Pos', 'Top 3', 'Top 10']]
+                
+                for url, data in sorted_pages[:20]:  # Top 20 pages
+                    # Truncate URL for display
+                    display_url = url[:50] + '...' if len(url) > 50 else url
+                    table_data.append([
+                        display_url,
+                        str(data['total_count']),
+                        str(data['avg_position']),
+                        str(data['top_3']),
+                        str(data['top_10'])
+                    ])
+                
+                pages_table = Table(table_data, colWidths=[3.5*inch, 1*inch, 1*inch, 0.75*inch, 0.75*inch])
+                pages_table.setStyle(TableStyle([
+                    ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                    ('ALIGN', (1, 0), (-1, -1), 'CENTER'),
+                    ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                    ('FONTSIZE', (0, 0), (-1, -1), 10),
+                    ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                ]))
+                story.append(pages_table)
+                
+                # Build PDF
+                doc.build(story)
+                pdf_content = pdf_buffer.getvalue()
+                results['pdf_content'] = pdf_content
+                results['pdf_size'] = len(pdf_content)
+            
+            results['success'] = True
+            results['summary'] = {
+                'total_pages': len(sorted_pages),
+                'total_keywords': sum(d['total_count'] for _, d in sorted_pages),
+                'top_page': sorted_pages[0][0] if sorted_pages else None
+            }
+            
+        except Exception as e:
+            logger.error(f"Error generating page rankings report: {e}", exc_info=True)
+            results['error'] = str(e)
+        
+        return results
+    
+    def _generate_top_competitors_report(self) -> Dict[str, Any]:
+        """Generate top competitors report based on competitor tracking data"""
+        results = {
+            'success': False,
+            'csv_path': None,
+            'pdf_path': None,
+            'error': None
+        }
+        
+        try:
+            logger.info(f"Generating top competitors report for project {self.project.id}")
+            from competitors.models import Competitor, CompetitorRank
+            from collections import defaultdict
+            
+            # Get all competitors for this project
+            competitors = Competitor.objects.filter(project=self.project)
+            
+            competitor_stats = []
+            
+            for competitor in competitors:
+                # Get latest ranking data for this competitor
+                latest_ranks = CompetitorRank.objects.filter(
+                    competitor=competitor
+                ).select_related('keyword').order_by('keyword', '-created_at').distinct('keyword')
+                
+                # Calculate stats
+                total_keywords = latest_ranks.count()
+                top_3 = latest_ranks.filter(rank__lte=3).count()
+                top_10 = latest_ranks.filter(rank__lte=10).count()
+                top_30 = latest_ranks.filter(rank__lte=30).count()
+                
+                avg_rank = 0
+                if total_keywords > 0:
+                    ranks = [r.rank for r in latest_ranks if r.rank > 0 and r.rank <= 100]
+                    avg_rank = round(sum(ranks) / len(ranks), 1) if ranks else 0
+                
+                competitor_stats.append({
+                    'domain': competitor.domain,
+                    'total_keywords': total_keywords,
+                    'avg_rank': avg_rank,
+                    'top_3': top_3,
+                    'top_10': top_10,
+                    'top_30': top_30,
+                    'visibility_score': top_3 * 3 + top_10 * 2 + top_30  # Simple visibility scoring
+                })
+            
+            # Sort by visibility score
+            competitor_stats.sort(key=lambda x: x['visibility_score'], reverse=True)
+            
+            # Generate CSV if requested
+            if self.report.report_format in ['csv', 'both']:
+                csv_buffer = io.StringIO()
+                csv_writer = csv.writer(csv_buffer)
+                
+                # Write headers
+                csv_writer.writerow([
+                    'Competitor Domain',
+                    'Total Keywords',
+                    'Avg. Position',
+                    'Top 3',
+                    'Top 10',
+                    'Top 30',
+                    'Visibility Score'
+                ])
+                
+                # Write data
+                for comp in competitor_stats:
+                    csv_writer.writerow([
+                        comp['domain'],
+                        comp['total_keywords'],
+                        comp['avg_rank'],
+                        comp['top_3'],
+                        comp['top_10'],
+                        comp['top_30'],
+                        comp['visibility_score']
+                    ])
+                
+                csv_content = csv_buffer.getvalue()
+                results['csv_content'] = csv_content
+                results['csv_size'] = len(csv_content)
+            
+            # Generate PDF if requested
+            if self.report.report_format in ['pdf', 'both']:
+                pdf_buffer = io.BytesIO()
+                doc = SimpleDocTemplate(pdf_buffer, pagesize=letter)
+                story = []
+                styles = getSampleStyleSheet()
+                
+                # Title
+                title_style = ParagraphStyle(
+                    'CustomTitle',
+                    parent=styles['Heading1'],
+                    fontSize=24,
+                    textColor=colors.HexColor('#1e40af'),
+                    spaceAfter=30,
+                    alignment=TA_CENTER
+                )
+                story.append(Paragraph(f"Top Competitors Report", title_style))
+                story.append(Paragraph(f"{self.project.domain}", styles['Heading2']))
+                story.append(Spacer(1, 0.5*inch))
+                
+                # Competitors table
+                table_data = [['Competitor', 'Keywords', 'Avg Pos', 'Top 3', 'Top 10', 'Top 30', 'Score']]
+                
+                for comp in competitor_stats[:20]:  # Top 20 competitors
+                    table_data.append([
+                        comp['domain'][:30] + '...' if len(comp['domain']) > 30 else comp['domain'],
+                        str(comp['total_keywords']),
+                        str(comp['avg_rank']),
+                        str(comp['top_3']),
+                        str(comp['top_10']),
+                        str(comp['top_30']),
+                        str(comp['visibility_score'])
+                    ])
+                
+                comp_table = Table(table_data, colWidths=[2.5*inch, 0.9*inch, 0.9*inch, 0.7*inch, 0.7*inch, 0.7*inch, 0.8*inch])
+                comp_table.setStyle(TableStyle([
+                    ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                    ('ALIGN', (1, 0), (-1, -1), 'CENTER'),
+                    ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                    ('FONTSIZE', (0, 0), (-1, -1), 10),
+                    ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                ]))
+                story.append(comp_table)
+                
+                # Build PDF
+                doc.build(story)
+                pdf_content = pdf_buffer.getvalue()
+                results['pdf_content'] = pdf_content
+                results['pdf_size'] = len(pdf_content)
+            
+            results['success'] = True
+            results['summary'] = {
+                'total_competitors': len(competitor_stats),
+                'top_competitor': competitor_stats[0]['domain'] if competitor_stats else None
+            }
+            
+        except Exception as e:
+            logger.error(f"Error generating top competitors report: {e}", exc_info=True)
+            results['error'] = str(e)
+        
+        return results
+    
+    def _generate_competitors_targets_report(self) -> Dict[str, Any]:
+        """Generate competitors targets report showing what keywords competitors target"""
+        results = {
+            'success': False,
+            'csv_path': None,
+            'pdf_path': None,
+            'error': None
+        }
+        
+        try:
+            logger.info(f"Generating competitors targets report for project {self.project.id}")
+            from competitors.models import CompetitorKeyword
+            from collections import defaultdict
+            
+            # Get all competitor keywords for this project
+            comp_keywords = CompetitorKeyword.objects.filter(
+                project=self.project
+            ).select_related('competitor')
+            
+            # Group by keyword
+            keyword_competitors = defaultdict(list)
+            
+            for ck in comp_keywords:
+                keyword_competitors[ck.keyword].append({
+                    'competitor': ck.competitor.domain,
+                    'rank': ck.rank if ck.rank > 0 else 101,
+                    'url': ck.url
+                })
+            
+            # Sort keywords by number of competitors targeting them
+            keyword_data = []
+            for keyword, competitors in keyword_competitors.items():
+                # Sort competitors by rank
+                competitors.sort(key=lambda x: x['rank'])
+                
+                keyword_data.append({
+                    'keyword': keyword,
+                    'competitor_count': len(competitors),
+                    'top_competitor': competitors[0]['competitor'] if competitors else None,
+                    'top_rank': competitors[0]['rank'] if competitors else 0,
+                    'competitors': competitors[:5]  # Top 5 competitors for this keyword
+                })
+            
+            # Sort by competitor count
+            keyword_data.sort(key=lambda x: x['competitor_count'], reverse=True)
+            
+            # Generate CSV if requested
+            if self.report.report_format in ['csv', 'both']:
+                csv_buffer = io.StringIO()
+                csv_writer = csv.writer(csv_buffer)
+                
+                # Write headers
+                csv_writer.writerow([
+                    'Keyword',
+                    'Competitors Count',
+                    'Top Competitor',
+                    'Top Rank',
+                    'All Competitors (Top 5)'
+                ])
+                
+                # Write data
+                for kw_data in keyword_data:
+                    competitors_str = '; '.join([
+                        f"{c['competitor']} (#{c['rank']})"
+                        for c in kw_data['competitors']
+                    ])
+                    
+                    csv_writer.writerow([
+                        kw_data['keyword'],
+                        kw_data['competitor_count'],
+                        kw_data['top_competitor'],
+                        kw_data['top_rank'] if kw_data['top_rank'] <= 100 else 'NR',
+                        competitors_str
+                    ])
+                
+                csv_content = csv_buffer.getvalue()
+                results['csv_content'] = csv_content
+                results['csv_size'] = len(csv_content)
+            
+            # Generate PDF if requested
+            if self.report.report_format in ['pdf', 'both']:
+                pdf_buffer = io.BytesIO()
+                doc = SimpleDocTemplate(pdf_buffer, pagesize=letter)
+                story = []
+                styles = getSampleStyleSheet()
+                
+                # Title
+                title_style = ParagraphStyle(
+                    'CustomTitle',
+                    parent=styles['Heading1'],
+                    fontSize=24,
+                    textColor=colors.HexColor('#1e40af'),
+                    spaceAfter=30,
+                    alignment=TA_CENTER
+                )
+                story.append(Paragraph(f"Competitor Targets Report", title_style))
+                story.append(Paragraph(f"{self.project.domain}", styles['Heading2']))
+                story.append(Spacer(1, 0.5*inch))
+                
+                # Keywords table
+                table_data = [['Keyword', 'Competitors', 'Top Competitor', 'Top Rank']]
+                
+                for kw_data in keyword_data[:50]:  # Top 50 keywords
+                    keyword_display = kw_data['keyword'][:30] + '...' if len(kw_data['keyword']) > 30 else kw_data['keyword']
+                    comp_display = kw_data['top_competitor'][:25] + '...' if kw_data['top_competitor'] and len(kw_data['top_competitor']) > 25 else kw_data['top_competitor']
+                    
+                    table_data.append([
+                        keyword_display,
+                        str(kw_data['competitor_count']),
+                        comp_display or 'N/A',
+                        str(kw_data['top_rank']) if kw_data['top_rank'] <= 100 else 'NR'
+                    ])
+                
+                kw_table = Table(table_data, colWidths=[3*inch, 1.2*inch, 2.5*inch, 0.8*inch])
+                kw_table.setStyle(TableStyle([
+                    ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                    ('ALIGN', (1, 0), (-1, -1), 'CENTER'),
+                    ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                    ('FONTSIZE', (0, 0), (-1, -1), 10),
+                    ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                ]))
+                story.append(kw_table)
+                
+                # Build PDF
+                doc.build(story)
+                pdf_content = pdf_buffer.getvalue()
+                results['pdf_content'] = pdf_content
+                results['pdf_size'] = len(pdf_content)
+            
+            results['success'] = True
+            results['summary'] = {
+                'total_keywords': len(keyword_data),
+                'most_competitive': keyword_data[0]['keyword'] if keyword_data else None
+            }
+            
+        except Exception as e:
+            logger.error(f"Error generating competitors targets report: {e}", exc_info=True)
+            results['error'] = str(e)
+        
+        return results

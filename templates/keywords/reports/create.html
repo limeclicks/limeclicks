@@ -24,30 +24,47 @@
                 
                 <div class="form-control">
                     <label class="label">
+                        <span class="label-text">Report Type</span>
+                    </label>
+                    <select name="report_type" id="reportType" class="select select-bordered">
+                        <option value="keyword_rankings" selected>Keyword Rankings</option>
+                        <option value="page_rankings">Page Rankings</option>
+                        <option value="top_competitors">Top Competitors</option>
+                        <option value="competitors_targets">Competitors Targets</option>
+                    </select>
+                    <label class="label">
+                        <span class="label-text-alt text-base-content/60">
+                            <span id="typeDescription">Track keyword position changes over time</span>
+                        </span>
+                    </label>
+                </div>
+                
+                <div class="form-control">
+                    <label class="label">
                         <span class="label-text">Report Name</span>
                     </label>
-                    <input type="text" name="name" class="input input-bordered" 
+                    <input type="text" name="name" id="reportName" class="input input-bordered" 
                            placeholder="e.g., Monthly SEO Report - {{ project.domain }}"
                            value="{{ project.domain }} Report - {% now 'F Y' %}">
                 </div>
                 
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4" id="dateFields">
                     <div class="form-control">
                         <label class="label">
                             <span class="label-text">Start Date</span>
                         </label>
-                        <input type="date" name="start_date" class="input input-bordered" 
+                        <input type="date" name="start_date" id="startDate" class="input input-bordered" 
                                value="{{ default_start_date|date:'Y-m-d' }}"
-                               max="{{ max_date|date:'Y-m-d' }}" required>
+                               max="{{ max_date|date:'Y-m-d' }}">
                     </div>
                     
                     <div class="form-control">
                         <label class="label">
                             <span class="label-text">End Date</span>
                         </label>
-                        <input type="date" name="end_date" class="input input-bordered" 
+                        <input type="date" name="end_date" id="endDate" class="input input-bordered" 
                                value="{{ default_end_date|date:'Y-m-d' }}"
-                               max="{{ max_date|date:'Y-m-d' }}" required>
+                               max="{{ max_date|date:'Y-m-d' }}">
                     </div>
                 </div>
                 
@@ -64,7 +81,7 @@
             </div>
 
             <!-- Keyword Filters -->
-            <div class="space-y-4">
+            <div class="space-y-4" id="keywordFilters">
                 <h3 class="text-lg font-semibold">Keyword Filters</h3>
                 
                 <div class="alert alert-info">
@@ -113,11 +130,11 @@
             </div>
 
             <!-- Report Options -->
-            <div class="space-y-4">
+            <div class="space-y-4" id="reportOptions">
                 <h3 class="text-lg font-semibold">Report Options</h3>
                 
                 <div class="space-y-2">
-                    <label class="label cursor-pointer justify-start gap-3">
+                    <label class="label cursor-pointer justify-start gap-3" id="graphsOption">
                         <input type="checkbox" name="include_graphs" class="checkbox" checked>
                         <span class="label-text">
                             Include graphs in PDF report
@@ -127,7 +144,7 @@
                         </span>
                     </label>
                     
-                    <label class="label cursor-pointer justify-start gap-3">
+                    <label class="label cursor-pointer justify-start gap-3" id="competitorsOption">
                         <input type="checkbox" name="include_competitors" class="checkbox">
                         <span class="label-text">
                             Include competitor data (if available)
@@ -162,14 +179,83 @@
 </div>
 
 <script>
-// Date validation
-document.querySelector('input[name="start_date"]').addEventListener('change', function() {
+// Report type handling
+const reportTypeSelect = document.getElementById('reportType');
+const dateFields = document.getElementById('dateFields');
+const keywordFilters = document.getElementById('keywordFilters');
+const graphsOption = document.getElementById('graphsOption');
+const competitorsOption = document.getElementById('competitorsOption');
+const reportNameInput = document.getElementById('reportName');
+const typeDescription = document.getElementById('typeDescription');
+const startDateInput = document.getElementById('startDate');
+const endDateInput = document.getElementById('endDate');
+
+const reportDescriptions = {
+    'keyword_rankings': 'Track keyword position changes over time',
+    'page_rankings': 'Analyze which pages rank for the most keywords',
+    'top_competitors': 'Identify top competitors for your keywords',
+    'competitors_targets': 'Discover competitors\' target keywords and strategies'
+};
+
+const reportDefaultNames = {
+    'keyword_rankings': '{{ project.domain }} Keyword Rankings - {% now 'F Y' %}',
+    'page_rankings': '{{ project.domain }} Page Rankings Report',
+    'top_competitors': '{{ project.domain }} Top Competitors Report',
+    'competitors_targets': '{{ project.domain }} Competitor Targets Report'
+};
+
+function updateFormBasedOnReportType() {
+    const reportType = reportTypeSelect.value;
+    
+    // Update description
+    typeDescription.textContent = reportDescriptions[reportType];
+    
+    // Update default name
+    if (!reportNameInput.value || reportNameInput.value === reportNameInput.defaultValue) {
+        reportNameInput.value = reportDefaultNames[reportType];
+        reportNameInput.defaultValue = reportDefaultNames[reportType];
+    }
+    
+    // Show/hide fields based on report type
+    if (reportType === 'keyword_rankings') {
+        // Show all fields for keyword rankings
+        dateFields.style.display = 'grid';
+        keywordFilters.style.display = 'block';
+        graphsOption.style.display = 'flex';
+        competitorsOption.style.display = 'flex';
+        
+        // Make dates required
+        startDateInput.required = true;
+        endDateInput.required = true;
+    } else {
+        // Hide unnecessary fields for other report types
+        dateFields.style.display = 'none';
+        keywordFilters.style.display = 'none';
+        graphsOption.style.display = 'none';
+        competitorsOption.style.display = 'none';
+        
+        // Remove required attribute from dates
+        startDateInput.required = false;
+        endDateInput.required = false;
+    }
+}
+
+// Initialize on page load
+updateFormBasedOnReportType();
+
+// Update when report type changes
+reportTypeSelect.addEventListener('change', updateFormBasedOnReportType);
+
+// Date validation (only for keyword rankings)
+startDateInput.addEventListener('change', function() {
+    if (reportTypeSelect.value !== 'keyword_rankings') return;
+    
     const startDate = new Date(this.value);
-    const endDate = new Date(document.querySelector('input[name="end_date"]').value);
+    const endDate = new Date(endDateInput.value);
     
     // Ensure end date is after start date
     if (startDate > endDate) {
-        document.querySelector('input[name="end_date"]').value = this.value;
+        endDateInput.value = this.value;
     }
     
     // Check 60-day limit
@@ -177,20 +263,22 @@ document.querySelector('input[name="start_date"]').addEventListener('change', fu
     if (daysDiff > 60) {
         const maxEndDate = new Date(startDate);
         maxEndDate.setDate(maxEndDate.getDate() + 60);
-        document.querySelector('input[name="end_date"]').value = maxEndDate.toISOString().split('T')[0];
+        endDateInput.value = maxEndDate.toISOString().split('T')[0];
         alert('Report period cannot exceed 60 days. End date has been adjusted.');
     }
 });
 
-document.querySelector('input[name="end_date"]').addEventListener('change', function() {
-    const startDate = new Date(document.querySelector('input[name="start_date"]').value);
+endDateInput.addEventListener('change', function() {
+    if (reportTypeSelect.value !== 'keyword_rankings') return;
+    
+    const startDate = new Date(startDateInput.value);
     const endDate = new Date(this.value);
     
     // Check 60-day limit
     const daysDiff = Math.floor((endDate - startDate) / (1000 * 60 * 60 * 24));
     if (daysDiff > 60) {
         alert('Report period cannot exceed 60 days. Please adjust your date range.');
-        this.value = document.querySelector('input[name="end_date"]').defaultValue;
+        this.value = endDateInput.defaultValue;
     }
 });
 </script>

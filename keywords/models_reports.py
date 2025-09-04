@@ -27,6 +27,13 @@ class KeywordReport(models.Model):
         ('both', 'Both CSV and PDF'),
     ]
     
+    REPORT_TYPE_CHOICES = [
+        ('keyword_rankings', 'Keyword Rankings'),
+        ('page_rankings', 'Page Rankings'),
+        ('top_competitors', 'Top Competitors'),
+        ('competitors_targets', 'Competitors Targets'),
+    ]
+    
     # Core fields
     project = models.ForeignKey(
         Project,
@@ -40,12 +47,23 @@ class KeywordReport(models.Model):
         help_text="Report name or title"
     )
     
+    report_type = models.CharField(
+        max_length=30,
+        choices=REPORT_TYPE_CHOICES,
+        default='keyword_rankings',
+        help_text="Type of report to generate"
+    )
+    
     start_date = models.DateField(
-        help_text="Report start date"
+        help_text="Report start date",
+        null=True,
+        blank=True
     )
     
     end_date = models.DateField(
-        help_text="Report end date"
+        help_text="Report end date",
+        null=True,
+        blank=True
     )
     
     report_format = models.CharField(

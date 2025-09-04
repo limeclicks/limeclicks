@@ -101,38 +101,66 @@ def create_report_view(request, project_id):
         try:
             # Parse form data
             name = request.POST.get('name', '').strip()
-            start_date = request.POST.get('start_date')
-            end_date = request.POST.get('end_date')
+            report_type = request.POST.get('report_type', 'keyword_rankings')
             report_format = request.POST.get('format', 'both')
             
-            # Validate dates
-            start_date = datetime.strptime(start_date, '%Y-%m-%d').date()
-            end_date = datetime.strptime(end_date, '%Y-%m-%d').date()
+            # Date validation only for keyword_rankings type
+            start_date = None
+            end_date = None
             
-            # Validate date range (max 60 days)
-            date_diff = (end_date - start_date).days
-            if date_diff < 0:
-                messages.error(request, "End date must be after start date")
-                return redirect('keywords:create_report', project_id=project.id)
+            if report_type == 'keyword_rankings':
+                start_date_str = request.POST.get('start_date')
+                end_date_str = request.POST.get('end_date')
+                
+                if not start_date_str or not end_date_str:
+                    messages.error(request, "Start and end dates are required for keyword rankings reports")
+                    return redirect('keywords:create_report', project_id=project.id)
+                
+                # Validate dates
+                start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+                end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+                
+                # Validate date range (max 60 days)
+                date_diff = (end_date - start_date).days
+                if date_diff < 0:
+                    messages.error(request, "End date must be after start date")
+                    return redirect('keywords:create_report', project_id=project.id)
+                
+                if date_diff > 60:
+                    messages.error(request, "Report period cannot exceed 60 days")
+                    return redirect('keywords:create_report', project_id=project.id)
             
-            if date_diff > 60:
-                messages.error(request, "Report period cannot exceed 60 days")
-                return redirect('keywords:create_report', project_id=project.id)
-            
-            # Get filter options
-            selected_countries = request.POST.getlist('countries')
-            selected_tags = request.POST.getlist('tags')
+            # Get filter options (only for keyword_rankings type)
+            selected_countries = []
+            selected_tags = []
+            if report_type == 'keyword_rankings':
+                selected_countries = request.POST.getlist('countries')
+                selected_tags = request.POST.getlist('tags')
             
             # Get report options
             fill_missing_ranks = True  # Always fill missing ranks by default
-            include_competitors = request.POST.get('include_competitors') == 'on'
-            include_graphs = request.POST.get('include_graphs') == 'on'
+            include_competitors = request.POST.get('include_competitors') == 'on' if report_type == 'keyword_rankings' else False
+            include_graphs = request.POST.get('include_graphs') == 'on' if report_type == 'keyword_rankings' else False
             send_notification = request.POST.get('send_notification') == 'on'
             
             # Create report
+            # Generate default name based on report type
+            if not name:
+                if report_type == 'keyword_rankings':
+                    name = f"{project.domain} Keyword Rankings - {end_date.strftime('%B %Y')}" if end_date else f"{project.domain} Keyword Rankings"
+                elif report_type == 'page_rankings':
+                    name = f"{project.domain} Page Rankings Report"
+                elif report_type == 'top_competitors':
+                    name = f"{project.domain} Top Competitors Report"
+                elif report_type == 'competitors_targets':
+                    name = f"{project.domain} Competitor Targets Report"
+                else:
+                    name = f"{project.domain} Report"
+            
             report = KeywordReport.objects.create(
                 project=project,
-                name=name or f"{project.domain} Report - {end_date.strftime('%B %Y')}",
+                name=name,
+                report_type=report_type,
                 start_date=start_date,
                 end_date=end_date,
                 report_format=report_format,
