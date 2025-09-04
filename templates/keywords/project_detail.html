@@ -133,9 +133,19 @@
         opacity: 1 !important;
     }
     
-    /* Table container - simple wrapper for horizontal scroll on mobile */
+    /* Table container - fix scroll issue */
     .table-container {
-        overflow-x: auto;
+        min-height: auto;
+        height: auto;
+        max-height: unset;
+        overflow: hidden;
+    }
+    
+    /* Add horizontal scroll only when needed */
+    @media (max-width: 768px) {
+        .table-container {
+            overflow-x: auto;
+        }
     }
     
     /* Table styles */
