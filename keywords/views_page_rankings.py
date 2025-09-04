@@ -8,7 +8,7 @@ from django.views.generic import TemplateView
 from django.http import JsonResponse
 from django.db.models import Q, Count, Avg, F, Value, CharField
 from django.db.models.functions import Concat
-from django.core.paginator import Paginator
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from .models import Keyword, Rank
 from project.models import Project
 from urllib.parse import urlparse
@@ -42,8 +42,22 @@ def page_rankings_data(request):
     # Get filter parameters
     project_id = request.GET.get('project', '')
     search_query = request.GET.get('search', '')
-    page = request.GET.get('page', 1)
-    per_page = int(request.GET.get('per_page', 50))
+    
+    # Safely get page number
+    try:
+        page = int(request.GET.get('page', 1))
+        if page < 1:
+            page = 1
+    except (ValueError, TypeError):
+        page = 1
+    
+    # Safely get per_page
+    try:
+        per_page = int(request.GET.get('per_page', 50))
+        if per_page not in [10, 25, 50, 100]:
+            per_page = 50
+    except (ValueError, TypeError):
+        per_page = 50
     
     # Base queryset - get all keywords user has access to
     keywords = Keyword.objects.filter(
@@ -124,7 +138,14 @@ def page_rankings_data(request):
     
     try:
         pages = paginator.page(page)
-    except:
+    except (EmptyPage, PageNotAnInteger):
+        # If page is out of range or not an integer, deliver first page
+        pages = paginator.page(1)
+    except Exception as e:
+        # Log the error for debugging
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Pagination error in page_rankings_data: {str(e)}")
         pages = paginator.page(1)
     
     # Format response
@@ -173,12 +194,21 @@ def page_rankings_data(request):
     # Prepare pagination info
     # Generate elided page range (with ellipsis)
     page_range = []
-    for page_num in paginator.get_elided_page_range(pages.number, on_each_side=2, on_ends=1):
-        # Check if it's an ellipsis (not an integer)
-        if not isinstance(page_num, int):
-            page_range.append('...')
+    try:
+        # Use get_elided_page_range if available (Django 3.2+)
+        if hasattr(paginator, 'get_elided_page_range'):
+            for page_num in paginator.get_elided_page_range(pages.number, on_each_side=2, on_ends=1):
+                # Check if it's an ellipsis
+                if page_num == paginator.ELLIPSIS:
+                    page_range.append('...')
+                else:
+                    page_range.append(page_num)
         else:
-            page_range.append(page_num)
+            # Fallback for older Django versions - simple page range
+            page_range = list(range(1, paginator.num_pages + 1))
+    except Exception as e:
+        # Fallback to simple range if any error
+        page_range = list(range(1, min(paginator.num_pages + 1, 11)))  # Max 10 pages shown
     
     pagination = {
         'current_page': pages.number,
