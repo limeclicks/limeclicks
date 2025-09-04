@@ -847,19 +847,21 @@ class KeywordReportGenerator:
         
         try:
             logger.info(f"Generating top competitors report for project {self.project.id}")
-            from competitors.models import Competitor, CompetitorRank
+            from competitors.models import Target, TargetKeywordRank
             from collections import defaultdict
             
-            # Get all competitors for this project
-            competitors = Competitor.objects.filter(project=self.project)
+            # Get all competitors (targets) for this project
+            competitors = Target.objects.filter(project=self.project)
             
             competitor_stats = []
             
             for competitor in competitors:
-                # Get latest ranking data for this competitor
-                latest_ranks = CompetitorRank.objects.filter(
-                    competitor=competitor
-                ).select_related('keyword').order_by('keyword', '-created_at').distinct('keyword')
+                # Get latest ranking data for this competitor (target)
+                # Use a simpler approach without distinct to avoid PostgreSQL issues
+                from django.db.models import Max
+                latest_ranks = TargetKeywordRank.objects.filter(
+                    target=competitor
+                ).select_related('keyword')
                 
                 # Calculate stats
                 total_keywords = latest_ranks.count()
@@ -991,22 +993,22 @@ class KeywordReportGenerator:
         
         try:
             logger.info(f"Generating competitors targets report for project {self.project.id}")
-            from competitors.models import CompetitorKeyword
+            from competitors.models import TargetKeywordRank
             from collections import defaultdict
             
-            # Get all competitor keywords for this project
-            comp_keywords = CompetitorKeyword.objects.filter(
-                project=self.project
-            ).select_related('competitor')
+            # Get all competitor keywords (target keyword ranks) for this project
+            comp_keywords = TargetKeywordRank.objects.filter(
+                target__project=self.project
+            ).select_related('target', 'keyword')
             
             # Group by keyword
             keyword_competitors = defaultdict(list)
             
             for ck in comp_keywords:
-                keyword_competitors[ck.keyword].append({
-                    'competitor': ck.competitor.domain,
+                keyword_competitors[ck.keyword.keyword].append({
+                    'competitor': ck.target.domain,
                     'rank': ck.rank if ck.rank > 0 else 101,
-                    'url': ck.url
+                    'url': ck.rank_url
                 })
             
             # Sort keywords by number of competitors targeting them
