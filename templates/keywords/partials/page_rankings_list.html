@@ -3,10 +3,6 @@
     document.getElementById('totalPages').textContent = '{{ total_pages }}';
     document.getElementById('totalKeywords').textContent = '{{ total_keywords }}';
     document.getElementById('avgPosition').textContent = '{{ avg_position }}';
-    // Update current page in the form
-    if (document.getElementById('currentPage')) {
-        document.getElementById('currentPage').value = '{{ pagination.current_page }}';
-    }
 </script>
 
 {% if pages %}
@@ -71,7 +67,6 @@
                                     hx-trigger="click"
                                     hx-swap="innerHTML settle:100ms">
                                 <i class="fas fa-eye mr-1"></i>
-                                View Keywords
                             </button>
                         </td>
                     </tr>
@@ -88,7 +83,7 @@
             <div class="flex-1 flex justify-between sm:hidden">
                 {% if pagination.has_previous %}
                 <button class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
-                        hx-get="{% url 'keywords:page_rankings_data' %}?page={{ pagination.previous_page }}&search={{ request.GET.search }}&project={{ request.GET.project }}&per_page={{ request.GET.per_page }}"
+                        hx-get="{% url 'keywords:page_rankings_data' %}?page={{ pagination.previous_page }}&search={{ request.GET.search|default:'' }}&project={{ request.GET.project|default:'' }}&per_page={{ request.GET.per_page|default:'50' }}"
                         hx-target="#pagesContainer"
                         hx-indicator="#loadingIndicator">
                     Previous
@@ -96,7 +91,7 @@
                 {% endif %}
                 {% if pagination.has_next %}
                 <button class="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
-                        hx-get="{% url 'keywords:page_rankings_data' %}?page={{ pagination.next_page }}&search={{ request.GET.search }}&project={{ request.GET.project }}&per_page={{ request.GET.per_page }}"
+                        hx-get="{% url 'keywords:page_rankings_data' %}?page={{ pagination.next_page }}&search={{ request.GET.search|default:'' }}&project={{ request.GET.project|default:'' }}&per_page={{ request.GET.per_page|default:'50' }}"
                         hx-target="#pagesContainer"
                         hx-indicator="#loadingIndicator">
                     Next
@@ -115,7 +110,7 @@
                     <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
                         {% if pagination.has_previous %}
                         <button class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
-                                hx-get="{% url 'keywords:page_rankings_data' %}?page={{ pagination.previous_page }}&search={{ request.GET.search }}&project={{ request.GET.project }}&per_page={{ request.GET.per_page }}"
+                                hx-get="{% url 'keywords:page_rankings_data' %}?page={{ pagination.previous_page }}&search={{ request.GET.search|default:'' }}&project={{ request.GET.project|default:'' }}&per_page={{ request.GET.per_page|default:'50' }}"
                                 hx-target="#pagesContainer"
                                 hx-indicator="#loadingIndicator">
                             <span class="sr-only">Previous</span>
@@ -139,7 +134,7 @@
                             </span>
                             {% else %}
                             <button class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50"
-                                    hx-get="{% url 'keywords:page_rankings_data' %}?page={{ page_num }}&search={{ request.GET.search }}&project={{ request.GET.project }}&per_page={{ request.GET.per_page }}"
+                                    hx-get="{% url 'keywords:page_rankings_data' %}?page={{ page_num }}&search={{ request.GET.search|default:'' }}&project={{ request.GET.project|default:'' }}&per_page={{ request.GET.per_page|default:'50' }}"
                                     hx-target="#pagesContainer"
                                     hx-indicator="#loadingIndicator">
                                 {{ page_num }}
@@ -149,7 +144,7 @@
                         
                         {% if pagination.has_next %}
                         <button class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
-                                hx-get="{% url 'keywords:page_rankings_data' %}?page={{ pagination.next_page }}&search={{ request.GET.search }}&project={{ request.GET.project }}&per_page={{ request.GET.per_page }}"
+                                hx-get="{% url 'keywords:page_rankings_data' %}?page={{ pagination.next_page }}&search={{ request.GET.search|default:'' }}&project={{ request.GET.project|default:'' }}&per_page={{ request.GET.per_page|default:'50' }}"
                                 hx-target="#pagesContainer"
                                 hx-indicator="#loadingIndicator">
                             <span class="sr-only">Next</span>

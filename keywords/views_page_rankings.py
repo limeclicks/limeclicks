@@ -54,7 +54,7 @@ def page_rankings_data(request):
     # Safely get per_page
     try:
         per_page = int(request.GET.get('per_page', 50))
-        if per_page not in [10, 25, 50, 100]:
+        if per_page not in [25, 50, 100]:
             per_page = 50
     except (ValueError, TypeError):
         per_page = 50
