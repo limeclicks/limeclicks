@@ -26,17 +26,20 @@ class AuditFileUploader:
         self.storage = CloudflareR2Storage()
         self.project = site_audit.project
         
-    def upload_audit_files(self, audit_dir: str) -> Dict[str, any]:
+    def upload_audit_files(self, audit_dir: str, use_consolidation: bool = True) -> Dict[str, any]:
         """
-        Upload all CSV files from audit directory to R2.
+        Upload audit files from directory to R2.
+        Can either upload individual CSVs or consolidated Excel files.
         
         Args:
             audit_dir: Path to the directory containing audit CSV files
+            use_consolidation: If True, consolidate CSVs into Excel files before uploading
             
         Returns:
             Dict with upload statistics and results
         """
         from .models import AuditFile
+        from .report_consolidator import AuditReportConsolidator
         
         audit_path = Path(audit_dir)
         if not audit_path.exists():
@@ -47,86 +50,155 @@ class AuditFileUploader:
             "uploaded": [],
             "failed": [],
             "total_size": 0,
-            "file_count": 0
+            "file_count": 0,
+            "consolidation_used": use_consolidation
         }
         
-        # Map filenames to file types
-        file_type_mapping = {
-            'crawl_overview': ['crawl_overview'],
-            'issues_overview': ['issues_overview', 'issues_reports'],
-            'internal_all': ['internal_all', 'internal_html'],
-            'external_all': ['external_all', 'external_html'],
-            'response_codes': ['response_codes', 'client_error', 'server_error'],
-            'page_titles': ['page_titles', 'page_title', 'titles'],
-            'meta_descriptions': ['meta_description', 'meta_desc'],
-            'h1': ['h1_all', 'h1_1', 'h1-all'],
-            'h2': ['h2_all', 'h2_1', 'h2-all'],
-            'images': ['images', 'images_missing_alt'],
-            'canonicals': ['canonical', 'canonicals'],
-            'directives': ['directives', 'robots'],
-            'hreflang': ['hreflang'],
-            'structured_data': ['structured_data', 'schema'],
-            'links': ['links', 'inlinks', 'outlinks'],
-            'javascript': ['javascript', 'js'],
-            'validation': ['validation', 'html_validation'],
-        }
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         
-        # Find all CSV files
-        csv_files = list(audit_path.glob('*.csv'))
-        logger.info(f"Found {len(csv_files)} CSV files to upload")
+        if use_consolidation:
+            # Consolidate CSV files into Excel reports
+            logger.info("Consolidating CSV files into Excel reports...")
+            
+            try:
+                consolidator = AuditReportConsolidator(audit_dir)
+                consolidated_reports = consolidator.consolidate_reports()
+                
+                logger.info(f"Created {len(consolidated_reports)} consolidated Excel reports")
+                
+                # Upload each consolidated report
+                with transaction.atomic():
+                    for filename, excel_data in consolidated_reports.items():
+                        try:
+                            # Determine file type from filename
+                            file_type = self._determine_excel_file_type(filename)
+                            
+                            # Calculate checksum
+                            checksum = hashlib.md5(excel_data).hexdigest()
+                            
+                            # Generate R2 path
+                            r2_path = f"site_audits/{self.project.domain}/{timestamp}/{filename}"
+                            
+                            # Upload to R2
+                            file_obj = io.BytesIO(excel_data)
+                            saved_path = self.storage.save(r2_path, file_obj)
+                            
+                            # Get file size
+                            file_size = len(excel_data)
+                            
+                            # Create database record
+                            audit_file = AuditFile.objects.create(
+                                site_audit=self.site_audit,
+                                file_type=file_type,
+                                original_filename=filename,
+                                r2_path=saved_path,
+                                file_size=file_size,
+                                mime_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                                checksum=checksum
+                            )
+                            
+                            results["uploaded"].append({
+                                "filename": filename,
+                                "r2_path": saved_path,
+                                "size": file_size,
+                                "type": file_type
+                            })
+                            results["total_size"] += file_size
+                            results["file_count"] += 1
+                            
+                            logger.info(f"Uploaded consolidated report {filename} to R2: {saved_path}")
+                            
+                        except Exception as e:
+                            logger.error(f"Failed to upload {filename}: {e}")
+                            results["failed"].append({
+                                "filename": filename,
+                                "error": str(e)
+                            })
+                            
+            except Exception as e:
+                logger.error(f"Failed to consolidate reports: {e}")
+                # Fall back to individual CSV upload
+                use_consolidation = False
+                results["consolidation_error"] = str(e)
         
-        with transaction.atomic():
-            for csv_file in csv_files:
-                try:
-                    # Determine file type
-                    file_type = self._determine_file_type(csv_file.name, file_type_mapping)
-                    
-                    # Calculate checksum
-                    checksum = self._calculate_checksum(csv_file)
-                    
-                    # Generate R2 path with timestamp
-                    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-                    r2_path = f"site_audits/{self.project.domain}/{timestamp}/{csv_file.name}"
-                    
-                    # Read file content
-                    with open(csv_file, 'rb') as f:
-                        file_content = f.read()
-                    
-                    # Upload to R2
-                    file_obj = io.BytesIO(file_content)
-                    saved_path = self.storage.save(r2_path, file_obj)
-                    
-                    # Get file size
-                    file_size = len(file_content)
-                    
-                    # Create database record
-                    audit_file = AuditFile.objects.create(
-                        site_audit=self.site_audit,
-                        file_type=file_type,
-                        original_filename=csv_file.name,
-                        r2_path=saved_path,
-                        file_size=file_size,
-                        mime_type='text/csv',
-                        checksum=checksum
-                    )
-                    
-                    results["uploaded"].append({
-                        "filename": csv_file.name,
-                        "r2_path": saved_path,
-                        "size": file_size,
-                        "type": file_type
-                    })
-                    results["total_size"] += file_size
-                    results["file_count"] += 1
-                    
-                    logger.info(f"Uploaded {csv_file.name} to R2: {saved_path}")
-                    
-                except Exception as e:
-                    logger.error(f"Failed to upload {csv_file.name}: {e}")
-                    results["failed"].append({
-                        "filename": csv_file.name,
-                        "error": str(e)
-                    })
+        # If not using consolidation or consolidation failed, upload individual CSVs
+        if not use_consolidation:
+            # Original CSV upload logic
+            file_type_mapping = {
+                'crawl_overview': ['crawl_overview'],
+                'issues_overview': ['issues_overview', 'issues_reports'],
+                'internal_all': ['internal_all', 'internal_html'],
+                'external_all': ['external_all', 'external_html'],
+                'response_codes': ['response_codes', 'client_error', 'server_error'],
+                'page_titles': ['page_titles', 'page_title', 'titles'],
+                'meta_descriptions': ['meta_description', 'meta_desc'],
+                'h1': ['h1_all', 'h1_1', 'h1-all'],
+                'h2': ['h2_all', 'h2_1', 'h2-all'],
+                'images': ['images', 'images_missing_alt'],
+                'canonicals': ['canonical', 'canonicals'],
+                'directives': ['directives', 'robots'],
+                'hreflang': ['hreflang'],
+                'structured_data': ['structured_data', 'schema'],
+                'links': ['links', 'inlinks', 'outlinks'],
+                'javascript': ['javascript', 'js'],
+                'validation': ['validation', 'html_validation'],
+            }
+            
+            # Find all CSV files
+            csv_files = list(audit_path.glob('*.csv'))
+            logger.info(f"Found {len(csv_files)} CSV files to upload")
+            
+            with transaction.atomic():
+                for csv_file in csv_files:
+                    try:
+                        # Determine file type
+                        file_type = self._determine_file_type(csv_file.name, file_type_mapping)
+                        
+                        # Calculate checksum
+                        checksum = self._calculate_checksum(csv_file)
+                        
+                        # Generate R2 path with timestamp
+                        r2_path = f"site_audits/{self.project.domain}/{timestamp}/{csv_file.name}"
+                        
+                        # Read file content
+                        with open(csv_file, 'rb') as f:
+                            file_content = f.read()
+                        
+                        # Upload to R2
+                        file_obj = io.BytesIO(file_content)
+                        saved_path = self.storage.save(r2_path, file_obj)
+                        
+                        # Get file size
+                        file_size = len(file_content)
+                        
+                        # Create database record
+                        audit_file = AuditFile.objects.create(
+                            site_audit=self.site_audit,
+                            file_type=file_type,
+                            original_filename=csv_file.name,
+                            r2_path=saved_path,
+                            file_size=file_size,
+                            mime_type='text/csv',
+                            checksum=checksum
+                        )
+                        
+                        results["uploaded"].append({
+                            "filename": csv_file.name,
+                            "r2_path": saved_path,
+                            "size": file_size,
+                            "type": file_type
+                        })
+                        results["total_size"] += file_size
+                        results["file_count"] += 1
+                        
+                        logger.info(f"Uploaded {csv_file.name} to R2: {saved_path}")
+                        
+                    except Exception as e:
+                        logger.error(f"Failed to upload {csv_file.name}: {e}")
+                        results["failed"].append({
+                            "filename": csv_file.name,
+                            "error": str(e)
+                        })
         
         # Apply retention policy after successful upload
         if results["file_count"] > 0:
@@ -144,6 +216,31 @@ class AuditFileUploader:
                     return file_type
         
         return 'other'
+    
+    def _determine_excel_file_type(self, filename: str) -> str:
+        """Determine file type for consolidated Excel reports"""
+        filename_lower = filename.lower()
+        
+        if 'technical_seo' in filename_lower:
+            return 'technical_seo_audit'
+        elif 'content_optimization' in filename_lower:
+            return 'content_optimization'
+        elif 'technical_configuration' in filename_lower:
+            return 'technical_config'
+        elif 'media' in filename_lower or 'resource' in filename_lower:
+            return 'media_analysis'
+        elif 'link_analysis' in filename_lower:
+            return 'link_analysis'
+        elif 'performance' in filename_lower:
+            return 'page_performance'
+        elif 'security' in filename_lower:
+            return 'security'
+        elif 'validation' in filename_lower:
+            return 'validation'
+        elif 'summary' in filename_lower:
+            return 'audit_summary'
+        else:
+            return 'other'
     
     def _calculate_checksum(self, file_path: Path) -> str:
         """Calculate MD5 checksum of a file"""

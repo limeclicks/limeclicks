@@ -160,18 +160,8 @@ def run_site_audit(self, site_audit_id: int) -> dict:
                     'message': str(e)
                 }
             
-            # Trigger PageSpeed Insights collection in parallel
-            try:
-                psi_task = collect_pagespeed_insights.apply_async(
-                    args=[site_audit.id],
-                    queue='audit_scheduled',
-                    priority=4  # Slightly lower priority than main audit
-                )
-                logger.info(f"PageSpeed Insights task triggered: {psi_task.id}")
-                result['psi_task_id'] = psi_task.id
-            except Exception as e:
-                logger.warning(f"Failed to trigger PageSpeed Insights collection: {e}")
-                result['psi_error'] = str(e)
+            # PageSpeed Insights is now triggered separately in parallel
+            # No longer triggered from within this task to enable simultaneous execution
             
             return result
             
@@ -286,74 +276,35 @@ def trigger_manual_site_audit(self, project_id: int) -> dict:
     site_audit.status = 'pending'
     site_audit.save(update_fields=['last_manual_audit', 'status'])
     
-    # Enqueue the actual audit task
-    task = run_site_audit.apply_async(
+    # Enqueue both audit tasks simultaneously
+    site_audit_task = run_site_audit.apply_async(
         args=[site_audit.id],
         queue='audit_scheduled',  # Match the configured queue routing
         priority=5
     )
     
-    logger.info(f"Manual site audit triggered for {project.domain}, task_id={task.id}")
+    psi_task = collect_pagespeed_insights.apply_async(
+        args=[site_audit.id],
+        queue='audit_scheduled',  # Same queue for simultaneous execution
+        priority=5  # Same priority for parallel execution
+    )
+    
+    logger.info(f"Manual site audit triggered for {project.domain}, task_id={site_audit_task.id}")
+    logger.info(f"Manual PageSpeed audit triggered for {project.domain}, task_id={psi_task.id}")
     
     return {
         "status": "triggered",
-        "task_id": task.id,
+        "site_audit_task_id": site_audit_task.id,
+        "psi_task_id": psi_task.id,
         "site_audit_id": site_audit.id,
-        "message": f"Site audit started for {project.domain}"
+        "message": f"Site audit and PageSpeed audit started for {project.domain}"
     }
 
 
-@shared_task
-def enqueue_scheduled_site_audits():
-    """
-    Celery Beat task to enqueue scheduled site audits.
-    Runs daily and enqueues audits that are due.
-    
-    This task itself is quick, just identifies and enqueues the actual audit tasks.
-    """
-    now = timezone.now()
-    
-    # Find site audits that are due for automatic audit
-    due_audits = SiteAudit.objects.filter(
-        is_audit_enabled=True,
-        next_scheduled_audit__lte=now
-    ).select_related('project')[:10]  # Process max 10 per run to avoid overload
-    
-    if not due_audits:
-        logger.info("No site audits are due")
-        return {"total": 0}
-    
-    enqueued_count = 0
-    
-    for site_audit in due_audits:
-        # Check if project is active
-        if not site_audit.project.active:
-            logger.info(f"Skipping audit for inactive project: {site_audit.project.domain}")
-            continue
-        
-        # Update next scheduled audit immediately to prevent duplicate enqueuing
-        site_audit.next_scheduled_audit = now + timedelta(days=site_audit.audit_frequency_days)
-        site_audit.save(update_fields=['next_scheduled_audit'])
-        
-        # Enqueue the audit task
-        task = run_site_audit.apply_async(
-            args=[site_audit.id],
-            queue='audit_scheduled',
-            priority=3  # Lower priority than manual audits
-        )
-        
-        logger.info(
-            f"Scheduled site audit enqueued for {site_audit.project.domain}, "
-            f"task_id={task.id}"
-        )
-        enqueued_count += 1
-    
-    logger.info(f"Enqueued {enqueued_count} scheduled site audits")
-    
-    return {
-        "total": enqueued_count,
-        "projects": [audit.project.domain for audit in due_audits[:enqueued_count]]
-    }
+# REMOVED: enqueue_scheduled_site_audits task
+# Site audits are now only triggered:
+# 1. Automatically when a project is first created (via signal)
+# 2. Manually by users through the UI
 
 
 @shared_task(
@@ -754,19 +705,26 @@ def create_site_audit_for_new_project(self, project_id: int) -> dict:
             site_audit.save()
             logger.info(f"Using existing SiteAudit id={site_audit.id} for project {project.domain}")
         
-        # Trigger the site audit
-        result = run_site_audit.apply_async(
+        # Trigger both site audit and PageSpeed audit simultaneously
+        site_audit_result = run_site_audit.apply_async(
             args=[site_audit.id],
             queue='audit_high_priority'  # Use high priority queue
         )
         
-        logger.info(f"Triggered HIGH PRIORITY site audit task {result.id} for project {project.domain}")
+        psi_result = collect_pagespeed_insights.apply_async(
+            args=[site_audit.id],
+            queue='audit_high_priority'  # Use same high priority queue for simultaneous execution
+        )
+        
+        logger.info(f"Triggered HIGH PRIORITY site audit task {site_audit_result.id} for project {project.domain}")
+        logger.info(f"Triggered HIGH PRIORITY PageSpeed audit task {psi_result.id} for project {project.domain}")
         
         return {
             "status": "success",
             "site_audit_id": site_audit.id,
-            "task_id": result.id,
-            "message": f"Site audit created and triggered for {project.domain}"
+            "site_audit_task_id": site_audit_result.id,
+            "psi_task_id": psi_result.id,
+            "message": f"Site audit and PageSpeed audit created and triggered for {project.domain}"
         }
         
     except Exception as e:

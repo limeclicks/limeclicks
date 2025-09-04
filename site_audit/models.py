@@ -21,17 +21,19 @@ class SiteAudit(models.Model):
     )
     
     # Audit settings
+    # DEPRECATED: audit_frequency_days - No longer used, kept for backward compatibility
     audit_frequency_days = models.IntegerField(
         default=30,
-        help_text="Days between automatic audits (minimum 30)"
+        help_text="DEPRECATED - Automatic audits no longer run on schedule"
     )
     manual_audit_frequency_days = models.IntegerField(
         default=1,
         help_text="Days between manual audits (minimum 1)"
     )
+    # DEPRECATED: is_audit_enabled - No longer used, kept for backward compatibility
     is_audit_enabled = models.BooleanField(
-        default=True,
-        help_text="Enable/disable automatic audits"
+        default=False,
+        help_text="DEPRECATED - Automatic scheduled audits are disabled"
     )
     max_pages_to_crawl = models.IntegerField(
         default=5000,
@@ -39,8 +41,10 @@ class SiteAudit(models.Model):
     )
     
     # Rate limiting
+    # DEPRECATED: last_automatic_audit - No longer used
     last_automatic_audit = models.DateTimeField(null=True, blank=True)
     last_manual_audit = models.DateTimeField(null=True, blank=True)
+    # DEPRECATED: next_scheduled_audit - No longer used
     next_scheduled_audit = models.DateTimeField(null=True, blank=True)
     
     # Latest audit summary
@@ -128,19 +132,17 @@ class SiteAudit(models.Model):
         verbose_name = 'On-Page Audit'
         verbose_name_plural = 'On-Page Audits'
         indexes = [
-            models.Index(fields=['next_scheduled_audit']),
-            models.Index(fields=['is_audit_enabled', 'next_scheduled_audit']),
+            # Removed scheduling-related indexes as automatic audits are disabled
+            models.Index(fields=['project', 'status']),
+            models.Index(fields=['last_audit_date']),
         ]
     
     def __str__(self):
         return f"On-Page Audit for {self.project.domain}"
     
     def can_run_automatic_audit(self):
-        """Check if automatic audit can be run (30 day limit)"""
-        if not self.last_automatic_audit:
-            return True
-        time_since_last = timezone.now() - self.last_automatic_audit
-        return time_since_last >= timedelta(days=self.audit_frequency_days)
+        """DEPRECATED - Automatic scheduled audits are disabled"""
+        return False  # Always return False as scheduled audits are disabled
     
     def can_run_manual_audit(self):
         """Check if manual audit can be run (3 day limit)"""
@@ -150,10 +152,8 @@ class SiteAudit(models.Model):
         return time_since_last >= timedelta(days=self.manual_audit_frequency_days)
     
     def schedule_next_audit(self):
-        """Schedule the next automatic audit"""
-        if self.is_audit_enabled:
-            self.next_scheduled_audit = timezone.now() + timedelta(days=self.audit_frequency_days)
-            self.save(update_fields=['next_scheduled_audit'])
+        """DEPRECATED - Automatic scheduled audits are disabled"""
+        pass  # Do nothing as scheduled audits are disabled
         
     def update_from_audit_results(self, crawl_results):
         """Update summary from latest audit results - updated for overview JSON"""
@@ -630,6 +630,7 @@ class AuditFile(models.Model):
     """Track audit files uploaded to R2 storage"""
     
     FILE_TYPE_CHOICES = [
+        # Individual CSV reports
         ('crawl_overview', 'Crawl Overview'),
         ('issues_overview', 'Issues Overview'),
         ('internal_all', 'Internal All'),
@@ -647,6 +648,15 @@ class AuditFile(models.Model):
         ('links', 'Links'),
         ('javascript', 'JavaScript'),
         ('validation', 'Validation'),
+        # Consolidated Excel reports
+        ('technical_seo_audit', 'Technical SEO Audit'),
+        ('content_optimization', 'Content Optimization'),
+        ('technical_config', 'Technical Configuration'),
+        ('media_analysis', 'Media Analysis'),
+        ('link_analysis', 'Link Analysis'),
+        ('page_performance', 'Page Performance'),
+        ('security', 'Security & HTTPS'),
+        ('audit_summary', 'Audit Summary'),
         ('other', 'Other'),
     ]
     

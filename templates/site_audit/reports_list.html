@@ -1,0 +1,396 @@
+{% extends "dashboard_base.html" %}
+{% load static %}
+
+{% block title %}Site Audit Reports - LimeClicks{% endblock %}
+{% block page_title %}Site Audit Reports{% endblock %}
+
+{% block extra_head %}
+<style>
+    .file-card {
+        transition: all 0.2s ease;
+        cursor: pointer;
+    }
+    
+    .file-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+    
+    .file-icon {
+        width: 48px;
+        height: 48px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 12px;
+    }
+    
+    .health-score-ring {
+        position: relative;
+        width: 120px;
+        height: 120px;
+    }
+    
+    .health-score-text {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        font-size: 2rem;
+        font-weight: bold;
+    }
+    
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .report-item {
+        animation: fadeIn 0.3s ease;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto">
+    <!-- Header Section -->
+    <div class="mb-8">
+        <div class="flex items-center justify-between mb-6">
+            <div>
+                <h1 class="text-3xl font-bold text-base-content">Site Audit Reports</h1>
+                <p class="text-base-content/60 mt-1">Download CSV reports from your site audits</p>
+            </div>
+        </div>
+        
+        <!-- Project Selector Card -->
+        <div class="card bg-base-100 shadow-sm border border-base-300">
+            <div class="card-body">
+                <div class="flex items-center gap-4">
+                    <label class="text-sm font-semibold text-base-content">Select Project:</label>
+                    <select 
+                        id="project-selector" 
+                        class="select select-bordered flex-1 max-w-md"
+                        onchange="loadProjectReports(this.value)"
+                    >
+                        <option value="">Choose a project...</option>
+                        {% for project in projects %}
+                        <option value="{{ project.id }}" {% if project.id|stringformat:"s" == selected_project_id %}selected{% endif %}>
+                            {{ project.domain }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                    {% if selected_project %}
+                    <button 
+                        class="btn btn-primary btn-sm"
+                        onclick="downloadAllReports({{ selected_project.id }})"
+                        id="download-all-btn"
+                        {% if not has_audit %}disabled{% endif %}
+                    >
+                        <i class="fas fa-download mr-2"></i>
+                        Download All as ZIP
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Reports Content -->
+    <div id="reports-content">
+        {% if selected_project %}
+        <!-- Audit Summary Card -->
+        <div id="audit-summary" class="card bg-base-100 shadow-sm border border-base-300 mb-6" style="display: none;">
+            <div class="card-body">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 class="text-xl font-bold mb-2">Latest Audit Summary</h2>
+                        <div class="flex gap-6">
+                            <div>
+                                <p class="text-sm text-base-content/60">Audit Date</p>
+                                <p class="font-semibold" id="audit-date">-</p>
+                            </div>
+                            <div>
+                                <p class="text-sm text-base-content/60">Pages Crawled</p>
+                                <p class="font-semibold" id="pages-crawled">-</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="health-score-ring">
+                        <div class="radial-progress text-primary" id="health-score-progress" style="--value:0; --size:120px;">
+                            <div class="health-score-text" id="health-score">-</div>
+                        </div>
+                        <p class="text-center text-sm text-base-content/60 mt-2">Health Score</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Files Grid -->
+        <div id="files-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <!-- Files will be loaded here dynamically -->
+        </div>
+        
+        <!-- Loading State -->
+        <div id="loading-state" class="text-center py-12" style="display: none;">
+            <div class="loading loading-spinner loading-lg text-primary mx-auto mb-4"></div>
+            <p class="text-base-content/60">Loading reports...</p>
+        </div>
+        
+        <!-- Empty State -->
+        <div id="empty-state" class="text-center py-12" style="display: none;">
+            <div class="w-20 h-20 bg-base-200 rounded-full flex items-center justify-center mx-auto mb-4">
+                <i class="fas fa-file-csv text-2xl text-base-content/40"></i>
+            </div>
+            <h3 class="text-lg font-semibold mb-2">No Reports Available</h3>
+            <p class="text-base-content/60">
+                {% if selected_project %}
+                No completed audits found for {{ selected_project.domain }}
+                {% else %}
+                Select a project to view available reports
+                {% endif %}
+            </p>
+        </div>
+        {% else %}
+        <!-- No Project Selected -->
+        <div class="text-center py-12">
+            <div class="w-20 h-20 bg-base-200 rounded-full flex items-center justify-center mx-auto mb-4">
+                <i class="fas fa-folder-open text-2xl text-base-content/40"></i>
+            </div>
+            <h3 class="text-lg font-semibold mb-2">Select a Project</h3>
+            <p class="text-base-content/60">Choose a project from the dropdown above to view available audit reports</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+    // Get CSRF token
+    function getCookie(name) {
+        const m = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
+        return m ? m.pop() : '';
+    }
+    
+    // Load project reports
+    async function loadProjectReports(projectId) {
+        if (!projectId) {
+            // Redirect to clear selection
+            window.location.href = '/site-audit/reports/';
+            return;
+        }
+        
+        // Update URL with selected project
+        const url = new URL(window.location);
+        url.searchParams.set('project', projectId);
+        window.history.pushState({}, '', url);
+        
+        // Show loading state
+        document.getElementById('loading-state').style.display = 'block';
+        document.getElementById('empty-state').style.display = 'none';
+        document.getElementById('files-grid').innerHTML = '';
+        
+        if (document.getElementById('audit-summary')) {
+            document.getElementById('audit-summary').style.display = 'none';
+        }
+        
+        try {
+            const response = await fetch(`/site-audit/reports/project/${projectId}/files/`);
+            const data = await response.json();
+            
+            document.getElementById('loading-state').style.display = 'none';
+            
+            if (data.success && data.files.length > 0) {
+                // Update summary
+                displayAuditSummary(data);
+                
+                // Display files
+                displayFiles(data.files);
+            } else {
+                document.getElementById('empty-state').style.display = 'block';
+            }
+        } catch (error) {
+            console.error('Error loading reports:', error);
+            document.getElementById('loading-state').style.display = 'none';
+            document.getElementById('empty-state').style.display = 'block';
+        }
+    }
+    
+    // Display audit summary
+    function displayAuditSummary(data) {
+        const summaryCard = document.getElementById('audit-summary');
+        if (summaryCard) {
+            summaryCard.style.display = 'block';
+            
+            document.getElementById('audit-date').textContent = data.audit_date || '-';
+            document.getElementById('pages-crawled').textContent = data.total_pages_crawled || '-';
+            
+            const healthScore = data.health_score || 0;
+            document.getElementById('health-score').textContent = healthScore ? healthScore.toFixed(1) : '-';
+            
+            // Update radial progress
+            const progress = document.getElementById('health-score-progress');
+            progress.style.setProperty('--value', healthScore);
+            
+            // Set color based on score
+            if (healthScore >= 80) {
+                progress.className = 'radial-progress text-success';
+            } else if (healthScore >= 60) {
+                progress.className = 'radial-progress text-warning';
+            } else {
+                progress.className = 'radial-progress text-error';
+            }
+        }
+    }
+    
+    // Display files grid
+    function displayFiles(files) {
+        const grid = document.getElementById('files-grid');
+        grid.innerHTML = '';
+        
+        // Group files by category
+        const categories = {
+            'Overview': ['crawl_overview', 'issues_overview'],
+            'URLs': ['internal_all', 'external_all', 'response_codes'],
+            'Meta Data': ['page_titles', 'meta_descriptions', 'h1', 'h2'],
+            'Technical': ['images', 'canonicals', 'directives', 'hreflang', 'structured_data'],
+            'Other': ['links', 'javascript', 'validation', 'other']
+        };
+        
+        files.forEach((file, index) => {
+            // Determine category and icon
+            let category = 'Other';
+            let iconClass = 'fa-file-csv';
+            let bgColor = 'bg-base-200';
+            
+            for (const [cat, types] of Object.entries(categories)) {
+                if (types.includes(file.type)) {
+                    category = cat;
+                    break;
+                }
+            }
+            
+            // Set icon based on file type
+            const iconMap = {
+                'crawl_overview': { icon: 'fa-chart-line', color: 'bg-primary/20 text-primary' },
+                'issues_overview': { icon: 'fa-exclamation-triangle', color: 'bg-warning/20 text-warning' },
+                'internal_all': { icon: 'fa-sitemap', color: 'bg-info/20 text-info' },
+                'external_all': { icon: 'fa-external-link-alt', color: 'bg-secondary/20 text-secondary' },
+                'response_codes': { icon: 'fa-server', color: 'bg-error/20 text-error' },
+                'page_titles': { icon: 'fa-heading', color: 'bg-success/20 text-success' },
+                'meta_descriptions': { icon: 'fa-align-left', color: 'bg-accent/20 text-accent' },
+                'images': { icon: 'fa-image', color: 'bg-primary/20 text-primary' },
+            };
+            
+            const iconConfig = iconMap[file.type] || { icon: 'fa-file-csv', color: 'bg-base-200' };
+            
+            const fileCard = document.createElement('div');
+            fileCard.className = 'card bg-base-100 shadow-sm border border-base-300 file-card report-item';
+            fileCard.style.animationDelay = `${index * 50}ms`;
+            
+            fileCard.innerHTML = `
+                <div class="card-body p-4">
+                    <div class="flex items-start gap-4">
+                        <div class="file-icon ${iconConfig.color}">
+                            <i class="fas ${iconConfig.icon} text-xl"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="font-semibold text-base-content truncate">${file.display_name}</h3>
+                            <p class="text-sm text-base-content/60 truncate">${file.original_filename}</p>
+                            <div class="flex items-center gap-3 mt-2 text-xs text-base-content/50">
+                                <span><i class="fas fa-file-alt mr-1"></i>${file.size}</span>
+                                <span><i class="fas fa-clock mr-1"></i>${file.uploaded_at}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-4 flex justify-end">
+                        <a 
+                            href="${file.download_url}" 
+                            class="btn btn-primary btn-sm"
+                            download
+                        >
+                            <i class="fas fa-download mr-2"></i>
+                            Download
+                        </a>
+                    </div>
+                </div>
+            `;
+            
+            grid.appendChild(fileCard);
+        });
+    }
+    
+    // Download all reports as ZIP
+    async function downloadAllReports(projectId) {
+        const btn = document.getElementById('download-all-btn');
+        if (!btn) return;
+        
+        // Show loading state
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Preparing ZIP...';
+        btn.disabled = true;
+        
+        try {
+            const response = await fetch(`/site-audit/reports/project/${projectId}/download-all/`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCookie('csrftoken')
+                }
+            });
+            
+            if (response.ok) {
+                // Download the file
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = url;
+                
+                // Extract filename from response headers or use default
+                const contentDisposition = response.headers.get('content-disposition');
+                const filenameMatch = contentDisposition && contentDisposition.match(/filename="(.+)"/);
+                const filename = filenameMatch ? filenameMatch[1] : 'site_audit_reports.zip';
+                
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+                
+                // Show success message
+                showNotification('ZIP file downloaded successfully', 'success');
+            } else {
+                throw new Error('Failed to download ZIP');
+            }
+        } catch (error) {
+            console.error('Error downloading ZIP:', error);
+            showNotification('Failed to download ZIP file', 'error');
+        } finally {
+            // Restore button
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+        }
+    }
+    
+    // Show notification
+    function showNotification(message, type = 'info') {
+        const toast = document.createElement('div');
+        toast.className = `alert alert-${type === 'success' ? 'success' : 'error'} fixed top-4 right-4 z-50 max-w-sm shadow-lg`;
+        toast.innerHTML = `
+            <div>
+                <span>${message}</span>
+            </div>
+        `;
+        document.body.appendChild(toast);
+        
+        setTimeout(() => {
+            toast.remove();
+        }, 5000);
+    }
+    
+    // Load reports on page load if project is selected
+    {% if selected_project %}
+    document.addEventListener('DOMContentLoaded', () => {
+        loadProjectReports({{ selected_project.id }});
+    });
+    {% endif %}
+</script>
+{% endblock %}

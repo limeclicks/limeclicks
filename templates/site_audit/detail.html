@@ -274,7 +274,11 @@
                     <i class="fas fa-download mr-2"></i>
                     Export Report
                 </button>
-                <button class="btn btn-ghost btn-sm">
+                <button 
+                    class="btn btn-ghost btn-sm"
+                    onclick="triggerRerunAudit({{ audit.project.id }})"
+                    id="rerun-audit-btn"
+                >
                     <i class="fas fa-sync-alt mr-2"></i>
                     Re-run Audit
                 </button>
@@ -495,5 +499,84 @@
     document.addEventListener('htmx:responseError', function(evt) {
         console.error('HTMX error:', evt.detail);
     });
+    
+    // Function to trigger re-run audit
+    async function triggerRerunAudit(projectId) {
+        const btn = document.getElementById('rerun-audit-btn');
+        if (!btn) return;
+        
+        // Confirm with user
+        if (!confirm('Are you sure you want to re-run the audit for this project? This may take several minutes.')) {
+            return;
+        }
+        
+        // Update button to show loading
+        const originalHTML = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Triggering Audit...';
+        btn.disabled = true;
+        
+        try {
+            // Get CSRF token
+            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || 
+                           getCookie('csrftoken');
+            
+            const response = await fetch(`/site-audit/trigger/${projectId}/`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken
+                },
+                body: JSON.stringify({ manual: true })
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                // Show success message
+                showNotification('Audit triggered successfully! Redirecting to audit list...', 'success');
+                
+                // Redirect to audit list after 2 seconds
+                setTimeout(() => {
+                    window.location.href = '/site-audit/';
+                }, 2000);
+            } else {
+                // Show error message
+                showNotification(data.message || 'Failed to trigger audit', 'error');
+                
+                // Restore button
+                btn.innerHTML = originalHTML;
+                btn.disabled = false;
+            }
+        } catch (error) {
+            console.error('Error triggering audit:', error);
+            showNotification('An error occurred while triggering the audit', 'error');
+            
+            // Restore button
+            btn.innerHTML = originalHTML;
+            btn.disabled = false;
+        }
+    }
+    
+    // Helper function to get cookie
+    function getCookie(name) {
+        const m = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
+        return m ? m.pop() : '';
+    }
+    
+    // Show notification
+    function showNotification(message, type = 'info') {
+        const toast = document.createElement('div');
+        toast.className = `alert alert-${type === 'success' ? 'success' : 'error'} fixed top-4 right-4 z-50 max-w-sm shadow-lg`;
+        toast.innerHTML = `
+            <div>
+                <span>${message}</span>
+            </div>
+        `;
+        document.body.appendChild(toast);
+        
+        setTimeout(() => {
+            toast.remove();
+        }, 5000);
+    }
 </script>
 {% endblock %}

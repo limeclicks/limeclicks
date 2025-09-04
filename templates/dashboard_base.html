@@ -472,9 +472,15 @@
                         <span class="text-xs uppercase font-semibold text-base-content/60">On Page & Tech SEO</span>
                     </li>
                     <li>
-                        <a href="{% url 'site_audit:list' %}" class="flex items-center gap-3 {% if request.resolver_match.app_name == 'site_audit' %}active{% endif %}">
+                        <a href="{% url 'site_audit:list' %}" class="flex items-center gap-3 {% if request.resolver_match.app_name == 'site_audit' and request.resolver_match.url_name != 'reports_list' %}active{% endif %}">
                             <i class="fas fa-search-location w-4"></i>
                             <span>Site Audits</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="{% url 'site_audit:reports_list' %}" class="flex items-center gap-3 {% if request.resolver_match.url_name == 'reports_list' %}active{% endif %}">
+                            <i class="fas fa-file-csv w-4"></i>
+                            <span>Audit Reports</span>
                         </a>
                     </li>
 
