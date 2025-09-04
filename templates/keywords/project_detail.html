@@ -1590,7 +1590,7 @@
         try {
             // Send requests for each selected keyword
             const promises = Array.from(selectedKeywords).map(keywordId => 
-                fetch(`/keywords/api/force-crawl/${keywordId}/`, {
+                fetch(`/keywords/api/keyword/${keywordId}/force-crawl/`, {
                     method: 'POST',
                     headers: {
                         'X-CSRFToken': getCookie('csrftoken'),
@@ -1690,7 +1690,7 @@
         try {
             // Send delete requests for each selected keyword
             const promises = Array.from(selectedKeywords).map(keywordId => 
-                fetch(`/keywords/api/delete/${keywordId}/`, {
+                fetch(`/keywords/api/keyword/${keywordId}/delete/`, {
                     method: 'POST',
                     headers: {
                         'X-CSRFToken': getCookie('csrftoken'),
