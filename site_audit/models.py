@@ -181,9 +181,19 @@ class SiteAudit(models.Model):
                 audit.delete()
     
     def calculate_overall_score(self):
-        """Calculate overall site health score based on database issues"""
+        """
+        Calculate overall site health score based on database issues.
+        
+        Scoring Philosophy:
+        - Healthy (80-100): Few or no critical/high issues, mostly low issues
+        - Good (60-79): Some critical/high issues but manageable, balanced mix
+        - Needs Attention (40-59): Significant critical/high issues
+        - Critical (20-39): Many critical/high issues requiring immediate attention
+        - Severe (0-19): Overwhelming number of critical issues
+        """
         from site_audit.models import SiteIssue
         from django.db.models import Count
+        import math
         
         # Get issues from database
         issues = SiteIssue.objects.filter(site_audit=self)
@@ -212,44 +222,107 @@ class SiteAudit(models.Model):
             elif item['severity'] == 'low':
                 low_issues = item['count']
         
-        # Calculate weighted issue score with stronger penalties
-        # Critical = 10 points, High = 5 points, Medium = 2 points, Low = 1 point
-        weighted_issues = (critical_issues * 10) + (high_issues * 5) + (medium_issues * 2) + (low_issues * 1)
+        total_issues = critical_issues + high_issues + medium_issues + low_issues
+        pages_crawled = max(self.total_pages_crawled or 1, 1)
         
-        # Calculate health score based on weighted issues
-        if self.total_pages_crawled and self.total_pages_crawled > 0:
-            # Normalize by pages crawled
-            issues_per_page = weighted_issues / self.total_pages_crawled
-            
-            # More aggressive deduction: each weighted issue point per page reduces score by 20 points
-            deduction = issues_per_page * 20
-            self.overall_site_health_score = max(0, min(100, 100 - deduction))
+        # Calculate weighted score using logarithmic scaling for more balanced results
+        # This prevents sites from immediately dropping to zero
+        
+        # 1. Base score calculation using weighted severities
+        # Use logarithmic scaling to soften the impact of high issue counts
+        critical_weight = 3.0
+        high_weight = 1.5
+        medium_weight = 0.5
+        low_weight = 0.1
+        
+        # Calculate weighted issues with logarithmic dampening
+        if critical_issues > 0:
+            critical_score = math.log(critical_issues + 1) * critical_weight
         else:
-            # If no pages crawled, base on absolute issues
-            if weighted_issues == 0:
-                self.overall_site_health_score = 100
-            elif weighted_issues <= 5:
-                self.overall_site_health_score = 90
-            elif weighted_issues <= 10:
-                self.overall_site_health_score = 75
-            elif weighted_issues <= 20:
-                self.overall_site_health_score = 60
-            else:
-                self.overall_site_health_score = max(0, 100 - (weighted_issues * 2))
-
+            critical_score = 0
+            
         if high_issues > 0:
-            if high_issues >= 5:
-                # 5+ high issues = critical (max 40%)
-                self.overall_site_health_score = min(self.overall_site_health_score, 40)
-            elif high_issues >= 2:
-                # 2-4 high issues = needs attention (max 60%)  
-                self.overall_site_health_score = min(self.overall_site_health_score, 60)
-            else:
-                # 1 high issue = slight penalty (max 75%)
-                self.overall_site_health_score = min(self.overall_site_health_score, 75)
+            high_score = math.log(high_issues + 1) * high_weight
+        else:
+            high_score = 0
+            
+        if medium_issues > 0:
+            medium_score = math.log(medium_issues + 1) * medium_weight
+        else:
+            medium_score = 0
+            
+        if low_issues > 0:
+            low_score = math.log(low_issues + 1) * low_weight
+        else:
+            low_score = 0
         
-        # Round to 1 decimal place
-        self.overall_site_health_score = round(self.overall_site_health_score, 1)
+        # Total weighted score
+        total_weighted = critical_score + high_score + medium_score + low_score
+        
+        # 2. Normalize by pages crawled (also with logarithmic scaling)
+        pages_factor = math.log(pages_crawled + 1) / 2
+        normalized_score = total_weighted / max(pages_factor, 1)
+        
+        # 3. Convert to 0-100 scale using inverse exponential
+        # This ensures a more gradual decrease in score
+        score = 100 * math.exp(-normalized_score / 10)
+        
+        # 4. Apply composition-based adjustments for better categorization
+        severe_issues = critical_issues + high_issues
+        severe_ratio = severe_issues / total_issues if total_issues > 0 else 0
+        
+        # Bonus/penalty based on issue composition
+        if critical_issues == 0 and high_issues == 0:
+            # No severe issues - significant bonus
+            score = min(100, score + 20)
+        elif critical_issues == 0 and high_issues < 5:
+            # Very few high issues - moderate bonus
+            score = min(100, score + 10)
+        elif severe_ratio > 0.8:
+            # Mostly severe issues - moderate penalty
+            score = max(0, score - 10)
+        elif severe_ratio > 0.6:
+            # Many severe issues - small penalty
+            score = max(0, score - 5)
+        
+        # 5. Issue density adjustment (issues per page)
+        issues_per_page = total_issues / pages_crawled
+        
+        if issues_per_page < 0.5:
+            # Very low issue density - bonus
+            score = min(100, score + 10)
+        elif issues_per_page < 1:
+            # Low issue density - small bonus
+            score = min(100, score + 5)
+        elif issues_per_page > 5:
+            # High issue density - penalty
+            score = max(0, score - 10)
+        elif issues_per_page > 3:
+            # Moderate issue density - small penalty
+            score = max(0, score - 5)
+        
+        # 6. Set minimum scores based on severity to ensure differentiation
+        if critical_issues == 0:
+            # No critical issues - minimum score of 25
+            score = max(25, score)
+        elif critical_issues <= 10:
+            # Few critical issues - minimum score of 15
+            score = max(15, score)
+        elif critical_issues <= 50:
+            # Moderate critical issues - minimum score of 8
+            score = max(8, score)
+        else:
+            # Many critical issues - minimum score of 3
+            score = max(3, score)
+        
+        # 7. Add small variation for differentiation between similar sites
+        # This helps avoid identical scores
+        hash_value = hash(f"{self.project.domain}{total_issues}")
+        variation = (abs(hash_value) % 100) / 100.0  # 0-0.99 variation
+        score = score + variation
+        
+        # Final bounds check and rounding
+        self.overall_site_health_score = round(max(0, min(100, score)), 1)
     
     def get_total_issues_count(self):
         """Get total issues count from database only"""
