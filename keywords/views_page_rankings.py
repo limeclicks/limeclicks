@@ -62,16 +62,16 @@ def page_rankings_data(request):
     # Apply search filter
     if search_query:
         keywords = keywords.filter(
-            Q(page_url__icontains=search_query) |
+            Q(rank_url__icontains=search_query) |
             Q(keyword__icontains=search_query)
         )
     
     # Group by page URL and get counts
     page_data = {}
     for keyword in keywords:
-        if keyword.page_url:
+        if keyword.rank_url:
             # Clean up the URL for grouping
-            page_url = keyword.page_url.strip()
+            page_url = keyword.rank_url.strip()
             
             if page_url not in page_data:
                 page_data[page_url] = {
@@ -218,7 +218,7 @@ def page_keywords_detail(request):
         Q(project__user=request.user) |
         Q(project__members=request.user)
     ).filter(
-        page_url=page_url,
+        rank_url=page_url,
         archive=False,
         rank__gt=0,
         rank__lte=100
