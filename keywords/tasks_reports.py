@@ -56,7 +56,12 @@ def generate_keyword_report(self, report_id: int) -> Dict[str, Any]:
         
         # Upload CSV if generated
         if 'csv_content' in results:
-            csv_filename = f"{report.project.domain}_{report.start_date.strftime('%Y%m%d')}_{report.end_date.strftime('%Y%m%d')}.csv"
+            # Generate filename based on report type
+            if report.start_date and report.end_date:
+                csv_filename = f"{report.project.domain}_{report.start_date.strftime('%Y%m%d')}_{report.end_date.strftime('%Y%m%d')}.csv"
+            else:
+                # For reports without date ranges (page_rankings, top_competitors, etc.)
+                csv_filename = f"{report.project.domain}_{report.report_type}_{timestamp}.csv"
             csv_key = f"{base_path}/{csv_filename}"
             
             upload_result = r2_service.upload_file(
@@ -79,7 +84,12 @@ def generate_keyword_report(self, report_id: int) -> Dict[str, Any]:
         
         # Upload PDF if generated
         if 'pdf_content' in results:
-            pdf_filename = f"{report.project.domain}_{report.start_date.strftime('%Y%m%d')}_{report.end_date.strftime('%Y%m%d')}.pdf"
+            # Generate filename based on report type
+            if report.start_date and report.end_date:
+                pdf_filename = f"{report.project.domain}_{report.start_date.strftime('%Y%m%d')}_{report.end_date.strftime('%Y%m%d')}.pdf"
+            else:
+                # For reports without date ranges (page_rankings, top_competitors, etc.)
+                pdf_filename = f"{report.project.domain}_{report.report_type}_{timestamp}.pdf"
             pdf_key = f"{base_path}/{pdf_filename}"
             
             upload_result = r2_service.upload_file(
