@@ -49,12 +49,7 @@ class Target(models.Model):
         return domain
     
     def clean(self):
-        # Validate max 3 targets per project (only if project is set)
-        if hasattr(self, 'project') and self.project and self.pk is None:  # Only check on creation
-            existing_count = Target.objects.filter(project=self.project).count()
-            if existing_count >= 3:
-                raise ValidationError("Maximum 3 targets allowed per project")
-        
+        # No longer limiting to 3 targets since we auto-track top competitors
         # Clean domain using the static method
         if self.domain:
             self.domain = self.clean_domain_string(self.domain)
