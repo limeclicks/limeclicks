@@ -79,17 +79,6 @@
                         </option>
                         {% endfor %}
                     </select>
-                    {% if selected_project %}
-                    <button 
-                        class="btn btn-primary btn-sm"
-                        onclick="downloadAllReports({{ selected_project.id }})"
-                        id="download-all-btn"
-                        {% if not has_audit %}disabled{% endif %}
-                    >
-                        <i class="fas fa-download mr-2"></i>
-                        Download All as ZIP
-                    </button>
-                    {% endif %}
                 </div>
             </div>
         </div>
@@ -97,8 +86,7 @@
     
     <!-- Reports Content -->
     <div id="reports-content">
-        {% if selected_project %}
-        <!-- Audit Summary Card -->
+        <!-- Audit Summary Card (always present but hidden initially) -->
         <div id="audit-summary" class="card bg-base-100 shadow-sm border border-base-300 mb-6" style="display: none;">
             <div class="card-body">
                 <div class="flex items-center justify-between">
@@ -125,6 +113,18 @@
             </div>
         </div>
         
+        <!-- Download All Button (hidden initially, shown when project selected) -->
+        <div id="download-all-container" style="display: none;" class="mb-4 text-right">
+            <button 
+                class="btn btn-primary btn-sm"
+                onclick="downloadAllReports()"
+                id="download-all-btn"
+            >
+                <i class="fas fa-download mr-2"></i>
+                Download All as ZIP
+            </button>
+        </div>
+        
         <!-- Files Grid -->
         <div id="files-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <!-- Files will be loaded here dynamically -->
@@ -142,28 +142,26 @@
                 <i class="fas fa-file-csv text-2xl text-base-content/40"></i>
             </div>
             <h3 class="text-lg font-semibold mb-2">No Reports Available</h3>
-            <p class="text-base-content/60">
-                {% if selected_project %}
-                No completed audits found for {{ selected_project.domain }}
-                {% else %}
+            <p class="text-base-content/60" id="empty-state-message">
                 Select a project to view available reports
-                {% endif %}
             </p>
         </div>
-        {% else %}
+        
         <!-- No Project Selected -->
-        <div class="text-center py-12">
+        <div id="no-project-state" class="text-center py-12">
             <div class="w-20 h-20 bg-base-200 rounded-full flex items-center justify-center mx-auto mb-4">
                 <i class="fas fa-folder-open text-2xl text-base-content/40"></i>
             </div>
             <h3 class="text-lg font-semibold mb-2">Select a Project</h3>
             <p class="text-base-content/60">Choose a project from the dropdown above to view available audit reports</p>
         </div>
-        {% endif %}
     </div>
 </div>
 
 <script>
+    // Store the current project ID
+    let currentProjectId = null;
+    
     // Get CSRF token
     function getCookie(name) {
         const m = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
@@ -173,24 +171,37 @@
     // Load project reports
     async function loadProjectReports(projectId) {
         if (!projectId) {
-            // Redirect to clear selection
-            window.location.href = '/site-audit/reports/';
+            // Clear selection
+            currentProjectId = null;
+            document.getElementById('no-project-state').style.display = 'block';
+            document.getElementById('audit-summary').style.display = 'none';
+            document.getElementById('download-all-container').style.display = 'none';
+            document.getElementById('files-grid').innerHTML = '';
+            document.getElementById('empty-state').style.display = 'none';
+            document.getElementById('loading-state').style.display = 'none';
+            
+            // Update URL
+            const url = new URL(window.location);
+            url.searchParams.delete('project');
+            window.history.pushState({}, '', url);
             return;
         }
+        
+        // Store current project
+        currentProjectId = projectId;
         
         // Update URL with selected project
         const url = new URL(window.location);
         url.searchParams.set('project', projectId);
         window.history.pushState({}, '', url);
         
-        // Show loading state
-        document.getElementById('loading-state').style.display = 'block';
+        // Hide all states and show loading
+        document.getElementById('no-project-state').style.display = 'none';
         document.getElementById('empty-state').style.display = 'none';
+        document.getElementById('audit-summary').style.display = 'none';
+        document.getElementById('download-all-container').style.display = 'none';
         document.getElementById('files-grid').innerHTML = '';
-        
-        if (document.getElementById('audit-summary')) {
-            document.getElementById('audit-summary').style.display = 'none';
-        }
+        document.getElementById('loading-state').style.display = 'block';
         
         try {
             const response = await fetch(`/site-audit/reports/project/${projectId}/files/`);
@@ -204,7 +215,13 @@
                 
                 // Display files
                 displayFiles(data.files);
+                
+                // Show download all button
+                document.getElementById('download-all-container').style.display = 'block';
             } else {
+                // Show empty state with project-specific message
+                const projectName = document.querySelector(`#project-selector option[value="${projectId}"]`).text;
+                document.getElementById('empty-state-message').textContent = `No completed audits found for ${projectName}`;
                 document.getElementById('empty-state').style.display = 'block';
             }
         } catch (error) {
@@ -319,7 +336,12 @@
     }
     
     // Download all reports as ZIP
-    async function downloadAllReports(projectId) {
+    async function downloadAllReports() {
+        if (!currentProjectId) {
+            showNotification('Please select a project first', 'error');
+            return;
+        }
+        
         const btn = document.getElementById('download-all-btn');
         if (!btn) return;
         
@@ -329,7 +351,7 @@
         btn.disabled = true;
         
         try {
-            const response = await fetch(`/site-audit/reports/project/${projectId}/download-all/`, {
+            const response = await fetch(`/site-audit/reports/project/${currentProjectId}/download-all/`, {
                 method: 'POST',
                 headers: {
                     'X-CSRFToken': getCookie('csrftoken')
@@ -386,11 +408,20 @@
         }, 5000);
     }
     
-    // Load reports on page load if project is selected
-    {% if selected_project %}
+    // Initialize on page load
     document.addEventListener('DOMContentLoaded', () => {
-        loadProjectReports({{ selected_project.id }});
+        // Check if project is pre-selected from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const projectId = urlParams.get('project');
+        
+        if (projectId) {
+            // Set the selector value and load reports
+            document.getElementById('project-selector').value = projectId;
+            loadProjectReports(projectId);
+        } else {
+            // Show no project state
+            document.getElementById('no-project-state').style.display = 'block';
+        }
     });
-    {% endif %}
 </script>
 {% endblock %}

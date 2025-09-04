@@ -96,8 +96,18 @@ def get_project_audit_files(request, project_id):
         })
     
     # Get all files for this audit with human-friendly names
+    # Filter to show only Excel files (consolidated reports) if they exist
     files_data = []
-    for audit_file in latest_audit.audit_files.all():
+    audit_files = latest_audit.audit_files.all()
+    
+    # Check if we have Excel files (consolidated reports)
+    excel_files = audit_files.filter(mime_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    
+    # If we have Excel files, show only those (consolidated reports)
+    # Otherwise, show CSV files for backward compatibility
+    files_to_show = excel_files if excel_files.exists() else audit_files
+    
+    for audit_file in files_to_show:
         files_data.append({
             'id': audit_file.id,
             'type': audit_file.file_type,
@@ -238,42 +248,44 @@ def download_all_audit_files(request, project_id):
 def get_human_friendly_name(audit_file):
     """Generate human-friendly display name for audit file"""
     # Check if it's an Excel file (consolidated report)
-    if audit_file.original_filename.endswith('.xlsx'):
-        # Use the filename without extension as display name
-        display_name = audit_file.original_filename.replace('.xlsx', '').replace('_', ' ')
-        return display_name
+    is_excel = audit_file.mime_type == 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     
-    # For CSV files, use the mapping
-    name_mapping = {
-        'crawl_overview': 'Crawl Overview Report',
-        'issues_overview': 'Issues Summary Report',
-        'internal_all': 'All Internal URLs',
-        'external_all': 'All External URLs',
-        'response_codes': 'Response Codes (4xx, 5xx, etc.)',
-        'page_titles': 'Page Titles Analysis',
-        'meta_descriptions': 'Meta Descriptions Analysis',
-        'h1': 'H1 Tags Analysis',
-        'h2': 'H2 Tags Analysis',
-        'images': 'Images Analysis',
-        'canonicals': 'Canonical URLs',
-        'directives': 'Robots & Meta Directives',
-        'hreflang': 'Hreflang Tags',
-        'structured_data': 'Structured Data (Schema)',
-        'links': 'Links Analysis',
-        'javascript': 'JavaScript Files',
-        'validation': 'HTML Validation',
-        # New Excel report types
-        'technical_seo_audit': 'Technical SEO Audit (Complete)',
-        'content_optimization': 'Content Optimization Report',
-        'technical_config': 'Technical Configuration',
-        'media_analysis': 'Media & Resources Analysis',
-        'link_analysis': 'Link Analysis Report',
-        'page_performance': 'Page Performance Report',
-        'security': 'Security & HTTPS Report',
-        'audit_summary': 'Audit Summary Overview',
-    }
-    
-    return name_mapping.get(audit_file.file_type, audit_file.get_file_type_display())
+    if is_excel:
+        # Excel consolidated report names with descriptions of included tabs
+        excel_mapping = {
+            'technical_seo_audit': 'Technical SEO Audit (Crawl Overview, Issues, Response Codes)',
+            'content_optimization': 'Content Optimization (Titles, Meta Descriptions, H1/H2 Tags)',
+            'technical_config': 'Technical Configuration (Canonicals, Robots, Hreflang, Structured Data)',
+            'media_analysis': 'Media & Resources (Images, JavaScript, CSS)',
+            'link_analysis': 'Link Analysis (Internal/External Links, Link Metrics)',
+            'page_performance': 'Page Performance (Core Web Vitals, Speed Metrics)',
+            'security': 'Security & HTTPS (Protocol, Mixed Content, Security Headers)',
+            'audit_summary': 'Audit Summary (Overall Health, Key Metrics)',
+            'validation': 'Validation & Other (HTML Validation, AMP, Custom Extraction)',
+        }
+        return excel_mapping.get(audit_file.file_type, audit_file.get_file_type_display())
+    else:
+        # CSV report names
+        csv_mapping = {
+            'crawl_overview': 'Crawl Overview Report',
+            'issues_overview': 'Issues Summary Report',
+            'internal_all': 'All Internal URLs',
+            'external_all': 'All External URLs',
+            'response_codes': 'Response Codes (4xx, 5xx, etc.)',
+            'page_titles': 'Page Titles Analysis',
+            'meta_descriptions': 'Meta Descriptions Analysis',
+            'h1': 'H1 Tags Analysis',
+            'h2': 'H2 Tags Analysis',
+            'images': 'Images Analysis',
+            'canonicals': 'Canonical URLs',
+            'directives': 'Robots & Meta Directives',
+            'hreflang': 'Hreflang Tags',
+            'structured_data': 'Structured Data (Schema)',
+            'links': 'Links Analysis',
+            'javascript': 'JavaScript Files',
+            'validation': 'HTML Validation',
+        }
+        return csv_mapping.get(audit_file.file_type, audit_file.get_file_type_display())
 
 
 def get_download_filename(audit_file):
@@ -284,30 +296,48 @@ def get_download_filename(audit_file):
     # Get audit date
     audit_date = audit_file.site_audit.last_audit_date.strftime('%Y%m%d') if audit_file.site_audit.last_audit_date else 'latest'
     
-    # Map file types to friendly names
-    filename_mapping = {
-        'crawl_overview': 'crawl_overview',
-        'issues_overview': 'issues_summary',
-        'internal_all': 'internal_urls',
-        'external_all': 'external_urls',
-        'response_codes': 'response_codes',
-        'page_titles': 'page_titles',
-        'meta_descriptions': 'meta_descriptions',
-        'h1': 'h1_tags',
-        'h2': 'h2_tags',
-        'images': 'images',
-        'canonicals': 'canonical_urls',
-        'directives': 'robots_directives',
-        'hreflang': 'hreflang',
-        'structured_data': 'structured_data',
-        'links': 'links',
-        'javascript': 'javascript',
-        'validation': 'html_validation',
-    }
+    # Check if it's an Excel file
+    is_excel = audit_file.mime_type == 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     
-    file_type = filename_mapping.get(audit_file.file_type, audit_file.file_type)
-    
-    return f"{domain}_{file_type}_{audit_date}.csv"
+    if is_excel:
+        # Excel consolidated reports - use original filename with domain and date
+        # Map Excel file types to friendly names
+        excel_mapping = {
+            'technical_seo_audit': 'Technical_SEO_Audit',
+            'content_optimization': 'Content_Optimization',
+            'technical_config': 'Technical_Configuration',
+            'media_analysis': 'Media_Resources_Analysis',
+            'link_analysis': 'Link_Analysis',
+            'page_performance': 'Page_Performance',
+            'security': 'Security_HTTPS',
+            'audit_summary': 'Audit_Summary',
+            'validation': 'Validation_Other',
+        }
+        file_type = excel_mapping.get(audit_file.file_type, audit_file.file_type)
+        return f"{domain}_{file_type}_{audit_date}.xlsx"
+    else:
+        # CSV files - legacy support
+        filename_mapping = {
+            'crawl_overview': 'crawl_overview',
+            'issues_overview': 'issues_summary',
+            'internal_all': 'internal_urls',
+            'external_all': 'external_urls',
+            'response_codes': 'response_codes',
+            'page_titles': 'page_titles',
+            'meta_descriptions': 'meta_descriptions',
+            'h1': 'h1_tags',
+            'h2': 'h2_tags',
+            'images': 'images',
+            'canonicals': 'canonical_urls',
+            'directives': 'robots_directives',
+            'hreflang': 'hreflang',
+            'structured_data': 'structured_data',
+            'links': 'links',
+            'javascript': 'javascript',
+            'validation': 'html_validation',
+        }
+        file_type = filename_mapping.get(audit_file.file_type, audit_file.file_type)
+        return f"{domain}_{file_type}_{audit_date}.csv"
 
 
 def format_file_size(size_bytes):
