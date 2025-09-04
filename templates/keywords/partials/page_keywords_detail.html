@@ -1,0 +1,66 @@
+<!-- Update modal title -->
+<script>
+    document.getElementById('modalTitle').textContent = '{{ page_title }}';
+</script>
+
+<div class="mb-3">
+    <div class="text-sm text-gray-600">{{ page_url }}</div>
+    <div class="text-sm font-medium mt-1">Total Keywords: {{ total_keywords }}</div>
+</div>
+
+{% if keywords %}
+<div class="table-responsive">
+    <table class="table table-hover">
+        <thead>
+            <tr>
+                <th>Keyword</th>
+                <th>Search Engine</th>
+                <th>Country</th>
+                <th>Ranking</th>
+                <th>Search Volume</th>
+                <th>CPC</th>
+                <th>Traffic</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for keyword in keywords %}
+            <tr>
+                <td class="font-medium">{{ keyword.keyword }}</td>
+                <td>
+                    <img src="https://www.google.com/favicon.ico" alt="Google" 
+                         style="width: 16px; height: 16px; display: inline-block; margin-right: 4px;">
+                    {{ keyword.search_engine }}
+                </td>
+                <td>
+                    <img src="https://flagcdn.com/16x12/{{ keyword.country|lower }}.png" 
+                         alt="{{ keyword.country }}" 
+                         style="display: inline-block; margin-right: 4px;">
+                    {{ keyword.country }}
+                </td>
+                <td>
+                    <span class="badge bg-primary">{{ keyword.rank }}</span>
+                    {% if keyword.rank_change != "-" %}
+                    <span class="ms-1 text-{{ keyword.rank_change_class }} small">
+                        {{ keyword.rank_change }}
+                    </span>
+                    {% endif %}
+                </td>
+                <td>{{ keyword.search_volume|floatformat:0 }}</td>
+                <td>${{ keyword.cpc|floatformat:2 }}</td>
+                <td>{{ keyword.traffic|floatformat:0 }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<style>
+    .text-positive { color: #10b981; }
+    .text-negative { color: #ef4444; }
+    .text-neutral { color: #6b7280; }
+</style>
+{% else %}
+<div class="text-center py-4">
+    <p class="text-gray-600">No keywords found for this page.</p>
+</div>
+{% endif %}

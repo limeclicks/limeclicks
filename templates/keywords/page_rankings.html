@@ -1,0 +1,340 @@
+{% extends "dashboard_base.html" %}
+{% load static %}
+
+{% block title %}Page Rankings - LimeClicks{% endblock %}
+
+{% block extra_css %}
+<style>
+    .metric-card {
+        background: white;
+        border-radius: 8px;
+        padding: 16px 20px;
+        border: 1px solid #e5e7eb;
+    }
+    
+    .metric-value {
+        font-size: 2rem;
+        font-weight: 700;
+        line-height: 1.2;
+    }
+    
+    .metric-label {
+        font-size: 0.875rem;
+        color: #6b7280;
+        margin-top: 4px;
+    }
+    
+    .page-row {
+        background: white;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 16px;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    
+    .page-row:hover {
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        transform: translateY(-1px);
+    }
+    
+    .page-title {
+        font-size: 1rem;
+        font-weight: 600;
+        color: #111827;
+        margin-bottom: 8px;
+    }
+    
+    .page-url {
+        font-size: 0.875rem;
+        color: #3b82f6;
+        text-decoration: none;
+        word-break: break-all;
+    }
+    
+    .page-url:hover {
+        text-decoration: underline;
+    }
+    
+    .page-metrics {
+        display: flex;
+        gap: 24px;
+        margin-top: 12px;
+        flex-wrap: wrap;
+    }
+    
+    .page-metric {
+        display: flex;
+        align-items: baseline;
+        gap: 6px;
+    }
+    
+    .page-metric-value {
+        font-size: 1.125rem;
+        font-weight: 600;
+        color: #111827;
+    }
+    
+    .page-metric-label {
+        font-size: 0.875rem;
+        color: #6b7280;
+    }
+    
+    .best-keyword {
+        margin-top: 8px;
+        padding: 8px 12px;
+        background: #f3f4f6;
+        border-radius: 6px;
+        font-size: 0.875rem;
+        color: #4b5563;
+    }
+    
+    .best-keyword strong {
+        color: #111827;
+    }
+    
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+        background: white;
+        border-radius: 8px;
+        border: 1px solid #e5e7eb;
+    }
+    
+    .empty-state-icon {
+        font-size: 3rem;
+        margin-bottom: 16px;
+    }
+    
+    .empty-state h3 {
+        font-size: 1.125rem;
+        font-weight: 600;
+        color: #111827;
+        margin-bottom: 8px;
+    }
+    
+    .empty-state p {
+        color: #6b7280;
+    }
+    
+    .loading-skeleton {
+        background: linear-gradient(90deg, #f3f4f6 25%, #e5e7eb 50%, #f3f4f6 75%);
+        background-size: 200% 100%;
+        animation: loading 1.5s infinite;
+        border-radius: 4px;
+    }
+    
+    @keyframes loading {
+        0% { background-position: 200% 0; }
+        100% { background-position: -200% 0; }
+    }
+    
+    .skeleton-row {
+        background: white;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 16px;
+    }
+    
+    .skeleton-title {
+        height: 20px;
+        width: 30%;
+        margin-bottom: 12px;
+    }
+    
+    .skeleton-url {
+        height: 16px;
+        width: 50%;
+        margin-bottom: 16px;
+    }
+    
+    .skeleton-metrics {
+        display: flex;
+        gap: 24px;
+    }
+    
+    .skeleton-metric {
+        height: 20px;
+        width: 100px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4">
+    <!-- Header -->
+    <div class="mb-4">
+        <h1 class="text-2xl font-bold">Page Rankings</h1>
+        <p class="text-gray-600">Analyze which pages rank for the most keywords</p>
+    </div>
+    
+    <!-- Metrics Cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div class="metric-card">
+            <div class="metric-value text-gray-900" id="totalPages">0</div>
+            <div class="metric-label">Total Pages</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-value text-blue-600" id="totalKeywords">0</div>
+            <div class="metric-label">Total Keywords</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-value text-green-600" id="avgPosition">0</div>
+            <div class="metric-label">Avg. Position</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-value text-amber-600" id="totalTraffic">0</div>
+            <div class="metric-label">Total Traffic</div>
+        </div>
+    </div>
+    
+    <!-- Filters -->
+    <div class="bg-white rounded-lg p-4 mb-6 border border-gray-200">
+        <form hx-get="{% url 'keywords:page_rankings_data' %}"
+              hx-target="#pagesContainer"
+              hx-trigger="change from:find select, keyup delay:500ms from:find input[type='text']"
+              hx-indicator="#loadingIndicator">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <!-- Search -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Search Pages</label>
+                    <input type="text" 
+                           name="search"
+                           placeholder="Search by URL or keyword..." 
+                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                
+                <!-- Project Filter -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Filter by Project</label>
+                    <select name="project" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="">All Projects</option>
+                        {% for project in projects %}
+                        <option value="{{ project.id }}" {% if project.id|stringformat:"s" == selected_project_id %}selected{% endif %}>
+                            {{ project.domain }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <!-- Items per page -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Items Per Page</label>
+                    <select name="per_page" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="25">25</option>
+                        <option value="50" selected>50</option>
+                        <option value="100">100</option>
+                    </select>
+                </div>
+            </div>
+        </form>
+    </div>
+    
+    <!-- Loading Indicator -->
+    <div id="loadingIndicator" class="htmx-indicator text-center py-4">
+        <div class="inline-flex items-center">
+            <svg class="animate-spin h-5 w-5 mr-3 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            Loading...
+        </div>
+    </div>
+    
+    <!-- Pages Container -->
+    <div id="pagesContainer" 
+         hx-get="{% url 'keywords:page_rankings_data' %}" 
+         hx-trigger="load"
+         hx-indicator="#loadingIndicator">
+        <!-- Loading skeleton -->
+        <div class="skeleton-row">
+            <div class="loading-skeleton skeleton-title"></div>
+            <div class="loading-skeleton skeleton-url"></div>
+            <div class="skeleton-metrics">
+                <div class="loading-skeleton skeleton-metric"></div>
+                <div class="loading-skeleton skeleton-metric"></div>
+                <div class="loading-skeleton skeleton-metric"></div>
+            </div>
+        </div>
+        <div class="skeleton-row">
+            <div class="loading-skeleton skeleton-title"></div>
+            <div class="loading-skeleton skeleton-url"></div>
+            <div class="skeleton-metrics">
+                <div class="loading-skeleton skeleton-metric"></div>
+                <div class="loading-skeleton skeleton-metric"></div>
+                <div class="loading-skeleton skeleton-metric"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Keywords Detail Modal -->
+<div id="keywordsModal" class="modal fade" tabindex="-1" style="display: none;">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalTitle">Page Keywords</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="modalBody">
+                <!-- Content loaded via HTMX -->
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Handle modal display
+    document.addEventListener('htmx:afterSwap', function(event) {
+        if (event.detail.target.id === 'modalBody') {
+            const modalElement = document.getElementById('keywordsModal');
+            if (modalElement) {
+                // Show modal using Bootstrap's modal if available, otherwise use basic display
+                if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+                    const modal = new bootstrap.Modal(modalElement);
+                    modal.show();
+                } else {
+                    modalElement.style.display = 'block';
+                    modalElement.classList.add('show');
+                    document.body.classList.add('modal-open');
+                    
+                    // Add backdrop
+                    const backdrop = document.createElement('div');
+                    backdrop.className = 'modal-backdrop fade show';
+                    document.body.appendChild(backdrop);
+                }
+            }
+        }
+    });
+    
+    // Close modal handler
+    function closeModal() {
+        const modalElement = document.getElementById('keywordsModal');
+        if (modalElement) {
+            if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+                const modal = bootstrap.Modal.getInstance(modalElement);
+                if (modal) modal.hide();
+            } else {
+                modalElement.style.display = 'none';
+                modalElement.classList.remove('show');
+                document.body.classList.remove('modal-open');
+                
+                // Remove backdrop
+                const backdrop = document.querySelector('.modal-backdrop');
+                if (backdrop) backdrop.remove();
+            }
+        }
+    }
+    
+    // Close modal on backdrop click
+    document.addEventListener('click', function(e) {
+        if (e.target.classList.contains('modal')) {
+            closeModal();
+        }
+    });
+</script>
+{% endblock %}

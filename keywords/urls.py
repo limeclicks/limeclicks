@@ -1,5 +1,5 @@
 from django.urls import path, include
-from . import views, views_reports_list, views_reports
+from . import views, views_reports_list, views_reports, views_page_rankings
 
 app_name = 'keywords'
 
@@ -9,6 +9,10 @@ urlpatterns = [
     
     # Reports main view
     path('reports/', views_reports_list.reports_main_list, name='reports_main'),
+    
+    # Page Rankings view
+    path('page-rankings/', views_page_rankings.PageRankingsView.as_view(), name='page_rankings'),
+    
     path('project/<int:project_id>/', views.project_keywords, name='project_keywords'),
     path('keyword/<int:keyword_id>/', views.keyword_detail, name='keyword_detail'),
     path('add-modal/', views.add_keyword_modal, name='add_keyword_modal'),
@@ -35,6 +39,10 @@ urlpatterns = [
     
     # Historical SERP data
     path('api/rank/<int:rank_id>/serp/', views.api_rank_serp, name='api_rank_serp'),
+    
+    # Page Rankings HTMX endpoints
+    path('page-rankings/data/', views_page_rankings.page_rankings_data, name='page_rankings_data'),
+    path('page-keywords-detail/', views_page_rankings.page_keywords_detail, name='page_keywords_detail'),
     
     # Project-specific Reports URLs (these will be accessible as keywords:report_list, etc.)
     path('project/<int:project_id>/reports/', views_reports.report_list_view, name='report_list'),

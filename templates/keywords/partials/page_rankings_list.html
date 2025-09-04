@@ -1,0 +1,108 @@
+<!-- Update metrics -->
+<script>
+    document.getElementById('totalPages').textContent = '{{ total_pages }}';
+    document.getElementById('totalKeywords').textContent = '{{ total_keywords }}';
+    document.getElementById('avgPosition').textContent = '{{ avg_position }}';
+    document.getElementById('totalTraffic').textContent = '{{ total_traffic }}';
+</script>
+
+{% if pages %}
+    {% for page in pages %}
+    <div class="page-row" 
+         hx-get="{% url 'keywords:page_keywords_detail' %}?url={{ page.url|urlencode }}&project_id={{ page.project_id }}"
+         hx-target="#modalBody"
+         hx-trigger="click">
+        <div>
+            <div class="page-title">{{ page.page_title }}</div>
+            <a href="{{ page.url }}" target="_blank" class="page-url" onclick="event.stopPropagation()">
+                {{ page.url }}
+            </a>
+            
+            <div class="page-metrics">
+                <div class="page-metric">
+                    <span class="page-metric-value text-blue-600">{{ page.total_keywords }}</span>
+                    <span class="page-metric-label">keywords</span>
+                </div>
+                <div class="page-metric">
+                    <span class="page-metric-value text-green-600">#{{ page.avg_position }}</span>
+                    <span class="page-metric-label">avg position</span>
+                </div>
+                <div class="page-metric">
+                    <span class="page-metric-value text-amber-600">{{ page.total_traffic|floatformat:0 }}</span>
+                    <span class="page-metric-label">traffic</span>
+                </div>
+                <div class="page-metric">
+                    <span class="page-metric-value">{{ page.avg_cpc|floatformat:2 }}</span>
+                    <span class="page-metric-label">avg CPC</span>
+                </div>
+            </div>
+            
+            {% if page.best_keyword %}
+            <div class="best-keyword">
+                Best performing: <strong>{{ page.best_keyword }}</strong> (Position #{{ page.best_position }})
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+    
+    <!-- Pagination -->
+    {% if pagination.total_pages > 1 %}
+    <div class="mt-6">
+        <div class="flex items-center justify-between">
+            <div class="text-sm text-gray-700">
+                Showing page <span class="font-medium">{{ pagination.current_page }}</span> of 
+                <span class="font-medium">{{ pagination.total_pages }}</span>
+                (<span class="font-medium">{{ pagination.total_items }}</span> total pages)
+            </div>
+            
+            <div class="btn-group">
+                {% if pagination.has_previous %}
+                <button class="btn btn-sm btn-outline"
+                        hx-get="{% url 'keywords:page_rankings_data' %}?page={{ pagination.previous_page }}&search={{ request.GET.search }}&project={{ request.GET.project }}&per_page={{ request.GET.per_page }}"
+                        hx-target="#pagesContainer"
+                        hx-indicator="#loadingIndicator">
+                    <i class="fas fa-chevron-left"></i>
+                </button>
+                {% else %}
+                <button class="btn btn-sm btn-outline" disabled>
+                    <i class="fas fa-chevron-left"></i>
+                </button>
+                {% endif %}
+                
+                {% for page_num in pagination.page_range %}
+                    {% if page_num == pagination.current_page %}
+                    <button class="btn btn-sm btn-primary">{{ page_num }}</button>
+                    {% else %}
+                    <button class="btn btn-sm btn-outline"
+                            hx-get="{% url 'keywords:page_rankings_data' %}?page={{ page_num }}&search={{ request.GET.search }}&project={{ request.GET.project }}&per_page={{ request.GET.per_page }}"
+                            hx-target="#pagesContainer"
+                            hx-indicator="#loadingIndicator">
+                        {{ page_num }}
+                    </button>
+                    {% endif %}
+                {% endfor %}
+                
+                {% if pagination.has_next %}
+                <button class="btn btn-sm btn-outline"
+                        hx-get="{% url 'keywords:page_rankings_data' %}?page={{ pagination.next_page }}&search={{ request.GET.search }}&project={{ request.GET.project }}&per_page={{ request.GET.per_page }}"
+                        hx-target="#pagesContainer"
+                        hx-indicator="#loadingIndicator">
+                    <i class="fas fa-chevron-right"></i>
+                </button>
+                {% else %}
+                <button class="btn btn-sm btn-outline" disabled>
+                    <i class="fas fa-chevron-right"></i>
+                </button>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+{% else %}
+    <div class="empty-state">
+        <div class="empty-state-icon">📊</div>
+        <h3>No Pages Found</h3>
+        <p>No pages are currently ranking for keywords in the selected filters.</p>
+    </div>
+{% endif %}

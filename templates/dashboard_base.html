@@ -438,7 +438,7 @@
                         <span class="text-xs uppercase font-semibold text-base-content/60">SEO & Keywords</span>
                     </li>
                     <li>
-                        <a href="{% url 'keywords:list' %}" class="flex items-center gap-3 {% if request.resolver_match.app_name == 'keywords' and 'report' not in request.resolver_match.url_name|default:'' and 'schedule' not in request.resolver_match.url_name|default:'' %}active{% endif %}">
+                        <a href="{% url 'keywords:list' %}" class="flex items-center gap-3 {% if request.resolver_match.app_name == 'keywords' and 'report' not in request.resolver_match.url_name|default:'' and 'schedule' not in request.resolver_match.url_name|default:'' and 'page_rankings' not in request.resolver_match.url_name|default:'' %}active{% endif %}">
                             <i class="fas fa-key w-4"></i>
                             <span>Keywords</span>
                         </a>
@@ -447,6 +447,12 @@
                         <a href="{% url 'keywords:reports_main' %}" class="flex items-center gap-3 {% if 'report' in request.resolver_match.url_name|default:'' or 'schedule' in request.resolver_match.url_name|default:'' %}active{% endif %}">
                             <i class="fas fa-chart-bar w-4"></i>
                             <span>Keyword Reports</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="{% url 'keywords:page_rankings' %}" class="flex items-center gap-3 {% if request.resolver_match.url_name == 'page_rankings' %}active{% endif %}">
+                            <i class="fas fa-file-alt w-4"></i>
+                            <span>Page Rankings</span>
                         </a>
                     </li>
                     <li>
