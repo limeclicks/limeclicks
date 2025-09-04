@@ -216,8 +216,47 @@
 
 {% block extra_js %}
 <script>
-    // Modal is handled via hx-on::after-swap directly on the button
-    // Close modal handler (if needed)
+    // Wait for HTMX to be loaded
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('Page Rankings: DOMContentLoaded - setting up modal handler');
+        
+        // Listen for HTMX after swap events
+        document.body.addEventListener('htmx:afterSwap', function(event) {
+            console.log('Page Rankings: htmx:afterSwap event received', {
+                targetId: event.detail.target?.id,
+                targetElement: event.detail.target
+            });
+            
+            // Check if the swap target is our modal body
+            if (event.detail.target && event.detail.target.id === 'modalBody') {
+                console.log('Page Rankings: Target is modalBody, attempting to open modal');
+                const modal = document.getElementById('keywordsModal');
+                
+                if (modal) {
+                    try {
+                        // Use the native showModal method for dialog element
+                        modal.showModal();
+                        console.log('Page Rankings: Modal opened successfully');
+                    } catch (error) {
+                        console.error('Page Rankings: Error opening modal', error);
+                    }
+                } else {
+                    console.error('Page Rankings: Modal element not found');
+                }
+            }
+        });
+        
+        // Also listen for other HTMX events for debugging
+        document.body.addEventListener('htmx:beforeRequest', function(event) {
+            console.log('Page Rankings: htmx:beforeRequest', event.detail);
+        });
+        
+        document.body.addEventListener('htmx:afterRequest', function(event) {
+            console.log('Page Rankings: htmx:afterRequest', event.detail);
+        });
+    });
+    
+    // Close modal handler
     function closeModal() {
         const modalElement = document.getElementById('keywordsModal');
         if (modalElement) {
