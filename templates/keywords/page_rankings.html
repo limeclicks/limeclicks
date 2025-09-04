@@ -6,88 +6,15 @@
 
 {% block extra_css %}
 <style>
-    .metric-card {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        border-radius: 1rem;
-        padding: 1.5rem;
-        position: relative;
-        overflow: hidden;
-        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+    /* Add hover effects to DaisyUI cards */
+    .card {
         transition: transform 0.3s ease, box-shadow 0.3s ease;
     }
     
-    .metric-card:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 15px 40px rgba(0, 0, 0, 0.15);
+    .card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
     }
-    
-    .metric-card.card-blue {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    }
-    
-    .metric-card.card-green {
-        background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
-    }
-    
-    .metric-card.card-orange {
-        background: linear-gradient(135deg, #fc5c7d 0%, #fd8b47 100%);
-    }
-    
-    .metric-card::before {
-        content: '';
-        position: absolute;
-        top: -50%;
-        right: -50%;
-        width: 200%;
-        height: 200%;
-        background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
-        transform: rotate(45deg);
-    }
-    
-    .metric-icon {
-        width: 48px;
-        height: 48px;
-        background: rgba(255, 255, 255, 0.2);
-        border-radius: 12px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        margin-bottom: 1rem;
-    }
-    
-    .metric-icon i {
-        font-size: 1.5rem;
-        color: white;
-    }
-    
-    .metric-value {
-        font-size: 2.5rem;
-        font-weight: 800;
-        line-height: 1;
-        color: white;
-        margin-bottom: 0.5rem;
-    }
-    
-    .metric-label {
-        font-size: 0.875rem;
-        color: rgba(255, 255, 255, 0.9);
-        font-weight: 500;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-    }
-    
-    .metric-change {
-        position: absolute;
-        top: 1.5rem;
-        right: 1.5rem;
-        padding: 0.25rem 0.75rem;
-        background: rgba(255, 255, 255, 0.2);
-        border-radius: 9999px;
-        font-size: 0.75rem;
-        color: white;
-        font-weight: 600;
-    }
-    
     
     .empty-state {
         text-align: center;
@@ -164,33 +91,72 @@
         <p class="text-gray-600">Analyze which pages rank for the most keywords</p>
     </div>
     
-    <!-- Metrics Cards -->
+    <!-- Metrics Cards using DaisyUI -->
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
         <!-- Total Pages Card -->
-        <div class="metric-card card-blue">
-            <div class="metric-icon">
-                <i class="fas fa-file-alt"></i>
+        <div class="card bg-gradient-to-br from-blue-500 to-purple-600 text-primary-content shadow-xl">
+            <div class="card-body">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <div class="stat-title text-white/90 text-sm font-medium mb-2">Total Pages</div>
+                        <div class="stat-value text-4xl font-bold text-white" id="totalPages">0</div>
+                    </div>
+                    <div class="stat-figure">
+                        <div class="w-14 h-14 bg-white/20 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-file-alt text-2xl text-white"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="stat-desc text-white/80 mt-2">
+                    <span class="badge badge-sm badge-ghost text-white/90">
+                        <i class="fas fa-arrow-up text-xs mr-1"></i> Ranking pages
+                    </span>
+                </div>
             </div>
-            <div class="metric-value" id="totalPages">0</div>
-            <div class="metric-label">Total Pages</div>
         </div>
         
         <!-- Total Keywords Card -->
-        <div class="metric-card card-green">
-            <div class="metric-icon">
-                <i class="fas fa-key"></i>
+        <div class="card bg-gradient-to-br from-emerald-500 to-teal-600 text-primary-content shadow-xl">
+            <div class="card-body">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <div class="stat-title text-white/90 text-sm font-medium mb-2">Total Keywords</div>
+                        <div class="stat-value text-4xl font-bold text-white" id="totalKeywords">0</div>
+                    </div>
+                    <div class="stat-figure">
+                        <div class="w-14 h-14 bg-white/20 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-key text-2xl text-white"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="stat-desc text-white/80 mt-2">
+                    <span class="badge badge-sm badge-ghost text-white/90">
+                        <i class="fas fa-chart-line text-xs mr-1"></i> Tracked keywords
+                    </span>
+                </div>
             </div>
-            <div class="metric-value" id="totalKeywords">0</div>
-            <div class="metric-label">Total Keywords</div>
         </div>
         
         <!-- Average Position Card -->
-        <div class="metric-card card-orange">
-            <div class="metric-icon">
-                <i class="fas fa-chart-line"></i>
+        <div class="card bg-gradient-to-br from-orange-500 to-pink-600 text-primary-content shadow-xl">
+            <div class="card-body">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <div class="stat-title text-white/90 text-sm font-medium mb-2">Avg. Position</div>
+                        <div class="stat-value text-4xl font-bold text-white">#<span id="avgPosition">0</span></div>
+                    </div>
+                    <div class="stat-figure">
+                        <div class="w-14 h-14 bg-white/20 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-chart-line text-2xl text-white"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="stat-desc text-white/80 mt-2">
+                    <span class="badge badge-sm badge-ghost text-white/90">
+                        <i class="fas fa-trophy text-xs mr-1"></i> Average rank
+                    </span>
+                </div>
             </div>
-            <div class="metric-value">#<span id="avgPosition">0</span></div>
-            <div class="metric-label">Average Position</div>
         </div>
     </div>
     
