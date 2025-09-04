@@ -20,8 +20,10 @@ def keywords_list(request):
     # Get filter parameters
     search_query = request.GET.get('search', '')
     
-    # Get user's projects
-    user_projects = Project.objects.filter(user=request.user)
+    # Get user's projects (owned and shared)
+    user_projects = Project.objects.filter(
+        Q(user=request.user) | Q(members=request.user)
+    ).distinct()
     
     # Apply search filter to projects
     if search_query:
@@ -63,8 +65,11 @@ def keywords_list(request):
             'recent_keywords': project_keywords.order_by('-created_at')[:5]
         })
     
-    # Calculate overall statistics across all projects
-    all_keywords = Keyword.objects.filter(project__user=request.user, archive=False)
+    # Calculate overall statistics across all projects (owned and shared)
+    all_keywords = Keyword.objects.filter(
+        Q(project__user=request.user) | Q(project__members=request.user),
+        archive=False
+    ).distinct()
     total_keywords = all_keywords.count()
     top10_count = all_keywords.filter(rank__lte=10, rank__gt=0).count()
     improved_count = all_keywords.filter(rank_status='up').count()
@@ -101,7 +106,10 @@ def keywords_list(request):
 def project_keywords(request, project_id):
     """Display all keywords for a specific project"""
     try:
-        project = Project.objects.get(id=project_id, user=request.user)
+        project = Project.objects.get(
+            Q(id=project_id) & 
+            (Q(user=request.user) | Q(members=request.user))
+        )
     except Project.DoesNotExist:
         return redirect('keywords:list')
     
@@ -264,7 +272,9 @@ def project_keywords(request, project_id):
 @login_required
 def add_keyword_modal(request):
     """Display modal for adding new keywords to a project"""
-    user_projects = Project.objects.filter(user=request.user)
+    user_projects = Project.objects.filter(
+        Q(user=request.user) | Q(members=request.user)
+    ).distinct()
     
     context = {
         'projects': user_projects,
@@ -292,9 +302,11 @@ def add_keywords(request):
         countries = ['US']  # Default to US if no country selected
     
     try:
-        project = Project.objects.get(id=project_id, user=request.user)
+        project = Project.objects.get(
+            Q(id=project_id) & (Q(user=request.user) | Q(members=request.user))
+        )
     except Project.DoesNotExist:
-        return JsonResponse({'error': 'Project not found'}, status=404)
+        return JsonResponse({'error': 'Project not found or access denied'}, status=404)
     
     # Parse keywords from file or text
     keywords_list = []
@@ -575,8 +587,8 @@ def api_tag_keyword(request):
     # Get keyword and ensure user owns the project
     try:
         keyword = Keyword.objects.get(
-            id=keyword_id,
-            project__user=request.user
+            Q(id=keyword_id) &
+            (Q(project__user=request.user) | Q(project__members=request.user))
         )
     except Keyword.DoesNotExist:
         return JsonResponse({'error': 'Keyword not found or access denied'}, status=404)
@@ -610,8 +622,8 @@ def api_untag_keyword(request, keyword_id, tag_id):
     # Get keyword and ensure user owns the project
     try:
         keyword = Keyword.objects.get(
-            id=keyword_id,
-            project__user=request.user
+            Q(id=keyword_id) &
+            (Q(project__user=request.user) | Q(project__members=request.user))
         )
     except Keyword.DoesNotExist:
         return JsonResponse({'error': 'Keyword not found or access denied'}, status=404)
@@ -645,8 +657,8 @@ def api_keyword_status(request, keyword_id):
     """
     try:
         keyword = Keyword.objects.get(
-            id=keyword_id,
-            project__user=request.user
+            Q(id=keyword_id) &
+            (Q(project__user=request.user) | Q(project__members=request.user))
         )
         
         # Calculate best rank from history
@@ -697,8 +709,8 @@ def api_force_crawl(request, keyword_id):
     try:
         # Get keyword and ensure user owns it
         keyword = Keyword.objects.get(
-            id=keyword_id,
-            project__user=request.user
+            Q(id=keyword_id) &
+            (Q(project__user=request.user) | Q(project__members=request.user))
         )
         
         # Check if force crawl is allowed
@@ -849,8 +861,8 @@ def api_crawl_status(request, keyword_id):
     """Get the crawl status and schedule for a keyword"""
     try:
         keyword = Keyword.objects.get(
-            id=keyword_id,
-            project__user=request.user
+            Q(id=keyword_id) &
+            (Q(project__user=request.user) | Q(project__members=request.user))
         )
         
         now = timezone.now()
@@ -944,9 +956,11 @@ def keyword_updates_sse(request, project_id):
     import time
     
     try:
-        project = Project.objects.get(id=project_id, user=request.user)
+        project = Project.objects.get(
+            Q(id=project_id) & (Q(user=request.user) | Q(members=request.user))
+        )
     except Project.DoesNotExist:
-        return JsonResponse({'error': 'Project not found'}, status=404)
+        return JsonResponse({'error': 'Project not found or access denied'}, status=404)
     
     def event_stream():
         """Generate SSE events for keyword updates"""
@@ -1005,8 +1019,8 @@ def keyword_detail(request, keyword_id):
     """Display detailed information for a specific keyword"""
     try:
         keyword = Keyword.objects.select_related('project').get(
-            id=keyword_id,
-            project__user=request.user
+            Q(id=keyword_id) &
+            (Q(project__user=request.user) | Q(project__members=request.user))
         )
     except Keyword.DoesNotExist:
         return redirect('keywords:list')
@@ -1236,7 +1250,11 @@ def api_delete_keyword(request, keyword_id):
     """Delete a keyword and all its associated data"""
     try:
         # Get the keyword and verify ownership
-        keyword = get_object_or_404(Keyword, id=keyword_id, project__user=request.user)
+        keyword = get_object_or_404(
+            Keyword,
+            Q(id=keyword_id) &
+            (Q(project__user=request.user) | Q(project__members=request.user))
+        )
         
         # Store keyword text for the response message
         keyword_text = keyword.keyword
