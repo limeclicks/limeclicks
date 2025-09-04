@@ -444,6 +444,34 @@
         </div>
     </div>
     
+    <!-- Bulk Actions Bar (hidden by default) -->
+    <div id="bulk-actions-bar" class="hidden mb-4 sticky top-0 z-10">
+        <div class="card bg-primary text-primary-content shadow-lg">
+            <div class="card-body p-4">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-4">
+                        <span class="font-semibold">
+                            <span id="selected-count">0</span> keywords selected
+                        </span>
+                        <button onclick="clearSelection()" class="btn btn-ghost btn-sm">
+                            Clear Selection
+                        </button>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button onclick="bulkRecheckRank()" class="btn btn-sm btn-secondary">
+                            <i class="fas fa-sync mr-2"></i>
+                            Recheck Rank
+                        </button>
+                        <button onclick="openBulkDeleteModal()" class="btn btn-sm btn-error">
+                            <i class="fas fa-trash mr-2"></i>
+                            Delete
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
     <!-- Keywords Table -->
     <div class="card bg-base-100 shadow-sm border border-base-300">
         <div class="card-body p-0">
@@ -452,6 +480,12 @@
                 <table class="table">
                         <thead>
                             <tr>
+                                <th class="w-12">
+                                    <input type="checkbox" 
+                                           id="select-all-keywords" 
+                                           class="checkbox checkbox-sm"
+                                           onchange="toggleAllKeywords(this)">
+                                </th>
                                 <th>
                                     <button class="flex items-center gap-1 font-semibold hover:text-primary cursor-pointer"
                                             onclick="sortTable('keyword')"
@@ -531,6 +565,12 @@
                         <tbody id="keywords-table-body" data-sort-by="{{ sort_by }}" data-sort-order="{{ sort_order }}">
                             {% for keyword in keywords %}
                             <tr class="keyword-row" data-keyword-id="{{ keyword.id }}">
+                                <td class="w-12">
+                                    <input type="checkbox" 
+                                           class="checkbox checkbox-sm keyword-checkbox"
+                                           value="{{ keyword.id }}"
+                                           onchange="updateBulkActions()">
+                                </td>
                                 <td>
                                     <div class="flex items-center gap-2">
                                         <a href="{% url 'keywords:keyword_detail' keyword.id %}" class="font-medium text-base-content hover:text-primary hover:underline">
@@ -834,6 +874,88 @@
     <!-- Click outside to close -->
     <form method="dialog" class="modal-backdrop">
         <button>close</button>
+    </form>
+</dialog>
+
+<!-- Bulk Delete Keywords Modal -->
+<dialog id="bulk-delete-keywords-modal" class="modal">
+    <div class="modal-box max-w-md">
+        <!-- Modal Header with Icon -->
+        <div class="flex items-center gap-4 mb-4">
+            <div class="w-12 h-12 rounded-full bg-error/20 flex items-center justify-center">
+                <i class="fas fa-trash-alt text-error text-xl"></i>
+            </div>
+            <div>
+                <h3 class="font-bold text-lg">Delete Keywords</h3>
+                <p class="text-sm text-base-content/60">This action cannot be undone</p>
+            </div>
+        </div>
+        
+        <!-- Modal Content -->
+        <div class="py-4">
+            <div class="alert alert-error mb-4">
+                <i class="fas fa-exclamation-circle"></i>
+                <span>Warning: This will permanently delete <span id="bulk-delete-count" class="font-bold">0</span> selected keywords and all their ranking data.</span>
+            </div>
+            
+            <div class="divider"></div>
+            
+            <div class="space-y-3 mb-4">
+                <p class="text-sm text-base-content/80">This action will delete:</p>
+                <ul class="space-y-2 text-sm">
+                    <li class="flex items-center gap-2">
+                        <i class="fas fa-times-circle text-error"></i>
+                        <span>All ranking history for selected keywords</span>
+                    </li>
+                    <li class="flex items-center gap-2">
+                        <i class="fas fa-times-circle text-error"></i>
+                        <span>All competitor data for selected keywords</span>
+                    </li>
+                    <li class="flex items-center gap-2">
+                        <i class="fas fa-times-circle text-error"></i>
+                        <span>All reports containing selected keywords</span>
+                    </li>
+                </ul>
+            </div>
+            
+            <div class="form-control">
+                <label class="label">
+                    <span class="label-text font-semibold">Type <span class="text-error">"confirm"</span> to delete these keywords:</span>
+                </label>
+                <input 
+                    type="text" 
+                    id="bulk-delete-confirmation-input"
+                    class="input input-bordered" 
+                    placeholder="Type 'confirm' here"
+                    oninput="validateBulkDeleteConfirmation()"
+                    autocomplete="off"
+                />
+                <label class="label">
+                    <span class="label-text-alt text-error" id="bulk-delete-input-error"></span>
+                </label>
+            </div>
+        </div>
+        
+        <!-- Modal Actions -->
+        <div class="modal-action">
+            <form method="dialog">
+                <button class="btn btn-ghost" onclick="closeBulkDeleteModal()">Cancel</button>
+            </form>
+            <button 
+                id="confirm-bulk-delete-btn"
+                class="btn btn-error" 
+                disabled
+                onclick="confirmBulkDelete()"
+            >
+                <i class="fas fa-trash mr-2"></i>
+                Delete Keywords
+            </button>
+        </div>
+    </div>
+    
+    <!-- Click outside to close -->
+    <form method="dialog" class="modal-backdrop">
+        <button onclick="closeBulkDeleteModal()">close</button>
     </form>
 </dialog>
 
@@ -1401,6 +1523,242 @@
             eventSource.close();
         }
     });
+    
+    // Bulk Actions Functions
+    let selectedKeywords = new Set();
+    
+    // Toggle all keywords selection
+    function toggleAllKeywords(checkbox) {
+        const checkboxes = document.querySelectorAll('.keyword-checkbox');
+        selectedKeywords.clear();
+        
+        checkboxes.forEach(cb => {
+            cb.checked = checkbox.checked;
+            if (checkbox.checked) {
+                selectedKeywords.add(cb.value);
+            }
+        });
+        
+        updateBulkActions();
+    }
+    
+    // Update bulk actions bar visibility and count
+    function updateBulkActions() {
+        const checkboxes = document.querySelectorAll('.keyword-checkbox:checked');
+        selectedKeywords.clear();
+        
+        checkboxes.forEach(cb => {
+            selectedKeywords.add(cb.value);
+        });
+        
+        const bulkActionsBar = document.getElementById('bulk-actions-bar');
+        const selectedCount = document.getElementById('selected-count');
+        const selectAll = document.getElementById('select-all-keywords');
+        
+        if (selectedKeywords.size > 0) {
+            bulkActionsBar.classList.remove('hidden');
+            selectedCount.textContent = selectedKeywords.size;
+            
+            // Update select all checkbox state
+            const totalCheckboxes = document.querySelectorAll('.keyword-checkbox').length;
+            selectAll.checked = selectedKeywords.size === totalCheckboxes;
+            selectAll.indeterminate = selectedKeywords.size > 0 && selectedKeywords.size < totalCheckboxes;
+        } else {
+            bulkActionsBar.classList.add('hidden');
+            selectAll.checked = false;
+            selectAll.indeterminate = false;
+        }
+    }
+    
+    // Clear selection
+    function clearSelection() {
+        selectedKeywords.clear();
+        document.querySelectorAll('.keyword-checkbox').forEach(cb => cb.checked = false);
+        document.getElementById('select-all-keywords').checked = false;
+        updateBulkActions();
+    }
+    
+    // Bulk recheck rank
+    async function bulkRecheckRank() {
+        if (selectedKeywords.size === 0) return;
+        
+        const button = event.target.closest('button');
+        const originalHTML = button.innerHTML;
+        button.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Processing...';
+        button.disabled = true;
+        
+        try {
+            // Send requests for each selected keyword
+            const promises = Array.from(selectedKeywords).map(keywordId => 
+                fetch(`/keywords/api/force-crawl/${keywordId}/`, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': getCookie('csrftoken'),
+                        'Content-Type': 'application/json'
+                    }
+                })
+            );
+            
+            const results = await Promise.all(promises);
+            
+            // Count successes
+            let successCount = 0;
+            for (const result of results) {
+                if (result.ok) successCount++;
+            }
+            
+            // Show success message
+            showToast(`${successCount} keywords queued for rank checking`, 'success');
+            
+            // Clear selection
+            clearSelection();
+            
+            // Reload after a short delay to show updated processing status
+            setTimeout(() => {
+                location.reload();
+            }, 1500);
+            
+        } catch (error) {
+            console.error('Error rechecking ranks:', error);
+            showToast('Failed to recheck ranks. Please try again.', 'error');
+        } finally {
+            button.innerHTML = originalHTML;
+            button.disabled = false;
+        }
+    }
+    
+    // Open bulk delete modal
+    function openBulkDeleteModal() {
+        if (selectedKeywords.size === 0) return;
+        
+        const modal = document.getElementById('bulk-delete-keywords-modal');
+        const countSpan = document.getElementById('bulk-delete-count');
+        const confirmInput = document.getElementById('bulk-delete-confirmation-input');
+        const confirmBtn = document.getElementById('confirm-bulk-delete-btn');
+        const errorLabel = document.getElementById('bulk-delete-input-error');
+        
+        // Reset modal state
+        countSpan.textContent = selectedKeywords.size;
+        confirmInput.value = '';
+        confirmBtn.disabled = true;
+        errorLabel.textContent = '';
+        
+        // Show modal
+        modal.showModal();
+    }
+    
+    // Close bulk delete modal
+    function closeBulkDeleteModal() {
+        const modal = document.getElementById('bulk-delete-keywords-modal');
+        modal.close();
+    }
+    
+    // Validate bulk delete confirmation
+    function validateBulkDeleteConfirmation() {
+        const input = document.getElementById('bulk-delete-confirmation-input');
+        const confirmBtn = document.getElementById('confirm-bulk-delete-btn');
+        const errorLabel = document.getElementById('bulk-delete-input-error');
+        
+        if (input.value.toLowerCase() === 'confirm') {
+            confirmBtn.disabled = false;
+            errorLabel.textContent = '';
+            input.classList.remove('input-error');
+        } else {
+            confirmBtn.disabled = true;
+            if (input.value.length > 0) {
+                errorLabel.textContent = 'Please type "confirm" to delete';
+                input.classList.add('input-error');
+            } else {
+                errorLabel.textContent = '';
+                input.classList.remove('input-error');
+            }
+        }
+    }
+    
+    // Confirm bulk delete
+    async function confirmBulkDelete() {
+        if (selectedKeywords.size === 0) return;
+        
+        const confirmBtn = document.getElementById('confirm-bulk-delete-btn');
+        const modal = document.getElementById('bulk-delete-keywords-modal');
+        
+        // Update button to show loading
+        const originalHTML = confirmBtn.innerHTML;
+        confirmBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Deleting...';
+        confirmBtn.disabled = true;
+        
+        try {
+            // Send delete requests for each selected keyword
+            const promises = Array.from(selectedKeywords).map(keywordId => 
+                fetch(`/keywords/api/delete/${keywordId}/`, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': getCookie('csrftoken'),
+                        'Content-Type': 'application/json'
+                    }
+                })
+            );
+            
+            const results = await Promise.all(promises);
+            
+            // Count successes
+            let successCount = 0;
+            for (const result of results) {
+                if (result.ok) successCount++;
+            }
+            
+            // Close modal
+            modal.close();
+            
+            // Show success message
+            showToast(`${successCount} keywords deleted successfully`, 'success');
+            
+            // Clear selection
+            clearSelection();
+            
+            // Reload page after short delay
+            setTimeout(() => {
+                location.reload();
+            }, 1500);
+            
+        } catch (error) {
+            console.error('Error deleting keywords:', error);
+            
+            // Show error message
+            const errorLabel = document.getElementById('bulk-delete-input-error');
+            errorLabel.textContent = 'Failed to delete keywords. Please try again.';
+            
+            // Restore button
+            confirmBtn.innerHTML = originalHTML;
+            confirmBtn.disabled = false;
+        }
+    }
+    
+    // Helper function to show toast messages
+    function showToast(message, type = 'info') {
+        const toast = document.createElement('div');
+        toast.className = 'toast toast-top toast-end';
+        
+        const alertClass = type === 'success' ? 'alert-success' : 
+                          type === 'error' ? 'alert-error' : 'alert-info';
+        
+        const icon = type === 'success' ? 'fa-check-circle' : 
+                    type === 'error' ? 'fa-times-circle' : 'fa-info-circle';
+        
+        toast.innerHTML = `
+            <div class="alert ${alertClass}">
+                <i class="fas ${icon}"></i>
+                <span>${message}</span>
+            </div>
+        `;
+        
+        document.body.appendChild(toast);
+        
+        // Remove toast after 5 seconds
+        setTimeout(() => {
+            toast.remove();
+        }, 5000);
+    }
     
 </script>
 {% endblock %}
