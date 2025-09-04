@@ -290,8 +290,15 @@ class TargetComparisonView(TemplateView):
         except EmptyPage:
             keywords_page = paginator.page(paginator.num_pages)
         
-        # Get targets for this project
-        targets = project.targets.all()[:3]  # Max 3 targets
+        # Get targets for this project (ensure no duplicates)
+        # Use a dict to track seen domains and avoid duplicates
+        seen_domains = set()
+        unique_targets = []
+        for target in project.targets.all().order_by('domain'):
+            if target.domain not in seen_domains and len(unique_targets) < 3:
+                seen_domains.add(target.domain)
+                unique_targets.append(target)
+        targets = unique_targets
         
         # Build comparison data
         comparison_data = []
