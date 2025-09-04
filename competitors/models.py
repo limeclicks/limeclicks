@@ -10,7 +10,7 @@ class Target(models.Model):
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='targets')
     domain = models.CharField(max_length=255, help_text="Competitor domain to track (e.g., example.com)")
     name = models.CharField(max_length=255, blank=True, help_text="Optional name for this competitor")
-    is_manual = models.BooleanField(default=False, help_text="True if manually added by user, False if auto-discovered")
+    is_manual = models.BooleanField(default=True, help_text="True if manually added by user")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True)
@@ -50,7 +50,6 @@ class Target(models.Model):
         return domain
     
     def clean(self):
-        # No longer limiting to 3 targets since we auto-track top competitors
         # Clean domain using the static method
         if self.domain:
             self.domain = self.clean_domain_string(self.domain)
@@ -58,6 +57,15 @@ class Target(models.Model):
             # Validate domain has at least one dot
             if '.' not in self.domain:
                 raise ValidationError("Please enter a valid domain name (e.g., example.com)")
+            
+            # Check target limit (max 3 manual targets per project)
+            if self.is_manual and not self.pk:  # Only check for new manual targets
+                existing_count = Target.objects.filter(
+                    project=self.project,
+                    is_manual=True
+                ).count()
+                if existing_count >= 3:
+                    raise ValidationError("Maximum 3 targets allowed per project")
     
     def save(self, *args, **kwargs):
         self.clean()

@@ -110,6 +110,9 @@ class KeywordRankTracker:
             # Update top competitors in the keyword
             self._update_keyword_competitors(keyword, parsed_results)
             
+            # Track manual targets if any exist
+            self._track_manual_targets(keyword, parsed_results)
+            
             return {
                 'success': True,
                 'rank': rank.rank,
@@ -372,6 +375,85 @@ class KeywordRankTracker:
         except Exception as e:
             logger.error(f"Error updating competitors for keyword {keyword.keyword}: {str(e)}")
             # Don't raise - competitor tracking shouldn't break main keyword tracking
+    
+    def _track_manual_targets(self, keyword: Keyword, parsed_results: Dict[str, Any]) -> None:
+        """
+        Track rankings for manually added targets
+        
+        Args:
+            keyword: Keyword model instance
+            parsed_results: Parsed search results
+        """
+        try:
+            # Import here to avoid circular imports
+            from competitors.models import Target, TargetKeywordRank
+            
+            # Get manual targets for this project
+            manual_targets = Target.objects.filter(
+                project=keyword.project,
+                is_manual=True
+            )
+            
+            if not manual_targets.exists():
+                return
+            
+            logger.info(f"Tracking {manual_targets.count()} manual targets for keyword: {keyword.keyword}")
+            
+            # Get organic results
+            organic_results = parsed_results.get('organic_results', [])
+            
+            for target in manual_targets:
+                # Clean target domain for matching
+                target_domain = target.domain.lower().replace('www.', '').replace('http://', '').replace('https://', '')
+                found = False
+                
+                # Search for target in results
+                for i, result in enumerate(organic_results[:100], 1):
+                    result_url = result.get('url', '').lower()
+                    
+                    if target_domain in result_url:
+                        # Found target ranking
+                        logger.info(f"Found manual target {target.domain} at position {i} for keyword {keyword.keyword}")
+                        
+                        # Create or update TargetKeywordRank
+                        target_rank, created = TargetKeywordRank.objects.update_or_create(
+                            target=target,
+                            keyword=keyword,
+                            defaults={
+                                'rank': i,
+                                'rank_url': result.get('url', ''),
+                                'scraped_at': timezone.now()
+                            }
+                        )
+                        
+                        if created:
+                            logger.info(f"Created new rank entry for manual target {target.domain}")
+                        else:
+                            logger.info(f"Updated rank entry for manual target {target.domain}")
+                        
+                        found = True
+                        break
+                
+                if not found:
+                    # Target not found in results - create entry with rank 0
+                    logger.info(f"Manual target {target.domain} not found in top 100 for keyword {keyword.keyword}")
+                    
+                    target_rank, created = TargetKeywordRank.objects.update_or_create(
+                        target=target,
+                        keyword=keyword,
+                        defaults={
+                            'rank': 0,
+                            'rank_url': '',
+                            'scraped_at': timezone.now()
+                        }
+                    )
+                    
+                    if created:
+                        logger.info(f"Created not-ranking entry for manual target {target.domain}")
+                        
+        except Exception as e:
+            logger.error(f"Error tracking manual targets: {str(e)}")
+            # Don't raise - target tracking shouldn't break main keyword tracking
 
 
 def bulk_track_keywords(keyword_ids: List[int]) -> Dict[str, Any]:

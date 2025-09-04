@@ -75,6 +75,9 @@ class RankingExtractor:
             # Extract and store top 3 competitors in keyword
             self._update_keyword_competitors(keyword, parsed_results)
             
+            # Track manual targets if any exist
+            self._track_manual_targets(keyword, parsed_results)
+            
             # Create Rank record
             rank = self._create_rank_record(
                 keyword,
@@ -381,6 +384,71 @@ class RankingExtractor:
         except Exception as e:
             logger.error(f"Error updating competitors for keyword {keyword.id}: {str(e)}")
             # Don't raise - competitor tracking shouldn't break main keyword tracking
+    
+    def _track_manual_targets(self, keyword: Keyword, parsed_results: Dict[str, Any]) -> None:
+        """
+        Track rankings for manually added targets
+        
+        Args:
+            keyword: Keyword model instance
+            parsed_results: Parsed search results from GoogleSearchParser
+        """
+        try:
+            # Import here to avoid circular imports
+            from competitors.models import Target, TargetKeywordRank
+            
+            # Get manual targets for this project
+            manual_targets = Target.objects.filter(
+                project=keyword.project,
+                is_manual=True
+            )
+            
+            if not manual_targets.exists():
+                return
+            
+            # Get organic results
+            organic_results = parsed_results.get('organic_results', [])
+            
+            for target in manual_targets:
+                # Find target in results
+                target_domain = self._normalize_domain(target.domain)
+                found = False
+                
+                for position, result in enumerate(organic_results[:100], 1):
+                    result_url = result.get('url', '')
+                    result_domain = self._extract_domain(result_url)
+                    
+                    if self._domains_match(target_domain, result_domain):
+                        # Found target ranking
+                        TargetKeywordRank.objects.update_or_create(
+                            target=target,
+                            keyword=keyword,
+                            defaults={
+                                'rank': position,
+                                'rank_url': result_url,
+                                'scraped_at': timezone.now()
+                            }
+                        )
+                        found = True
+                        logger.info(f"Tracked manual target {target.domain} at position {position} for keyword '{keyword.keyword}'")
+                        break
+                
+                if not found:
+                    # Target not found in results - create entry with rank 0
+                    TargetKeywordRank.objects.update_or_create(
+                        target=target,
+                        keyword=keyword,
+                        defaults={
+                            'rank': 0,
+                            'rank_url': '',
+                            'scraped_at': timezone.now()
+                        }
+                    )
+                    logger.info(f"Manual target {target.domain} not found in top 100 for keyword '{keyword.keyword}'")
+                        
+        except Exception as e:
+            logger.error(f"Error tracking manual targets for keyword {keyword.id}: {str(e)}")
+            # Don't raise - target tracking shouldn't break main keyword tracking
     
     def _create_rank_record(
         self,
