@@ -216,18 +216,8 @@
 
 {% block extra_js %}
 <script>
-    // Handle modal display with DaisyUI
-    document.addEventListener('htmx:afterSwap', function(event) {
-        if (event.detail.target.id === 'modalBody') {
-            const modalElement = document.getElementById('keywordsModal');
-            if (modalElement) {
-                // Show modal using HTML5 dialog API
-                modalElement.showModal();
-            }
-        }
-    });
-    
-    // Close modal handler
+    // Modal is handled via hx-on::after-swap directly on the button
+    // Close modal handler (if needed)
     function closeModal() {
         const modalElement = document.getElementById('keywordsModal');
         if (modalElement) {
