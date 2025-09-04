@@ -286,7 +286,8 @@ def trigger_manual_site_audit(self, project_id: int) -> dict:
     psi_task = collect_pagespeed_insights.apply_async(
         args=[site_audit.id],
         queue='audit_scheduled',  # Same queue for simultaneous execution
-        priority=5  # Same priority for parallel execution
+        priority=5,  # Same priority for parallel execution
+        countdown=2  # Small delay to ensure SiteAudit state is consistent
     )
     
     logger.info(f"Manual site audit triggered for {project.domain}, task_id={site_audit_task.id}")
@@ -520,11 +521,16 @@ def collect_pagespeed_insights(self, site_audit_id: int) -> dict:
     from limeclicks.storage_backends import CloudflareR2Storage
     
     try:
-        # Fetch site audit
+        # Fetch site audit with retry logic for simultaneous execution
         try:
             site_audit = SiteAudit.objects.get(id=site_audit_id)
         except SiteAudit.DoesNotExist:
-            logger.error(f"SiteAudit with id={site_audit_id} not found")
+            # When running simultaneously, the SiteAudit might not be ready yet
+            # Retry up to 3 times with increasing delays
+            if self.request.retries < 3:
+                logger.info(f"SiteAudit with id={site_audit_id} not ready yet, retrying in {10 * (self.request.retries + 1)} seconds")
+                raise self.retry(countdown=10 * (self.request.retries + 1), max_retries=3)
+            logger.error(f"SiteAudit with id={site_audit_id} not found after retries")
             return {"status": "error", "message": "SiteAudit not found"}
         
         project = site_audit.project
@@ -713,7 +719,8 @@ def create_site_audit_for_new_project(self, project_id: int) -> dict:
         
         psi_result = collect_pagespeed_insights.apply_async(
             args=[site_audit.id],
-            queue='audit_high_priority'  # Use same high priority queue for simultaneous execution
+            queue='audit_high_priority',  # Use same high priority queue for simultaneous execution
+            countdown=2  # Small delay to ensure SiteAudit is fully saved
         )
         
         logger.info(f"Triggered HIGH PRIORITY site audit task {site_audit_result.id} for project {project.domain}")
