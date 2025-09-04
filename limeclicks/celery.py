@@ -105,6 +105,16 @@ app.conf.beat_schedule = {
         'task': 'site_audit.tasks.check_license_expiry_reminder',
         'schedule': crontab(hour=9, minute=0),  # Run daily at 9 AM
     },
+    # Keyword report scheduling
+    'process-scheduled-keyword-reports': {
+        'task': 'keywords.tasks_reports.process_scheduled_reports',
+        'schedule': crontab(minute='*/15'),  # Run every 15 minutes to check for due reports
+    },
+    'cleanup-old-keyword-reports': {
+        'task': 'keywords.tasks_reports.cleanup_old_reports',
+        'schedule': crontab(hour=2, minute=0),  # Run daily at 2 AM
+        'kwargs': {'days_to_keep': 90}
+    },
 }
 
 @app.task(bind=True)

@@ -1,11 +1,15 @@
-from django.urls import path
+from django.urls import path, include
 from . import views
+from . import views_reports_list
 
 app_name = 'keywords'
 
 urlpatterns = [
     # Main list view
     path('', views.keywords_list, name='list'),
+    
+    # Reports main view
+    path('reports/', views_reports_list.reports_main_list, name='reports_main'),
     path('project/<int:project_id>/', views.project_keywords, name='project_keywords'),
     path('keyword/<int:keyword_id>/', views.keyword_detail, name='keyword_detail'),
     path('add-modal/', views.add_keyword_modal, name='add_keyword_modal'),
@@ -32,4 +36,7 @@ urlpatterns = [
     
     # Historical SERP data
     path('api/rank/<int:rank_id>/serp/', views.api_rank_serp, name='api_rank_serp'),
+    
+    # Project-specific Reports URLs
+    path('project/', include('keywords.urls_reports')),
 ]

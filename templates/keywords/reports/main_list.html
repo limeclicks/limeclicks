@@ -1,0 +1,274 @@
+{% extends 'dashboard_base.html' %}
+{% load static %}
+
+{% block title %}Keyword Reports - LimeClicks{% endblock %}
+
+{% block page_title %}Keyword Reports{% endblock %}
+
+{% block content %}
+<div class="container mx-auto">
+    <!-- Header Section -->
+    <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6">
+        <div>
+            <h1 class="text-3xl font-bold text-base-content">Keyword Reports</h1>
+            <p class="text-base-content/60 mt-1">Generate and manage keyword ranking reports</p>
+        </div>
+        <div class="flex gap-3">
+            <select class="select select-bordered" onchange="window.location.href='?project=' + this.value">
+                <option value="">All Projects</option>
+                {% for project in user_projects %}
+                    <option value="{{ project.id }}" {% if project_filter == project.id|stringformat:"s" %}selected{% endif %}>
+                        {{ project.domain }}
+                    </option>
+                {% endfor %}
+            </select>
+            <button class="btn btn-primary" onclick="createReportModal.showModal()">
+                <i class="fas fa-plus"></i> New Report
+            </button>
+        </div>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <div class="stats shadow">
+            <div class="stat">
+                <div class="stat-figure text-primary">
+                    <i class="fas fa-file-alt text-2xl"></i>
+                </div>
+                <div class="stat-title">Total Reports</div>
+                <div class="stat-value text-primary">{{ page_obj.paginator.count }}</div>
+            </div>
+        </div>
+        
+        <div class="stats shadow">
+            <div class="stat">
+                <div class="stat-figure text-success">
+                    <i class="fas fa-check-circle text-2xl"></i>
+                </div>
+                <div class="stat-title">Completed</div>
+                <div class="stat-value text-success">
+                    {{ reports|filter:"status:completed"|length|default:"0" }}
+                </div>
+            </div>
+        </div>
+        
+        <div class="stats shadow">
+            <div class="stat">
+                <div class="stat-figure text-info">
+                    <i class="fas fa-spinner text-2xl"></i>
+                </div>
+                <div class="stat-title">Processing</div>
+                <div class="stat-value text-info">
+                    {{ reports|filter:"status:processing"|length|default:"0" }}
+                </div>
+            </div>
+        </div>
+        
+        <div class="stats shadow">
+            <div class="stat">
+                <div class="stat-figure text-warning">
+                    <i class="fas fa-calendar-alt text-2xl"></i>
+                </div>
+                <div class="stat-title">Active Schedules</div>
+                <div class="stat-value text-warning">{{ active_schedules }}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="card bg-base-100 shadow-sm mb-6">
+        <div class="card-body p-4">
+            <form method="get" class="flex flex-wrap gap-3 items-end">
+                <div class="form-control flex-1 min-w-[200px]">
+                    <input type="text" name="search" placeholder="Search reports..." 
+                           value="{{ search }}" class="input input-bordered">
+                </div>
+                
+                <select name="status" class="select select-bordered">
+                    <option value="">All Status</option>
+                    <option value="pending" {% if status_filter == 'pending' %}selected{% endif %}>Pending</option>
+                    <option value="processing" {% if status_filter == 'processing' %}selected{% endif %}>Processing</option>
+                    <option value="completed" {% if status_filter == 'completed' %}selected{% endif %}>Completed</option>
+                    <option value="failed" {% if status_filter == 'failed' %}selected{% endif %}>Failed</option>
+                </select>
+                
+                <button type="submit" class="btn btn-outline">
+                    <i class="fas fa-search"></i> Filter
+                </button>
+                
+                {% if search or status_filter or project_filter %}
+                    <a href="{% url 'keywords:reports_main' %}" class="btn btn-ghost">
+                        <i class="fas fa-times"></i> Clear
+                    </a>
+                {% endif %}
+            </form>
+        </div>
+    </div>
+
+    <!-- Reports Table -->
+    <div class="card bg-base-100 shadow-sm">
+        <div class="overflow-x-auto">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Report Name</th>
+                        <th>Project</th>
+                        <th>Date Range</th>
+                        <th>Format</th>
+                        <th>Status</th>
+                        <th>Created</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for report in reports %}
+                    <tr class="hover">
+                        <td>
+                            <div class="font-medium">{{ report.name }}</div>
+                            {% if report.created_by %}
+                                <div class="text-sm text-base-content/60">by {{ report.created_by.get_full_name|default:report.created_by.username }}</div>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <a href="{% url 'project:detail' report.project.id %}" class="link link-primary">
+                                {{ report.project.domain }}
+                            </a>
+                        </td>
+                        <td>
+                            <span class="text-sm">
+                                {{ report.start_date|date:"M d" }} - {{ report.end_date|date:"M d, Y" }}
+                            </span>
+                        </td>
+                        <td>
+                            {% if report.report_format == 'csv' %}
+                                <span class="badge badge-info">CSV</span>
+                            {% elif report.report_format == 'pdf' %}
+                                <span class="badge badge-warning">PDF</span>
+                            {% else %}
+                                <span class="badge badge-primary">Both</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if report.status == 'completed' %}
+                                <span class="badge badge-success">Completed</span>
+                            {% elif report.status == 'processing' %}
+                                <span class="badge badge-info">
+                                    <i class="fas fa-spinner fa-spin mr-1"></i> Processing
+                                </span>
+                            {% elif report.status == 'failed' %}
+                                <span class="badge badge-error">Failed</span>
+                            {% else %}
+                                <span class="badge badge-warning">Pending</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="text-sm">{{ report.created_at|date:"M d, Y" }}</span>
+                        </td>
+                        <td>
+                            <div class="flex gap-2">
+                                {% if report.status == 'completed' %}
+                                    {% if report.csv_file_path %}
+                                        <a href="{% url 'keyword_reports:download_report' report.project.id report.id %}?type=csv" 
+                                           class="btn btn-sm btn-ghost" title="Download CSV">
+                                            <i class="fas fa-download"></i>
+                                        </a>
+                                    {% endif %}
+                                    {% if report.pdf_file_path %}
+                                        <a href="{% url 'keyword_reports:download_report' report.project.id report.id %}?type=pdf" 
+                                           class="btn btn-sm btn-ghost" title="Download PDF">
+                                            <i class="fas fa-file-pdf"></i>
+                                        </a>
+                                    {% endif %}
+                                {% endif %}
+                                <a href="{% url 'keyword_reports:report_detail' report.project.id report.id %}" 
+                                   class="btn btn-sm btn-ghost" title="View Details">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7" class="text-center py-8">
+                            <div class="text-base-content/60">
+                                <i class="fas fa-file-alt text-4xl mb-3"></i>
+                                <p>No reports found</p>
+                                <button class="btn btn-primary btn-sm mt-4" onclick="createReportModal.showModal()">
+                                    Create Your First Report
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Pagination -->
+        {% if page_obj.has_other_pages %}
+        <div class="card-body border-t">
+            <div class="join mx-auto">
+                {% if page_obj.has_previous %}
+                    <a href="?page={{ page_obj.previous_page_number }}{% if search %}&search={{ search }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if project_filter %}&project={{ project_filter }}{% endif %}" 
+                       class="join-item btn btn-sm">«</a>
+                {% endif %}
+                
+                {% for num in page_obj.paginator.page_range %}
+                    {% if page_obj.number == num %}
+                        <button class="join-item btn btn-sm btn-active">{{ num }}</button>
+                    {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                        <a href="?page={{ num }}{% if search %}&search={{ search }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if project_filter %}&project={{ project_filter }}{% endif %}" 
+                           class="join-item btn btn-sm">{{ num }}</a>
+                    {% endif %}
+                {% endfor %}
+                
+                {% if page_obj.has_next %}
+                    <a href="?page={{ page_obj.next_page_number }}{% if search %}&search={{ search }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if project_filter %}&project={{ project_filter }}{% endif %}" 
+                       class="join-item btn btn-sm">»</a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Create Report Modal -->
+<dialog id="createReportModal" class="modal">
+    <div class="modal-box max-w-2xl">
+        <h3 class="font-bold text-lg mb-4">Create New Report</h3>
+        
+        <div class="space-y-4">
+            <p class="text-base-content/60">
+                Select a project to create a report for:
+            </p>
+            
+            <div class="grid grid-cols-1 gap-3">
+                {% for project in user_projects %}
+                <a href="{% url 'keyword_reports:create_report' project.id %}" 
+                   class="btn btn-outline btn-block justify-start">
+                    <i class="fas fa-folder mr-2"></i>
+                    {{ project.domain }}
+                    <span class="ml-auto text-sm text-base-content/60">
+                        {{ project.keywords.count }} keywords
+                    </span>
+                </a>
+                {% empty %}
+                <p class="text-center text-base-content/60 py-8">
+                    No projects available. Create a project first.
+                </p>
+                {% endfor %}
+            </div>
+        </div>
+        
+        <div class="modal-action">
+            <form method="dialog">
+                <button class="btn">Cancel</button>
+            </form>
+        </div>
+    </div>
+    <form method="dialog" class="modal-backdrop">
+        <button>close</button>
+    </form>
+</dialog>
+
+{% endblock %}

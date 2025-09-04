@@ -400,3 +400,7 @@ class KeywordTag(models.Model):
     
     def __str__(self):
         return f"{self.keyword.keyword} - {self.tag.name}"
+
+
+# Import report models
+from .models_reports import KeywordReport, ReportSchedule

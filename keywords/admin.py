@@ -653,3 +653,5 @@ class TagAdmin(ModelAdmin):
         
         html += '</ul>'
         return format_html(html)
+# Import report admin configurations
+from .admin_reports import *

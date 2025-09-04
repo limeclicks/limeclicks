@@ -438,9 +438,15 @@
                         <span class="text-xs uppercase font-semibold text-base-content/60">Keyword Research</span>
                     </li>
                     <li>
-                        <a href="{% url 'keywords:list' %}" class="flex items-center gap-3 {% if request.resolver_match.app_name == 'keywords' %}active{% endif %}">
+                        <a href="{% url 'keywords:list' %}" class="flex items-center gap-3 {% if request.resolver_match.app_name == 'keywords' and request.resolver_match.url_name != 'report_list' %}active{% endif %}">
                             <i class="fas fa-key w-4"></i>
                             <span>Keywords</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="{% url 'keywords:reports_main' %}" class="flex items-center gap-3 {% if 'report' in request.resolver_match.url_name|default:'' %}active{% endif %}">
+                            <i class="fas fa-file-alt w-4"></i>
+                            <span>Reports</span>
                         </a>
                     </li>
                     
