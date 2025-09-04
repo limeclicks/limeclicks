@@ -58,7 +58,7 @@
         <div class="flex items-center justify-between mb-6">
             <div>
                 <h1 class="text-3xl font-bold text-base-content">Site Audit Reports</h1>
-                <p class="text-base-content/60 mt-1">Download CSV reports from your site audits</p>
+                <p class="text-base-content/60 mt-1">Download comprehensive Excel reports from your site audits</p>
             </div>
         </div>
         
@@ -139,7 +139,7 @@
         <!-- Empty State -->
         <div id="empty-state" class="text-center py-12" style="display: none;">
             <div class="w-20 h-20 bg-base-200 rounded-full flex items-center justify-center mx-auto mb-4">
-                <i class="fas fa-file-csv text-2xl text-base-content/40"></i>
+                <i class="fas fa-file-excel text-2xl text-base-content/40"></i>
             </div>
             <h3 class="text-lg font-semibold mb-2">No Reports Available</h3>
             <p class="text-base-content/60" id="empty-state-message">
@@ -273,20 +273,24 @@
         };
         
         files.forEach((file, index) => {
-            // Determine category and icon
-            let category = 'Other';
-            let iconClass = 'fa-file-csv';
-            let bgColor = 'bg-base-200';
+            // Check if it's an Excel file based on the filename
+            const isExcel = file.original_filename && file.original_filename.endsWith('.xlsx');
             
-            for (const [cat, types] of Object.entries(categories)) {
-                if (types.includes(file.type)) {
-                    category = cat;
-                    break;
-                }
-            }
+            // Set icon based on file type for Excel consolidated reports
+            const excelIconMap = {
+                'technical_seo_audit': { icon: 'fa-file-excel', color: 'bg-success/20 text-success' },
+                'content_optimization': { icon: 'fa-file-excel', color: 'bg-info/20 text-info' },
+                'technical_config': { icon: 'fa-file-excel', color: 'bg-primary/20 text-primary' },
+                'media_analysis': { icon: 'fa-file-excel', color: 'bg-warning/20 text-warning' },
+                'link_analysis': { icon: 'fa-file-excel', color: 'bg-secondary/20 text-secondary' },
+                'page_performance': { icon: 'fa-file-excel', color: 'bg-accent/20 text-accent' },
+                'security': { icon: 'fa-file-excel', color: 'bg-error/20 text-error' },
+                'audit_summary': { icon: 'fa-file-excel', color: 'bg-success/20 text-success' },
+                'validation': { icon: 'fa-file-excel', color: 'bg-primary/20 text-primary' },
+            };
             
-            // Set icon based on file type
-            const iconMap = {
+            // Set icon based on file type for CSV reports (legacy)
+            const csvIconMap = {
                 'crawl_overview': { icon: 'fa-chart-line', color: 'bg-primary/20 text-primary' },
                 'issues_overview': { icon: 'fa-exclamation-triangle', color: 'bg-warning/20 text-warning' },
                 'internal_all': { icon: 'fa-sitemap', color: 'bg-info/20 text-info' },
@@ -297,7 +301,12 @@
                 'images': { icon: 'fa-image', color: 'bg-primary/20 text-primary' },
             };
             
-            const iconConfig = iconMap[file.type] || { icon: 'fa-file-csv', color: 'bg-base-200' };
+            // Select appropriate icon map
+            const iconMap = isExcel ? excelIconMap : csvIconMap;
+            const iconConfig = iconMap[file.type] || { 
+                icon: isExcel ? 'fa-file-excel' : 'fa-file-csv', 
+                color: isExcel ? 'bg-success/20 text-success' : 'bg-base-200' 
+            };
             
             const fileCard = document.createElement('div');
             fileCard.className = 'card bg-base-100 shadow-sm border border-base-300 file-card report-item';
