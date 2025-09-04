@@ -786,40 +786,78 @@
 <div id="modal-container"></div>
 
 <!-- Delete Keyword Modal -->
-<div id="delete-keyword-modal" class="modal">
+<dialog id="delete-keyword-modal" class="modal">
     <div class="modal-box max-w-md">
-        <div class="flex justify-between items-center mb-6">
-            <h3 class="font-bold text-lg text-error">Delete Keyword</h3>
-            <button onclick="closeDeleteModal()" class="btn btn-sm btn-circle btn-ghost">✕</button>
+        <!-- Modal Header with Icon -->
+        <div class="flex items-center gap-4 mb-4">
+            <div class="w-12 h-12 rounded-full bg-error/20 flex items-center justify-center">
+                <i class="fas fa-trash-alt text-error text-xl"></i>
+            </div>
+            <div>
+                <h3 class="font-bold text-lg">Delete Keyword</h3>
+                <p class="text-sm text-base-content/60">This action cannot be undone</p>
+            </div>
         </div>
         
-        <div class="alert alert-warning mb-4">
-            <i class="fas fa-exclamation-triangle"></i>
-            <span>This action cannot be undone. All ranking data for this keyword will be permanently deleted.</span>
+        <!-- Modal Content -->
+        <div class="py-4">
+            <div class="alert alert-error mb-4">
+                <i class="fas fa-exclamation-circle"></i>
+                <span>Warning: This will permanently delete all ranking data and history for this keyword.</span>
+            </div>
+            
+            <div class="mb-4">
+                <p class="text-base-content mb-2">You are about to delete the keyword:</p>
+                <p class="font-bold text-lg px-4 py-2 bg-base-200 rounded-lg" id="delete-keyword-text"></p>
+            </div>
+            
+            <div class="divider"></div>
+            
+            <div class="space-y-3 mb-4">
+                <p class="text-sm text-base-content/80">This action will delete:</p>
+                <ul class="space-y-2 text-sm">
+                    <li class="flex items-center gap-2">
+                        <i class="fas fa-times-circle text-error"></i>
+                        <span>All historical ranking data</span>
+                    </li>
+                    <li class="flex items-center gap-2">
+                        <i class="fas fa-times-circle text-error"></i>
+                        <span>SERP snapshots and cached data</span>
+                    </li>
+                    <li class="flex items-center gap-2">
+                        <i class="fas fa-times-circle text-error"></i>
+                        <span>Competitor tracking for this keyword</span>
+                    </li>
+                    <li class="flex items-center gap-2">
+                        <i class="fas fa-times-circle text-error"></i>
+                        <span>Associated reports and analytics</span>
+                    </li>
+                </ul>
+            </div>
+            
+            <div class="form-control">
+                <label class="label">
+                    <span class="label-text font-semibold">Type <span class="text-error">"confirm"</span> to delete this keyword:</span>
+                </label>
+                <input 
+                    type="text" 
+                    id="delete-confirmation-input"
+                    class="input input-bordered" 
+                    placeholder="Type 'confirm' here"
+                    oninput="validateKeywordDeleteConfirmation()"
+                    autocomplete="off"
+                />
+                <label class="label">
+                    <span class="label-text-alt text-error" id="delete-input-error"></span>
+                </label>
+            </div>
         </div>
         
-        <div class="mb-4">
-            <p class="text-base-content mb-2">You are about to delete the keyword:</p>
-            <p class="font-bold text-lg" id="delete-keyword-text"></p>
-        </div>
-        
-        <div class="form-control w-full mb-6">
-            <label class="label">
-                <span class="label-text">Type <span class="font-bold text-error">delete</span> to confirm</span>
-            </label>
-            <input 
-                type="text" 
-                id="delete-confirmation-input"
-                placeholder="Type 'delete' here" 
-                class="input input-bordered w-full" 
-                autocomplete="off"
-            />
-            <label class="label">
-                <span class="label-text-alt text-error" id="delete-input-error"></span>
-            </label>
-        </div>
-        
+        <!-- Modal Actions -->
         <div class="modal-action">
+            <form method="dialog">
+                <button class="btn btn-ghost">Cancel</button>
+            </form>
             <button 
                 type="button" 
                 id="confirm-delete-btn"
@@ -827,12 +865,17 @@
                 disabled
                 onclick="confirmDeleteKeyword()"
             >
-                <i class="fas fa-trash mr-2"></i>Delete Keyword
+                <i class="fas fa-trash mr-2"></i>
+                Delete Keyword
             </button>
-            <button type="button" onclick="closeDeleteModal()" class="btn btn-ghost">Cancel</button>
         </div>
     </div>
-</div>
+    
+    <!-- Click outside to close -->
+    <form method="dialog" class="modal-backdrop">
+        <button>close</button>
+    </form>
+</dialog>
 
 <script>
     // Sort table by column
@@ -1093,44 +1136,45 @@
         confirmInput.value = '';
         confirmBtn.disabled = true;
         errorLabel.textContent = '';
+        confirmInput.classList.remove('input-error');
         
-        modal.classList.add('modal-open');
+        // Show modal using dialog API
+        modal.showModal();
         confirmInput.focus();
     }
     
-    // Close delete modal
-    function closeDeleteModal() {
-        const modal = document.getElementById('delete-keyword-modal');
-        modal.classList.remove('modal-open');
-        deleteKeywordId = null;
-        deleteKeywordText = null;
-    }
-    
-    // Handle delete confirmation input
-    document.getElementById('delete-confirmation-input').addEventListener('input', function(e) {
+    // Validate keyword deletion confirmation
+    function validateKeywordDeleteConfirmation() {
+        const input = document.getElementById('delete-confirmation-input');
         const confirmBtn = document.getElementById('confirm-delete-btn');
         const errorLabel = document.getElementById('delete-input-error');
         
-        if (e.target.value.toLowerCase() === 'delete') {
+        if (input.value.toLowerCase() === 'confirm') {
             confirmBtn.disabled = false;
-            e.target.classList.remove('input-error');
             errorLabel.textContent = '';
+            input.classList.remove('input-error');
         } else {
             confirmBtn.disabled = true;
-            if (e.target.value.length > 0) {
-                e.target.classList.add('input-error');
-                errorLabel.textContent = 'Please type "delete" exactly to confirm';
+            if (input.value.length > 0) {
+                errorLabel.textContent = 'Please type "confirm" to delete';
+                input.classList.add('input-error');
             } else {
-                e.target.classList.remove('input-error');
                 errorLabel.textContent = '';
+                input.classList.remove('input-error');
             }
         }
-    });
+    }
     
-    // Handle Enter key in delete confirmation input
-    document.getElementById('delete-confirmation-input').addEventListener('keypress', function(e) {
-        if (e.key === 'Enter' && e.target.value.toLowerCase() === 'delete') {
-            confirmDeleteKeyword();
+    // Initialize delete confirmation input validation after DOM is ready
+    document.addEventListener('DOMContentLoaded', function() {
+        const deleteInput = document.getElementById('delete-confirmation-input');
+        if (deleteInput) {
+            // Handle Enter key in delete confirmation input
+            deleteInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter' && e.target.value.toLowerCase() === 'confirm') {
+                    confirmDeleteKeyword();
+                }
+            });
         }
     });
     
@@ -1155,7 +1199,8 @@
             
             if (data.success) {
                 // Close modal
-                closeDeleteModal();
+                const modal = document.getElementById('delete-keyword-modal');
+                modal.close();
                 
                 // Show success message
                 showNotification(`Keyword "${deleteKeywordText}" has been deleted successfully.`, 'success');
