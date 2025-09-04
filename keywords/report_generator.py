@@ -279,7 +279,7 @@ class KeywordReportGenerator:
             # Determine current rank and impact
             current_rank = kw_data['rank']
             if current_rank == 0 or current_rank > 100:
-                current_rank_str = ">100"
+                current_rank_str = "NR"
             else:
                 current_rank_str = str(current_rank)
             
@@ -311,11 +311,11 @@ class KeywordReportGenerator:
                 if keyword_id in self.ranking_data and date_obj in self.ranking_data[keyword_id]:
                     rank_value = self.ranking_data[keyword_id][date_obj]['rank']
                     if rank_value == 0 or rank_value > 100:
-                        row.append(">100")
+                        row.append("NR")
                     else:
                         row.append(str(rank_value))
                 else:
-                    row.append(">100")  # No data means not ranking
+                    row.append("NR")  # No data means not ranking
             
             writer.writerow(row)
         
@@ -448,12 +448,12 @@ class KeywordReportGenerator:
                 last_rank = self.ranking_data[keyword_id][dates_with_data[-1]]['rank']
                 
                 if first_rank > 100:
-                    first_rank_str = ">100"
+                    first_rank_str = "NR"
                 else:
                     first_rank_str = str(first_rank)
                 
                 if last_rank > 100:
-                    last_rank_str = ">100"
+                    last_rank_str = "NR"
                 else:
                     last_rank_str = str(last_rank)
                 
@@ -510,7 +510,15 @@ class KeywordReportGenerator:
             elements.append(detail_table)
         
         # Build PDF
-        doc.build(elements)
+        try:
+            doc.build(elements)
+        except Exception as e:
+            logger.error(f"Error building PDF: {e}")
+            # Return a simple error PDF
+            buffer = io.BytesIO()
+            doc = SimpleDocTemplate(buffer, pagesize=A4)
+            elements = [Paragraph("Error generating report", styles['Title'])]
+            doc.build(elements)
         
         # Get PDF content
         pdf_content = buffer.getvalue()

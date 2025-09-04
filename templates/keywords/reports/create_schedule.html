@@ -1,0 +1,237 @@
+{% extends 'dashboard_base.html' %}
+{% load static %}
+
+{% block title %}Create Report Schedule - {{ project.domain }} - LimeClicks{% endblock %}
+
+{% block page_title %}Create Report Schedule{% endblock %}
+
+{% block content %}
+<div class="container mx-auto max-w-4xl">
+    <!-- Header -->
+    <div class="mb-6">
+        <h1 class="text-3xl font-bold text-base-content">Create Report Schedule</h1>
+        <p class="text-base-content/60 mt-1">Set up automated report generation for {{ project.domain }}</p>
+    </div>
+
+    <!-- Form Card -->
+    <form method="post" class="card bg-base-100 shadow-sm">
+        {% csrf_token %}
+        
+        <div class="card-body space-y-6">
+            <!-- Basic Information -->
+            <div class="space-y-4">
+                <h3 class="text-lg font-semibold">Schedule Information</h3>
+                
+                <div class="form-control">
+                    <label class="label">
+                        <span class="label-text">Schedule Name</span>
+                    </label>
+                    <input type="text" name="name" class="input input-bordered" 
+                           placeholder="e.g., Weekly SEO Report"
+                           value="Weekly {{ project.domain }} Report" required>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="form-control">
+                        <label class="label">
+                            <span class="label-text">Frequency</span>
+                        </label>
+                        <select name="frequency" id="frequency" class="select select-bordered" required>
+                            <option value="daily">Daily</option>
+                            <option value="weekly" selected>Weekly</option>
+                            <option value="biweekly">Bi-Weekly</option>
+                            <option value="monthly">Monthly</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-control">
+                        <label class="label">
+                            <span class="label-text">Time (UTC)</span>
+                        </label>
+                        <input type="time" name="time_of_day" class="input input-bordered" 
+                               value="09:00" required>
+                    </div>
+                </div>
+                
+                <!-- Day selection for weekly/biweekly -->
+                <div id="day_of_week_control" class="form-control">
+                    <label class="label">
+                        <span class="label-text">Day of Week</span>
+                    </label>
+                    <select name="day_of_week" class="select select-bordered">
+                        <option value="0" selected>Monday</option>
+                        <option value="1">Tuesday</option>
+                        <option value="2">Wednesday</option>
+                        <option value="3">Thursday</option>
+                        <option value="4">Friday</option>
+                        <option value="5">Saturday</option>
+                        <option value="6">Sunday</option>
+                    </select>
+                </div>
+                
+                <!-- Day of month for monthly -->
+                <div id="day_of_month_control" class="form-control hidden">
+                    <label class="label">
+                        <span class="label-text">Day of Month</span>
+                    </label>
+                    <input type="number" name="day_of_month" class="input input-bordered" 
+                           min="1" max="28" value="1">
+                    <label class="label">
+                        <span class="label-text-alt">Use 1-28 to ensure the schedule runs every month</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Report Configuration -->
+            <div class="space-y-4">
+                <h3 class="text-lg font-semibold">Report Configuration</h3>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="form-control">
+                        <label class="label">
+                            <span class="label-text">Report Period</span>
+                        </label>
+                        <select name="report_period_days" class="select select-bordered" required>
+                            <option value="7" selected>Last 7 days</option>
+                            <option value="14">Last 14 days</option>
+                            <option value="30">Last 30 days</option>
+                            <option value="60">Last 60 days</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-control">
+                        <label class="label">
+                            <span class="label-text">Report Format</span>
+                        </label>
+                        <select name="format" class="select select-bordered" required>
+                            <option value="both" selected>Both CSV and PDF</option>
+                            <option value="csv">CSV Only</option>
+                            <option value="pdf">PDF Only</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Keyword Filters -->
+            <div class="space-y-4">
+                <h3 class="text-lg font-semibold">Keyword Filters</h3>
+                
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i>
+                    <span>Leave filters empty to include all project keywords in reports.</span>
+                </div>
+                
+                <!-- Country Filter -->
+                {% if countries %}
+                <div class="form-control">
+                    <label class="label">
+                        <span class="label-text">Filter by Country</span>
+                    </label>
+                    <div class="grid grid-cols-2 md:grid-cols-3 gap-2">
+                        {% for country, country_code in countries %}
+                        <label class="label cursor-pointer justify-start gap-2">
+                            <input type="checkbox" name="countries" value="{{ country }}" class="checkbox checkbox-sm">
+                            <span class="label-text">{{ country_code }} ({{ country }})</span>
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+                
+                <!-- Tags Filter -->
+                {% if tags %}
+                <div class="form-control">
+                    <label class="label">
+                        <span class="label-text">Filter by Tags</span>
+                    </label>
+                    <div class="grid grid-cols-2 md:grid-cols-3 gap-2">
+                        {% for tag in tags %}
+                        <label class="label cursor-pointer justify-start gap-2">
+                            <input type="checkbox" name="tags" value="{{ tag.id }}" class="checkbox checkbox-sm">
+                            <span class="badge" style="background-color: {{ tag.color }}; color: white;">
+                                {{ tag.name }}
+                            </span>
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Report Options -->
+            <div class="space-y-4">
+                <h3 class="text-lg font-semibold">Report Options</h3>
+                
+                <div class="space-y-2">
+                    <label class="label cursor-pointer justify-start gap-3">
+                        <input type="checkbox" name="include_graphs" class="checkbox" checked>
+                        <span class="label-text">
+                            Include graphs in PDF report
+                            <span class="text-xs text-base-content/60 block">
+                                Adds visual charts showing ranking trends
+                            </span>
+                        </span>
+                    </label>
+                    
+                    <label class="label cursor-pointer justify-start gap-3">
+                        <input type="checkbox" name="include_competitors" class="checkbox">
+                        <span class="label-text">
+                            Include competitor data (if available)
+                            <span class="text-xs text-base-content/60 block">
+                                Shows competitor rankings for the same keywords
+                            </span>
+                        </span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Email Recipients -->
+            <div class="space-y-4">
+                <h3 class="text-lg font-semibold">Email Notifications</h3>
+                
+                <div class="form-control">
+                    <label class="label">
+                        <span class="label-text">Email Recipients</span>
+                        <span class="label-text-alt">Comma-separated email addresses</span>
+                    </label>
+                    <input type="text" name="email_recipients" class="input input-bordered" 
+                           placeholder="email1@example.com, email2@example.com"
+                           value="{{ request.user.email }}">
+                    <label class="label">
+                        <span class="label-text-alt">Leave empty to disable email notifications</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Actions -->
+            <div class="card-actions justify-end pt-4 border-t">
+                <a href="{% url 'keywords:schedule_list' project.id %}" class="btn btn-ghost">Cancel</a>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-calendar-plus mr-2"></i>
+                    Create Schedule
+                </button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<script>
+// Toggle day selection based on frequency
+document.getElementById('frequency').addEventListener('change', function() {
+    const dayOfWeek = document.getElementById('day_of_week_control');
+    const dayOfMonth = document.getElementById('day_of_month_control');
+    
+    if (this.value === 'monthly') {
+        dayOfWeek.classList.add('hidden');
+        dayOfMonth.classList.remove('hidden');
+    } else if (this.value === 'daily') {
+        dayOfWeek.classList.add('hidden');
+        dayOfMonth.classList.add('hidden');
+    } else {
+        dayOfWeek.classList.remove('hidden');
+        dayOfMonth.classList.add('hidden');
+    }
+});
+</script>
+
+{% endblock %}

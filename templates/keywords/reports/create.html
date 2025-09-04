@@ -1,0 +1,198 @@
+{% extends 'dashboard_base.html' %}
+{% load static %}
+
+{% block title %}Create Report - {{ project.domain }} - LimeClicks{% endblock %}
+
+{% block page_title %}Create Keyword Report{% endblock %}
+
+{% block content %}
+<div class="container mx-auto max-w-4xl">
+    <!-- Header -->
+    <div class="mb-6">
+        <h1 class="text-3xl font-bold text-base-content">Create Keyword Report</h1>
+        <p class="text-base-content/60 mt-1">Generate a ranking report for {{ project.domain }}</p>
+    </div>
+
+    <!-- Form Card -->
+    <form method="post" class="card bg-base-100 shadow-sm">
+        {% csrf_token %}
+        
+        <div class="card-body space-y-6">
+            <!-- Basic Information -->
+            <div class="space-y-4">
+                <h3 class="text-lg font-semibold">Report Information</h3>
+                
+                <div class="form-control">
+                    <label class="label">
+                        <span class="label-text">Report Name</span>
+                    </label>
+                    <input type="text" name="name" class="input input-bordered" 
+                           placeholder="e.g., Monthly SEO Report - {{ project.domain }}"
+                           value="{{ project.domain }} Report - {% now 'F Y' %}">
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="form-control">
+                        <label class="label">
+                            <span class="label-text">Start Date</span>
+                        </label>
+                        <input type="date" name="start_date" class="input input-bordered" 
+                               value="{{ default_start_date|date:'Y-m-d' }}"
+                               max="{{ max_date|date:'Y-m-d' }}" required>
+                    </div>
+                    
+                    <div class="form-control">
+                        <label class="label">
+                            <span class="label-text">End Date</span>
+                        </label>
+                        <input type="date" name="end_date" class="input input-bordered" 
+                               value="{{ default_end_date|date:'Y-m-d' }}"
+                               max="{{ max_date|date:'Y-m-d' }}" required>
+                    </div>
+                </div>
+                
+                <div class="form-control">
+                    <label class="label">
+                        <span class="label-text">Report Format</span>
+                    </label>
+                    <select name="format" class="select select-bordered">
+                        <option value="both" selected>Both CSV and PDF</option>
+                        <option value="csv">CSV Only</option>
+                        <option value="pdf">PDF Only</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Keyword Filters -->
+            <div class="space-y-4">
+                <h3 class="text-lg font-semibold">Keyword Filters</h3>
+                
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i>
+                    <span>Filter keywords by country and/or tags. If no filters are selected, all {{ keyword_count }} project keywords will be included in the report.</span>
+                </div>
+                
+                <!-- Country Filter -->
+                {% if countries %}
+                <div class="form-control">
+                    <label class="label">
+                        <span class="label-text">Filter by Country</span>
+                        <span class="label-text-alt text-base-content/60">Leave empty for all countries</span>
+                    </label>
+                    <div class="grid grid-cols-2 md:grid-cols-3 gap-2">
+                        {% for country, country_code in countries %}
+                        <label class="label cursor-pointer justify-start gap-2">
+                            <input type="checkbox" name="countries" value="{{ country }}" class="checkbox checkbox-sm">
+                            <span class="label-text">{{ country_code }} ({{ country }})</span>
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+                
+                <!-- Tags Filter -->
+                {% if tags %}
+                <div class="form-control">
+                    <label class="label">
+                        <span class="label-text">Filter by Tags</span>
+                        <span class="label-text-alt text-base-content/60">Leave empty for all tags</span>
+                    </label>
+                    <div class="grid grid-cols-2 md:grid-cols-3 gap-2">
+                        {% for tag in tags %}
+                        <label class="label cursor-pointer justify-start gap-2">
+                            <input type="checkbox" name="tags" value="{{ tag.id }}" class="checkbox checkbox-sm">
+                            <span class="badge" style="background-color: {{ tag.color }}; color: white;">
+                                {{ tag.name }}
+                            </span>
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+                
+            </div>
+
+            <!-- Report Options -->
+            <div class="space-y-4">
+                <h3 class="text-lg font-semibold">Report Options</h3>
+                
+                <div class="space-y-2">
+                    <label class="label cursor-pointer justify-start gap-3">
+                        <input type="checkbox" name="include_graphs" class="checkbox" checked>
+                        <span class="label-text">
+                            Include graphs in PDF report
+                            <span class="text-xs text-base-content/60 block">
+                                Adds visual charts showing ranking trends
+                            </span>
+                        </span>
+                    </label>
+                    
+                    <label class="label cursor-pointer justify-start gap-3">
+                        <input type="checkbox" name="include_competitors" class="checkbox">
+                        <span class="label-text">
+                            Include competitor data (if available)
+                            <span class="text-xs text-base-content/60 block">
+                                Shows competitor rankings for the same keywords
+                            </span>
+                        </span>
+                    </label>
+                    
+                    <label class="label cursor-pointer justify-start gap-3">
+                        <input type="checkbox" name="send_notification" class="checkbox" checked>
+                        <span class="label-text">
+                            Send email notification when ready
+                            <span class="text-xs text-base-content/60 block">
+                                You'll receive an email when the report is generated
+                            </span>
+                        </span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Actions -->
+            <div class="card-actions justify-end pt-4 border-t">
+                <a href="{% url 'keywords:reports_main' %}" class="btn btn-ghost">Cancel</a>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-file-alt mr-2"></i>
+                    Generate Report
+                </button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<script>
+// Date validation
+document.querySelector('input[name="start_date"]').addEventListener('change', function() {
+    const startDate = new Date(this.value);
+    const endDate = new Date(document.querySelector('input[name="end_date"]').value);
+    
+    // Ensure end date is after start date
+    if (startDate > endDate) {
+        document.querySelector('input[name="end_date"]').value = this.value;
+    }
+    
+    // Check 60-day limit
+    const daysDiff = Math.floor((endDate - startDate) / (1000 * 60 * 60 * 24));
+    if (daysDiff > 60) {
+        const maxEndDate = new Date(startDate);
+        maxEndDate.setDate(maxEndDate.getDate() + 60);
+        document.querySelector('input[name="end_date"]').value = maxEndDate.toISOString().split('T')[0];
+        alert('Report period cannot exceed 60 days. End date has been adjusted.');
+    }
+});
+
+document.querySelector('input[name="end_date"]').addEventListener('change', function() {
+    const startDate = new Date(document.querySelector('input[name="start_date"]').value);
+    const endDate = new Date(this.value);
+    
+    // Check 60-day limit
+    const daysDiff = Math.floor((endDate - startDate) / (1000 * 60 * 60 * 24));
+    if (daysDiff > 60) {
+        alert('Report period cannot exceed 60 days. Please adjust your date range.');
+        this.value = document.querySelector('input[name="end_date"]').defaultValue;
+    }
+});
+</script>
+
+{% endblock %}

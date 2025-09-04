@@ -1,0 +1,163 @@
+{% extends 'dashboard_base.html' %}
+{% load static %}
+
+{% block title %}Report Schedules - {{ project.domain }} - LimeClicks{% endblock %}
+
+{% block page_title %}Report Schedules{% endblock %}
+
+{% block content %}
+<div class="container mx-auto max-w-6xl">
+    <!-- Header -->
+    <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6">
+        <div>
+            <h1 class="text-3xl font-bold text-base-content">Report Schedules</h1>
+            <p class="text-base-content/60 mt-1">Automated report generation for {{ project.domain }}</p>
+        </div>
+        <div class="flex gap-3">
+            <a href="{% url 'keywords:reports_main' %}" class="btn btn-ghost">
+                <i class="fas fa-arrow-left"></i> Back to Reports
+            </a>
+            <a href="{% url 'keywords:create_schedule' project.id %}" class="btn btn-primary">
+                <i class="fas fa-plus"></i> New Schedule
+            </a>
+        </div>
+    </div>
+
+    <!-- Schedules List -->
+    {% if schedules %}
+    <div class="grid grid-cols-1 gap-4">
+        {% for schedule in schedules %}
+        <div class="card bg-base-100 shadow-sm">
+            <div class="card-body">
+                <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+                    <div class="flex-1">
+                        <h3 class="text-xl font-semibold">{{ schedule.name }}</h3>
+                        <div class="flex flex-wrap gap-4 mt-2 text-sm text-base-content/60">
+                            <span>
+                                <i class="fas fa-calendar mr-1"></i>
+                                {{ schedule.get_frequency_display }}
+                            </span>
+                            <span>
+                                <i class="fas fa-clock mr-1"></i>
+                                {{ schedule.time_of_day|date:"g:i A" }}
+                            </span>
+                            <span>
+                                <i class="fas fa-chart-line mr-1"></i>
+                                {{ schedule.report_period_days }}-day reports
+                            </span>
+                            <span>
+                                <i class="fas fa-file mr-1"></i>
+                                {{ schedule.get_report_format_display }}
+                            </span>
+                        </div>
+                        
+                        {% if schedule.last_run_at %}
+                        <div class="mt-2 text-sm">
+                            <span class="text-base-content/60">Last run:</span>
+                            {{ schedule.last_run_at|date:"M d, Y g:i A" }}
+                        </div>
+                        {% endif %}
+                        
+                        {% if schedule.next_run_at %}
+                        <div class="text-sm">
+                            <span class="text-base-content/60">Next run:</span>
+                            {{ schedule.next_run_at|date:"M d, Y g:i A" }}
+                        </div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="flex gap-2">
+                        {% if schedule.is_active %}
+                        <button onclick="toggleSchedule({{ schedule.id }}, false)" 
+                                class="btn btn-sm btn-outline btn-warning">
+                            <i class="fas fa-pause"></i> Pause
+                        </button>
+                        {% else %}
+                        <button onclick="toggleSchedule({{ schedule.id }}, true)" 
+                                class="btn btn-sm btn-outline btn-success">
+                            <i class="fas fa-play"></i> Activate
+                        </button>
+                        {% endif %}
+                        
+                        <button onclick="deleteSchedule({{ schedule.id }})" 
+                                class="btn btn-sm btn-outline btn-error">
+                            <i class="fas fa-trash"></i> Delete
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="flex items-center gap-4 mt-4">
+                    {% if schedule.is_active %}
+                    <span class="badge badge-success">Active</span>
+                    {% else %}
+                    <span class="badge badge-ghost">Inactive</span>
+                    {% endif %}
+                    
+                    {% if schedule.email_recipients %}
+                    <span class="text-sm text-base-content/60">
+                        <i class="fas fa-envelope mr-1"></i>
+                        Sending to {{ schedule.email_recipients|length }} recipient(s)
+                    </span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="card bg-base-100 shadow-sm">
+        <div class="card-body text-center py-12">
+            <i class="fas fa-calendar-alt text-6xl text-base-content/20 mb-4"></i>
+            <h3 class="text-xl font-semibold mb-2">No Scheduled Reports</h3>
+            <p class="text-base-content/60 mb-6">Create a schedule to automatically generate reports at regular intervals.</p>
+            <div>
+                <a href="{% url 'keywords:create_schedule' project.id %}" class="btn btn-primary">
+                    <i class="fas fa-plus"></i> Create First Schedule
+                </a>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+function toggleSchedule(scheduleId, activate) {
+    fetch(`{% url 'keywords:toggle_schedule' project.id 0 %}`.replace('0', scheduleId), {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': '{{ csrf_token }}',
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            window.location.reload();
+        } else {
+            alert('Error: ' + (data.error || 'Failed to update schedule'));
+        }
+    });
+}
+
+function deleteSchedule(scheduleId) {
+    if (!confirm('Are you sure you want to delete this schedule?')) return;
+    
+    fetch(`{% url 'keywords:delete_schedule' project.id 0 %}`.replace('0', scheduleId), {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': '{{ csrf_token }}',
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            window.location.reload();
+        } else {
+            alert('Error: ' + (data.error || 'Failed to delete schedule'));
+        }
+    });
+}
+</script>
+
+{% endblock %}

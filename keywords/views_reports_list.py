@@ -17,8 +17,8 @@ def reports_main_list(request):
     
     # Get all projects the user has access to
     user_projects = Project.objects.filter(
-        Q(created_by=request.user) | Q(team_members=request.user)
-    ).distinct()
+        Q(user=request.user) | Q(members=request.user)
+    ).distinct().order_by('domain')
     
     # Get all reports for these projects
     reports = KeywordReport.objects.filter(
@@ -54,6 +54,11 @@ def reports_main_list(request):
         is_active=True
     ).count()
     
+    # Calculate statistics
+    all_reports = KeywordReport.objects.filter(project__in=user_projects)
+    completed_count = all_reports.filter(status='completed').count()
+    processing_count = all_reports.filter(status='processing').count()
+    
     context = {
         'page_obj': page_obj,
         'reports': page_obj,
@@ -62,6 +67,8 @@ def reports_main_list(request):
         'project_filter': project_filter,
         'search': search,
         'active_schedules': schedules,
+        'completed_count': completed_count,
+        'processing_count': processing_count,
         'page_title': 'Keyword Reports',
     }
     

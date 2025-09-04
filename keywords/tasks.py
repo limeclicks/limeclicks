@@ -199,14 +199,14 @@ def _handle_successful_fetch(keyword: Keyword, html_content: str) -> None:
     if not is_new_file and not is_force_crawl:
         logger.info(f"File already exists for today: {relative_path} (skipping overwrite)")
         # Don't overwrite for regular crawls, but still count as success
-        # Extract top 3 ranking pages
-        top_pages = _extract_top_pages(html_content, limit=3)
+        # Extract top 10 ranking pages (to ensure we have enough after filtering own domain)
+        top_pages = _extract_top_pages(html_content, limit=10)
         
         # Update database to reflect the fetch attempt
         keyword.success_api_hit_count += 1
         keyword.last_error_message = None
         keyword.processing = False  # Reset processing flag
-        keyword.ranking_pages = top_pages  # Update top 3 pages
+        keyword.ranking_pages = top_pages  # Update top 10 pages
         # Update file path if it's different
         if not keyword.scrape_do_file_path or keyword.scrape_do_file_path != relative_path:
             keyword.scrape_do_file_path = relative_path
@@ -264,8 +264,8 @@ def _handle_successful_fetch(keyword: Keyword, html_content: str) -> None:
         except Exception as e:
             logger.warning(f"Failed to delete old file {old_file}: {e}")
     
-    # Extract top 3 ranking pages before updating database
-    top_pages = _extract_top_pages(html_content, limit=3)
+    # Extract top 10 ranking pages before updating database (to ensure we have enough after filtering own domain)
+    top_pages = _extract_top_pages(html_content, limit=10)
     
     # Update database
     keyword.scrape_do_file_path = relative_path
@@ -273,7 +273,7 @@ def _handle_successful_fetch(keyword: Keyword, html_content: str) -> None:
     keyword.success_api_hit_count += 1
     keyword.last_error_message = None
     keyword.processing = False  # Reset processing flag
-    keyword.ranking_pages = top_pages  # Store top 3 pages
+    keyword.ranking_pages = top_pages  # Store top 10 pages
     # Don't save yet - let ranking process first
     
     # Process ranking extraction for new file

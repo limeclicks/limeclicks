@@ -60,14 +60,14 @@ def generate_keyword_report(self, report_id: int) -> Dict[str, Any]:
             csv_key = f"{base_path}/{csv_filename}"
             
             upload_result = r2_service.upload_file(
-                file_obj=results['csv_content'],
-                key=csv_key,
-                content_type='text/csv',
+                results['csv_content'],  # file_obj
+                csv_key,  # key
                 metadata={
                     'report_id': str(report.id),
                     'project_id': str(report.project.id),
                     'type': 'keyword_report_csv'
-                }
+                },
+                content_type='text/csv'
             )
             
             if upload_result['success']:
@@ -83,14 +83,14 @@ def generate_keyword_report(self, report_id: int) -> Dict[str, Any]:
             pdf_key = f"{base_path}/{pdf_filename}"
             
             upload_result = r2_service.upload_file(
-                file_obj=results['pdf_content'],
-                key=pdf_key,
-                content_type='application/pdf',
+                results['pdf_content'],  # file_obj
+                pdf_key,  # key
                 metadata={
                     'report_id': str(report.id),
                     'project_id': str(report.project.id),
                     'type': 'keyword_report_pdf'
-                }
+                },
+                content_type='application/pdf'
             )
             
             if upload_result['success']:
@@ -99,6 +99,10 @@ def generate_keyword_report(self, report_id: int) -> Dict[str, Any]:
                 logger.info(f"PDF uploaded to R2: {pdf_key}")
             else:
                 logger.error(f"Failed to upload PDF: {upload_result.get('error')}")
+        
+        # Save file paths to database
+        if report.csv_file_path or report.pdf_file_path:
+            report.save(update_fields=['csv_file_path', 'csv_file_size', 'pdf_file_path', 'pdf_file_size'])
         
         # Mark as completed
         report.mark_as_completed()

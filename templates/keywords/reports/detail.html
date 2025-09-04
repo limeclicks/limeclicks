@@ -1,0 +1,317 @@
+{% extends 'dashboard_base.html' %}
+{% load static %}
+
+{% block title %}{{ report.name }} - Report Details - LimeClicks{% endblock %}
+
+{% block page_title %}Report Details{% endblock %}
+
+{% block content %}
+<div class="container mx-auto max-w-6xl">
+    <!-- Header -->
+    <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6">
+        <div>
+            <h1 class="text-3xl font-bold text-base-content">{{ report.name }}</h1>
+            <p class="text-base-content/60 mt-1">
+                {{ project.domain }} • {{ report.start_date|date:"M d" }} - {{ report.end_date|date:"M d, Y" }}
+            </p>
+        </div>
+        <div class="flex gap-3">
+            <a href="{% url 'keywords:reports_main' %}" class="btn btn-ghost">
+                <i class="fas fa-arrow-left"></i> Back to Reports
+            </a>
+            {% if report.status == 'completed' %}
+                {% if report.csv_file_path %}
+                <a href="{% url 'keywords:download_report' project.id report.id %}?type=csv" 
+                   class="btn btn-outline">
+                    <i class="fas fa-download"></i> Download CSV
+                </a>
+                {% endif %}
+                {% if report.pdf_file_path %}
+                <a href="{% url 'keywords:download_report' project.id report.id %}?type=pdf" 
+                   class="btn btn-outline">
+                    <i class="fas fa-file-pdf"></i> Download PDF
+                </a>
+                {% endif %}
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Status Alert -->
+    <div class="mb-6">
+        {% if report.status == 'pending' %}
+        <div class="alert alert-warning">
+            <i class="fas fa-clock"></i>
+            <div>
+                <h3 class="font-bold">Report Pending</h3>
+                <p>Your report is queued for generation. This page will update automatically when processing begins.</p>
+            </div>
+        </div>
+        {% elif report.status == 'processing' %}
+        <div class="alert alert-info">
+            <i class="fas fa-spinner fa-spin"></i>
+            <div>
+                <h3 class="font-bold">Generating Report</h3>
+                <p>Your report is being generated. This may take a few minutes depending on the number of keywords.</p>
+                <p class="text-sm mt-2">Processing started: {{ report.processing_started_at|date:"M d, Y g:i A"|default:"Just now" }}</p>
+            </div>
+        </div>
+        {% elif report.status == 'completed' %}
+        <div class="alert alert-success">
+            <i class="fas fa-check-circle"></i>
+            <div>
+                <h3 class="font-bold">Report Ready</h3>
+                <p>Your report has been generated successfully and is ready for download.</p>
+                {% if report.email_sent %}
+                <p class="text-sm mt-1">Email notification sent at {{ report.email_sent_at|date:"g:i A" }}</p>
+                {% endif %}
+            </div>
+        </div>
+        {% elif report.status == 'failed' %}
+        <div class="alert alert-error">
+            <i class="fas fa-exclamation-triangle"></i>
+            <div>
+                <h3 class="font-bold">Report Generation Failed</h3>
+                <p>{{ report.error_message|default:"An error occurred while generating the report." }}</p>
+                <p class="text-sm mt-2">You can try generating the report again or contact support if the issue persists.</p>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Report Information -->
+        <div class="lg:col-span-2">
+            <div class="card bg-base-100 shadow-sm">
+                <div class="card-body">
+                    <h2 class="card-title mb-4">Report Information</h2>
+                    
+                    <div class="space-y-3">
+                        <div class="flex justify-between items-center py-2 border-b">
+                            <span class="text-base-content/60">Status</span>
+                            <span>
+                                {% if report.status == 'completed' %}
+                                    <span class="badge badge-success">Completed</span>
+                                {% elif report.status == 'processing' %}
+                                    <span class="badge badge-info">Processing</span>
+                                {% elif report.status == 'pending' %}
+                                    <span class="badge badge-warning">Pending</span>
+                                {% else %}
+                                    <span class="badge badge-error">Failed</span>
+                                {% endif %}
+                            </span>
+                        </div>
+                        
+                        <div class="flex justify-between items-center py-2 border-b">
+                            <span class="text-base-content/60">Date Range</span>
+                            <span>{{ report.start_date|date:"M d" }} - {{ report.end_date|date:"M d, Y" }}</span>
+                        </div>
+                        
+                        <div class="flex justify-between items-center py-2 border-b">
+                            <span class="text-base-content/60">Report Period</span>
+                            <span>{{ report.end_date|timeuntil:report.start_date|cut:" ago" }}</span>
+                        </div>
+                        
+                        <div class="flex justify-between items-center py-2 border-b">
+                            <span class="text-base-content/60">Format</span>
+                            <span>
+                                {% if report.report_format == 'csv' %}
+                                    <span class="badge badge-info">CSV</span>
+                                {% elif report.report_format == 'pdf' %}
+                                    <span class="badge badge-warning">PDF</span>
+                                {% else %}
+                                    <span class="badge badge-primary">CSV + PDF</span>
+                                {% endif %}
+                            </span>
+                        </div>
+                        
+                        <div class="flex justify-between items-center py-2 border-b">
+                            <span class="text-base-content/60">Keywords Included</span>
+                            <span>{{ report.keywords.count|default:"All project keywords" }}</span>
+                        </div>
+                        
+                        {% if report.status == 'completed' %}
+                        <div class="flex justify-between items-center py-2 border-b">
+                            <span class="text-base-content/60">Processing Time</span>
+                            <span>{{ report.get_duration_display }}</span>
+                        </div>
+                        
+                        {% if report.csv_file_size > 0 or report.pdf_file_size > 0 %}
+                        <div class="flex justify-between items-center py-2 border-b">
+                            <span class="text-base-content/60">File Sizes</span>
+                            <span>
+                                {% if report.csv_file_size > 0 %}
+                                    CSV: {{ report.csv_file_size|filesizeformat }}
+                                {% endif %}
+                                {% if report.pdf_file_size > 0 %}
+                                    {% if report.csv_file_size > 0 %} • {% endif %}
+                                    PDF: {{ report.pdf_file_size|filesizeformat }}
+                                {% endif %}
+                            </span>
+                        </div>
+                        {% endif %}
+                        
+                        <div class="flex justify-between items-center py-2 border-b">
+                            <span class="text-base-content/60">Download Count</span>
+                            <span>{{ report.download_count }} times</span>
+                        </div>
+                        {% endif %}
+                        
+                        <div class="flex justify-between items-center py-2 border-b">
+                            <span class="text-base-content/60">Created By</span>
+                            <span>{{ report.created_by.get_full_name|default:report.created_by.username|default:"System" }}</span>
+                        </div>
+                        
+                        <div class="flex justify-between items-center py-2">
+                            <span class="text-base-content/60">Created At</span>
+                            <span>{{ report.created_at|date:"M d, Y g:i A" }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Report Options -->
+            <div class="card bg-base-100 shadow-sm mt-6">
+                <div class="card-body">
+                    <h2 class="card-title mb-4">Report Options</h2>
+                    
+                    <div class="space-y-2">
+                        <div class="flex items-center gap-3">
+                            <i class="fas fa-check-circle text-success"></i>
+                            <span>Missing rank data filled with previous day's rank</span>
+                        </div>
+                        
+                        {% if report.include_graphs %}
+                        <div class="flex items-center gap-3">
+                            <i class="fas fa-check-circle text-success"></i>
+                            <span>Graphs included in PDF report</span>
+                        </div>
+                        {% else %}
+                        <div class="flex items-center gap-3">
+                            <i class="fas fa-times-circle text-base-content/30"></i>
+                            <span class="text-base-content/60">Graphs not included</span>
+                        </div>
+                        {% endif %}
+                        
+                        {% if report.include_competitors %}
+                        <div class="flex items-center gap-3">
+                            <i class="fas fa-check-circle text-success"></i>
+                            <span>Competitor data included</span>
+                        </div>
+                        {% else %}
+                        <div class="flex items-center gap-3">
+                            <i class="fas fa-times-circle text-base-content/30"></i>
+                            <span class="text-base-content/60">Competitor data not included</span>
+                        </div>
+                        {% endif %}
+                        
+                        {% if report.send_email_notification %}
+                        <div class="flex items-center gap-3">
+                            {% if report.email_sent %}
+                            <i class="fas fa-check-circle text-success"></i>
+                            <span>Email notification sent</span>
+                            {% else %}
+                            <i class="fas fa-clock text-warning"></i>
+                            <span>Email notification pending</span>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Actions Sidebar -->
+        <div class="space-y-6">
+            <!-- Quick Actions -->
+            <div class="card bg-base-100 shadow-sm">
+                <div class="card-body">
+                    <h2 class="card-title mb-4">Actions</h2>
+                    
+                    <div class="space-y-3">
+                        {% if report.status == 'completed' %}
+                            {% if report.csv_file_path %}
+                            <a href="{% url 'keywords:download_report' project.id report.id %}?type=csv" 
+                               class="btn btn-primary btn-block">
+                                <i class="fas fa-download"></i>
+                                Download CSV
+                            </a>
+                            {% endif %}
+                            
+                            {% if report.pdf_file_path %}
+                            <a href="{% url 'keywords:download_report' project.id report.id %}?type=pdf" 
+                               class="btn btn-primary btn-block">
+                                <i class="fas fa-file-pdf"></i>
+                                Download PDF
+                            </a>
+                            {% endif %}
+                        {% elif report.status == 'failed' %}
+                            <form method="post" action="{% url 'keywords:create_report' project.id %}">
+                                {% csrf_token %}
+                                <input type="hidden" name="retry" value="{{ report.id }}">
+                                <button type="submit" class="btn btn-warning btn-block">
+                                    <i class="fas fa-redo"></i>
+                                    Retry Generation
+                                </button>
+                            </form>
+                        {% elif report.status == 'processing' %}
+                            <button class="btn btn-disabled btn-block">
+                                <i class="fas fa-spinner fa-spin"></i>
+                                Processing...
+                            </button>
+                        {% endif %}
+                        
+                        <a href="{% url 'keywords:create_report' project.id %}" 
+                           class="btn btn-outline btn-block">
+                            <i class="fas fa-plus"></i>
+                            Create New Report
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Filters Applied -->
+            {% if report.include_tags or report.exclude_tags %}
+            <div class="card bg-base-100 shadow-sm">
+                <div class="card-body">
+                    <h2 class="card-title mb-4">Filters Applied</h2>
+                    
+                    <div class="space-y-3">
+                        {% if report.exclude_tags %}
+                        <div>
+                            <p class="text-sm text-base-content/60 mb-2">Countries:</p>
+                            <div class="flex flex-wrap gap-2">
+                                {% for country in report.exclude_tags %}
+                                <span class="badge badge-outline">{{ country }}</span>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        {% if report.include_tags %}
+                        <div>
+                            <p class="text-sm text-base-content/60 mb-2">Tags:</p>
+                            <div class="flex flex-wrap gap-2">
+                                {% for tag_id in report.include_tags %}
+                                <span class="badge badge-primary">Tag #{{ tag_id }}</span>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+{% if report.status == 'processing' or report.status == 'pending' %}
+<script>
+// Auto-refresh page while report is processing
+setTimeout(function() {
+    window.location.reload();
+}, 10000); // Refresh every 10 seconds
+</script>
+{% endif %}
+
+{% endblock %}

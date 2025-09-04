@@ -425,6 +425,9 @@ class ReportSchedule(models.Model):
         
         # Combine date with time_of_day
         def combine_datetime(date, time_val):
+            # Convert string time to time object if necessary
+            if isinstance(time_val, str):
+                time_val = datetime.strptime(time_val, '%H:%M').time()
             return timezone.make_aware(
                 datetime.combine(date, time_val),
                 timezone.get_current_timezone()

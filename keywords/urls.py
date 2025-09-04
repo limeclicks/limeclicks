@@ -1,6 +1,5 @@
 from django.urls import path, include
-from . import views
-from . import views_reports_list
+from . import views, views_reports_list, views_reports
 
 app_name = 'keywords'
 
@@ -37,6 +36,16 @@ urlpatterns = [
     # Historical SERP data
     path('api/rank/<int:rank_id>/serp/', views.api_rank_serp, name='api_rank_serp'),
     
-    # Project-specific Reports URLs
-    path('project/', include('keywords.urls_reports')),
+    # Project-specific Reports URLs (these will be accessible as keywords:report_list, etc.)
+    path('project/<int:project_id>/reports/', views_reports.report_list_view, name='report_list'),
+    path('project/<int:project_id>/reports/create/', views_reports.create_report_view, name='create_report'),
+    path('project/<int:project_id>/reports/<int:report_id>/', views_reports.report_detail_view, name='report_detail'),
+    path('project/<int:project_id>/reports/<int:report_id>/download/', views_reports.download_report_view, name='download_report'),
+    path('project/<int:project_id>/reports/<int:report_id>/delete/', views_reports.delete_report_view, name='delete_report'),
+    
+    # Schedule management
+    path('project/<int:project_id>/schedules/', views_reports.schedule_list_view, name='schedule_list'),
+    path('project/<int:project_id>/schedules/create/', views_reports.create_schedule_view, name='create_schedule'),
+    path('project/<int:project_id>/schedules/<int:schedule_id>/toggle/', views_reports.toggle_schedule_view, name='toggle_schedule'),
+    path('project/<int:project_id>/schedules/<int:schedule_id>/delete/', views_reports.delete_schedule_view, name='delete_schedule'),
 ]

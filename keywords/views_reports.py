@@ -30,8 +30,8 @@ def report_list_view(request, project_id):
     """List all reports for a project"""
     project = get_object_or_404(Project, id=project_id)
     
-    # Check permissions
-    if not project.has_team_member(request.user):
+    # Check permissions - user must be owner or member
+    if project.user != request.user and request.user not in project.members.all():
         messages.error(request, "You don't have access to this project")
         return redirect('project:dashboard')
     
@@ -92,8 +92,8 @@ def create_report_view(request, project_id):
     """Create a new report"""
     project = get_object_or_404(Project, id=project_id)
     
-    # Check permissions
-    if not project.has_team_member(request.user):
+    # Check permissions - user must be owner or member
+    if project.user != request.user and request.user not in project.members.all():
         messages.error(request, "You don't have access to this project")
         return redirect('project:dashboard')
     
@@ -119,11 +119,12 @@ def create_report_view(request, project_id):
                 messages.error(request, "Report period cannot exceed 60 days")
                 return redirect('keywords:create_report', project_id=project.id)
             
-            # Get selected keywords
-            keyword_ids = request.POST.getlist('keywords')
+            # Get filter options
+            selected_countries = request.POST.getlist('countries')
+            selected_tags = request.POST.getlist('tags')
             
             # Get report options
-            fill_missing_ranks = request.POST.get('fill_missing_ranks') == 'on'
+            fill_missing_ranks = True  # Always fill missing ranks by default
             include_competitors = request.POST.get('include_competitors') == 'on'
             include_graphs = request.POST.get('include_graphs') == 'on'
             send_notification = request.POST.get('send_notification') == 'on'
@@ -131,7 +132,7 @@ def create_report_view(request, project_id):
             # Create report
             report = KeywordReport.objects.create(
                 project=project,
-                name=name or f"{project.domain} Report",
+                name=name or f"{project.domain} Report - {end_date.strftime('%B %Y')}",
                 start_date=start_date,
                 end_date=end_date,
                 report_format=report_format,
@@ -142,13 +143,31 @@ def create_report_view(request, project_id):
                 created_by=request.user
             )
             
-            # Add selected keywords
-            if keyword_ids:
-                keywords = Keyword.objects.filter(
-                    id__in=keyword_ids,
-                    project=project
-                )
-                report.keywords.set(keywords)
+            # Filter keywords based on selections
+            keywords = Keyword.objects.filter(
+                project=project,
+                archive=False
+            )
+            
+            # Apply country filter
+            if selected_countries:
+                keywords = keywords.filter(country__in=selected_countries)
+            
+            # Apply tag filter
+            if selected_tags:
+                keywords = keywords.filter(keyword_tags__tag_id__in=selected_tags).distinct()
+            
+            # Store filter information in report (for reference)
+            if selected_tags:
+                report.include_tags = list(map(int, selected_tags))
+            if selected_countries:
+                # Store countries in exclude_tags field temporarily (or add a new field)
+                report.exclude_tags = selected_countries
+            if selected_tags or selected_countries:
+                report.save(update_fields=['include_tags', 'exclude_tags'])
+            
+            # Add filtered keywords to report (or all if no filters applied)
+            report.keywords.set(keywords)
             
             # Generate report in background
             generate_keyword_report.delay(report.id)
@@ -165,18 +184,34 @@ def create_report_view(request, project_id):
             return redirect('keywords:create_report', project_id=project.id)
     
     # GET request - show form
-    keywords = Keyword.objects.filter(
+    # Get unique countries from project keywords (no need to load all keywords)
+    countries = Keyword.objects.filter(
         project=project,
         archive=False
-    ).order_by('keyword')
+    ).values_list('country', 'country_code').distinct().order_by('country')
     
-    # Calculate default date range (last 7 days)
+    # Get all tags used by project keywords
+    from .models import Tag
+    tags = Tag.objects.filter(
+        keyword_tags__keyword__project=project,
+        is_active=True
+    ).distinct().order_by('name')
+    
+    # Calculate default date range (last 30 days)
     default_end_date = timezone.now().date() - timedelta(days=1)  # Yesterday
-    default_start_date = default_end_date - timedelta(days=6)  # 7 days ago
+    default_start_date = default_end_date - timedelta(days=29)  # 30 days ago
+    
+    # Get keyword count for display
+    keyword_count = Keyword.objects.filter(
+        project=project,
+        archive=False
+    ).count()
     
     context = {
         'project': project,
-        'keywords': keywords,
+        'keyword_count': keyword_count,
+        'countries': countries,
+        'tags': tags,
         'default_start_date': default_start_date,
         'default_end_date': default_end_date,
         'max_date': timezone.now().date(),
@@ -191,8 +226,8 @@ def report_detail_view(request, project_id, report_id):
     project = get_object_or_404(Project, id=project_id)
     report = get_object_or_404(KeywordReport, id=report_id, project=project)
     
-    # Check permissions
-    if not project.has_team_member(request.user):
+    # Check permissions - user must be owner or member
+    if project.user != request.user and request.user not in project.members.all():
         messages.error(request, "You don't have access to this project")
         return redirect('project:dashboard')
     
@@ -212,7 +247,7 @@ def download_report_view(request, project_id, report_id):
     report = get_object_or_404(KeywordReport, id=report_id, project=project)
     
     # Check permissions
-    if not project.has_team_member(request.user):
+    if project.user != request.user and request.user not in project.members.all():
         raise Http404("Report not found")
     
     # Check if report is ready
@@ -280,7 +315,7 @@ def delete_report_view(request, project_id, report_id):
     report = get_object_or_404(KeywordReport, id=report_id, project=project)
     
     # Check permissions
-    if not project.has_team_member(request.user):
+    if project.user != request.user and request.user not in project.members.all():
         return JsonResponse({'error': 'Permission denied'}, status=403)
     
     try:
@@ -309,8 +344,8 @@ def schedule_list_view(request, project_id):
     """List report schedules"""
     project = get_object_or_404(Project, id=project_id)
     
-    # Check permissions
-    if not project.has_team_member(request.user):
+    # Check permissions - user must be owner or member
+    if project.user != request.user and request.user not in project.members.all():
         messages.error(request, "You don't have access to this project")
         return redirect('project:dashboard')
     
@@ -331,8 +366,8 @@ def create_schedule_view(request, project_id):
     """Create a report schedule"""
     project = get_object_or_404(Project, id=project_id)
     
-    # Check permissions
-    if not project.has_team_member(request.user):
+    # Check permissions - user must be owner or member
+    if project.user != request.user and request.user not in project.members.all():
         messages.error(request, "You don't have access to this project")
         return redirect('project:dashboard')
     
@@ -362,7 +397,7 @@ def create_schedule_view(request, project_id):
             email_list = [email.strip() for email in email_recipients.split(',') if email.strip()]
             
             # Get options
-            fill_missing_ranks = request.POST.get('fill_missing_ranks') == 'on'
+            fill_missing_ranks = True  # Always fill missing ranks by default
             include_competitors = request.POST.get('include_competitors') == 'on'
             include_graphs = request.POST.get('include_graphs') == 'on'
             
@@ -383,14 +418,17 @@ def create_schedule_view(request, project_id):
                 created_by=request.user
             )
             
-            # Get selected keywords
-            keyword_ids = request.POST.getlist('keywords')
-            if keyword_ids:
-                keywords = Keyword.objects.filter(
-                    id__in=keyword_ids,
-                    project=project
-                )
-                schedule.keywords.set(keywords)
+            # Get filter options
+            selected_countries = request.POST.getlist('countries')
+            selected_tags = request.POST.getlist('tags')
+            
+            # Store filter information
+            if selected_tags:
+                schedule.include_tags = list(map(int, selected_tags))
+            if selected_countries:
+                schedule.exclude_tags = selected_countries  # Using exclude_tags for countries temporarily
+            if selected_tags or selected_countries:
+                schedule.save(update_fields=['include_tags', 'exclude_tags'])
             
             # Calculate next run time
             schedule.calculate_next_run()
@@ -408,14 +446,23 @@ def create_schedule_view(request, project_id):
             return redirect('keywords:create_schedule', project_id=project.id)
     
     # GET request - show form
-    keywords = Keyword.objects.filter(
+    # Get unique countries from project keywords
+    countries = Keyword.objects.filter(
         project=project,
         archive=False
-    ).order_by('keyword')
+    ).values_list('country', 'country_code').distinct().order_by('country')
+    
+    # Get all tags used by project keywords
+    from .models import Tag
+    tags = Tag.objects.filter(
+        keyword_tags__keyword__project=project,
+        is_active=True
+    ).distinct().order_by('name')
     
     context = {
         'project': project,
-        'keywords': keywords,
+        'countries': countries,
+        'tags': tags,
     }
     
     return render(request, 'keywords/reports/create_schedule.html', context)
@@ -429,7 +476,7 @@ def toggle_schedule_view(request, project_id, schedule_id):
     schedule = get_object_or_404(ReportSchedule, id=schedule_id, project=project)
     
     # Check permissions
-    if not project.has_team_member(request.user):
+    if project.user != request.user and request.user not in project.members.all():
         return JsonResponse({'error': 'Permission denied'}, status=403)
     
     try:
@@ -460,7 +507,7 @@ def delete_schedule_view(request, project_id, schedule_id):
     schedule = get_object_or_404(ReportSchedule, id=schedule_id, project=project)
     
     # Check permissions
-    if not project.has_team_member(request.user):
+    if project.user != request.user and request.user not in project.members.all():
         return JsonResponse({'error': 'Permission denied'}, status=403)
     
     try:

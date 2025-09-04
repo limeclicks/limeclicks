@@ -84,22 +84,34 @@ class CompetitorKeywordsDataView(View):
         # Format data for response
         keywords_data = []
         for keyword in keywords_page:
-            # Parse ranking_pages data for top 3 competitors
+            # Parse ranking_pages data for top 3 unique competitors (excluding own domain)
             competitors = []
+            seen_domains = set()
+            project_domain = keyword.project.domain.lower().replace('www.', '')
+            
             if keyword.ranking_pages:
-                for idx, page_data in enumerate(keyword.ranking_pages[:3]):
+                for page_data in keyword.ranking_pages:
+                    if len(competitors) >= 3:
+                        break
+                        
                     if isinstance(page_data, dict):
                         url = page_data.get('url', '')
-                        position = page_data.get('position', idx + 1)
+                        position = page_data.get('position', 0)
                     else:
                         # Handle old format if any
                         url = page_data if isinstance(page_data, str) else ''
-                        position = idx + 1
+                        position = 0
                     
                     if url:
-                        domain = self._extract_domain(url)
+                        domain = self._extract_domain(url).lower()
+                        
+                        # Skip if it's the project's own domain or if we've already seen this domain
+                        if domain == project_domain or domain in seen_domains:
+                            continue
+                        
+                        seen_domains.add(domain)
                         competitors.append({
-                            'position': position,
+                            'position': position if position > 0 else len(competitors) + 1,
                             'domain': domain,
                             'url': url
                         })

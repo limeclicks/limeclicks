@@ -46,9 +46,7 @@
                     <i class="fas fa-check-circle text-2xl"></i>
                 </div>
                 <div class="stat-title">Completed</div>
-                <div class="stat-value text-success">
-                    {{ reports|filter:"status:completed"|length|default:"0" }}
-                </div>
+                <div class="stat-value text-success">{{ completed_count }}</div>
             </div>
         </div>
         
@@ -58,9 +56,7 @@
                     <i class="fas fa-spinner text-2xl"></i>
                 </div>
                 <div class="stat-title">Processing</div>
-                <div class="stat-value text-info">
-                    {{ reports|filter:"status:processing"|length|default:"0" }}
-                </div>
+                <div class="stat-value text-info">{{ processing_count }}</div>
             </div>
         </div>
         
@@ -130,7 +126,7 @@
                             {% endif %}
                         </td>
                         <td>
-                            <a href="{% url 'project:detail' report.project.id %}" class="link link-primary">
+                            <a href="{% url 'keywords:project_keywords' report.project.id %}" class="link link-primary">
                                 {{ report.project.domain }}
                             </a>
                         </td>
@@ -168,19 +164,19 @@
                             <div class="flex gap-2">
                                 {% if report.status == 'completed' %}
                                     {% if report.csv_file_path %}
-                                        <a href="{% url 'keyword_reports:download_report' report.project.id report.id %}?type=csv" 
+                                        <a href="{% url 'keywords:download_report' report.project.id report.id %}?type=csv" 
                                            class="btn btn-sm btn-ghost" title="Download CSV">
                                             <i class="fas fa-download"></i>
                                         </a>
                                     {% endif %}
                                     {% if report.pdf_file_path %}
-                                        <a href="{% url 'keyword_reports:download_report' report.project.id report.id %}?type=pdf" 
+                                        <a href="{% url 'keywords:download_report' report.project.id report.id %}?type=pdf" 
                                            class="btn btn-sm btn-ghost" title="Download PDF">
                                             <i class="fas fa-file-pdf"></i>
                                         </a>
                                     {% endif %}
                                 {% endif %}
-                                <a href="{% url 'keyword_reports:report_detail' report.project.id report.id %}" 
+                                <a href="{% url 'keywords:report_detail' report.project.id report.id %}" 
                                    class="btn btn-sm btn-ghost" title="View Details">
                                     <i class="fas fa-eye"></i>
                                 </a>
@@ -244,7 +240,7 @@
             
             <div class="grid grid-cols-1 gap-3">
                 {% for project in user_projects %}
-                <a href="{% url 'keyword_reports:create_report' project.id %}" 
+                <a href="{% url 'keywords:create_report' project.id %}" 
                    class="btn btn-outline btn-block justify-start">
                     <i class="fas fa-folder mr-2"></i>
                     {{ project.domain }}

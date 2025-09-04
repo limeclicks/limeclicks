@@ -233,6 +233,26 @@ UNFOLD = {
                         "icon": "label",
                         "link": "/admin/keywords/tag/",
                     },
+                    {
+                        "title": "Reports",
+                        "icon": "assessment",
+                        "link": "/admin/keywords/keywordreport/",
+                    },
+                    {
+                        "title": "Report Schedules",
+                        "icon": "schedule",
+                        "link": "/admin/keywords/reportschedule/",
+                    },
+                    {
+                        "title": "Competitor Targets",
+                        "icon": "flag",
+                        "link": "/admin/competitors/target/",
+                    },
+                    {
+                        "title": "Competitor Rankings",
+                        "icon": "leaderboard",
+                        "link": "/admin/competitors/targetkeywordrank/",
+                    },
                 ],
             },
             {
