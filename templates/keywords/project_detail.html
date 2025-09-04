@@ -132,6 +132,94 @@
         visibility: visible !important;
         opacity: 1 !important;
     }
+    
+    /* Fixed header with scrollable table body */
+    .table-container {
+        position: relative;
+        max-height: calc(100vh - 280px);
+        overflow: hidden;
+    }
+    
+    .table-scroll-wrapper {
+        max-height: calc(100vh - 320px);
+        min-height: 400px;
+        overflow-y: auto;
+        overflow-x: auto;
+    }
+    
+    /* Make thead sticky */
+    .table-scroll-wrapper thead {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        background: var(--fallback-b1, oklch(var(--b1)));
+    }
+    
+    .table-scroll-wrapper thead th {
+        background: var(--fallback-b1, oklch(var(--b1)));
+        border-bottom: 2px solid var(--fallback-b3, oklch(var(--b3)));
+    }
+    
+    /* Ensure proper scrollbar styling */
+    .table-scroll-wrapper::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+    }
+    
+    .table-scroll-wrapper::-webkit-scrollbar-track {
+        background: var(--fallback-b2, oklch(var(--b2)));
+        border-radius: 4px;
+    }
+    
+    .table-scroll-wrapper::-webkit-scrollbar-thumb {
+        background: var(--fallback-bc, oklch(var(--bc) / 0.3));
+        border-radius: 4px;
+    }
+    
+    .table-scroll-wrapper::-webkit-scrollbar-thumb:hover {
+        background: var(--fallback-bc, oklch(var(--bc) / 0.5));
+    }
+    
+    /* Responsive adjustments */
+    @media (max-width: 768px) {
+        .table-scroll-wrapper {
+            max-height: calc(100vh - 350px);
+        }
+    }
+    
+    /* Shadow effect for scrolling indication */
+    .table-container::before,
+    .table-container::after {
+        content: '';
+        position: absolute;
+        left: 0;
+        right: 0;
+        height: 20px;
+        pointer-events: none;
+        z-index: 5;
+    }
+    
+    .table-container::before {
+        top: 48px; /* Height of thead */
+        background: linear-gradient(to bottom, var(--fallback-b1, oklch(var(--b1))), transparent);
+        opacity: 0;
+        transition: opacity 0.3s;
+    }
+    
+    .table-container::after {
+        bottom: 0;
+        background: linear-gradient(to top, var(--fallback-b1, oklch(var(--b1))), transparent);
+        opacity: 0;
+        transition: opacity 0.3s;
+    }
+    
+    .table-container.scrolled-top::before {
+        opacity: 1;
+    }
+    
+    .table-container.scrolled-bottom::after {
+        opacity: 1;
+    }
 </style>
 {% endblock %}
 
@@ -397,9 +485,9 @@
     <!-- Keywords Table -->
     <div class="card bg-base-100 shadow-sm border border-base-300">
         <div class="card-body p-0">
-            <div id="keywords-table">
+            <div id="keywords-table" class="table-container">
                 {% if keywords %}
-                <div class="overflow-x-auto">
+                <div class="table-scroll-wrapper">
                     <table class="table">
                         <thead>
                             <tr>
@@ -1306,6 +1394,66 @@
     window.addEventListener('beforeunload', function() {
         if (eventSource) {
             eventSource.close();
+        }
+    });
+    
+    // Handle scroll indicators for the table
+    function setupScrollIndicators() {
+        const scrollWrapper = document.querySelector('.table-scroll-wrapper');
+        const container = document.querySelector('.table-container');
+        
+        if (!scrollWrapper || !container) return;
+        
+        function updateScrollIndicators() {
+            const scrollTop = scrollWrapper.scrollTop;
+            const scrollHeight = scrollWrapper.scrollHeight;
+            const clientHeight = scrollWrapper.clientHeight;
+            
+            // Check if content is scrollable
+            if (scrollHeight <= clientHeight) {
+                container.classList.remove('scrolled-top', 'scrolled-bottom');
+                return;
+            }
+            
+            // Add/remove classes based on scroll position
+            if (scrollTop > 10) {
+                container.classList.add('scrolled-top');
+            } else {
+                container.classList.remove('scrolled-top');
+            }
+            
+            if (scrollTop < scrollHeight - clientHeight - 10) {
+                container.classList.add('scrolled-bottom');
+            } else {
+                container.classList.remove('scrolled-bottom');
+            }
+        }
+        
+        // Initial check
+        updateScrollIndicators();
+        
+        // Update on scroll
+        scrollWrapper.addEventListener('scroll', updateScrollIndicators);
+        
+        // Update on window resize
+        window.addEventListener('resize', updateScrollIndicators);
+        
+        // Update after content changes
+        const observer = new MutationObserver(updateScrollIndicators);
+        observer.observe(scrollWrapper, { 
+            childList: true, 
+            subtree: true,
+            attributes: true 
+        });
+    }
+    
+    // Setup scroll indicators on page load
+    document.addEventListener('DOMContentLoaded', setupScrollIndicators);
+    
+    // Re-setup after HTMX swaps
+    document.body.addEventListener('htmx:afterSwap', function(evt) {
+        if (evt.target.id === 'keywords-table-body') {
+            setTimeout(setupScrollIndicators, 100);
         }
     });
 </script>
