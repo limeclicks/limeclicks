@@ -1415,7 +1415,8 @@
                 // Update keyword row with new data
                 const rankCell = row.querySelector('.rank-cell');
                 const changeCell = row.querySelector('.change-cell');
-                const keywordCell = row.querySelector('td:first-child');
+                const keywordCell = row.querySelectorAll('td')[1]; // Second td (after checkbox)
+                const lastCheckedCell = row.querySelectorAll('td')[5]; // 6th td (last checked column)
                 
                 if (data.processing) {
                     // Show processing status
@@ -1497,6 +1498,16 @@
                                 </a>
                             `;
                             keywordDiv.after(urlDiv);
+                        }
+                    }
+                    
+                    // Update last checked time
+                    if (lastCheckedCell) {
+                        if (data.scraped_at) {
+                            // Update with "just now" since it was just checked
+                            lastCheckedCell.innerHTML = '<span class="text-sm">just now</span>';
+                        } else {
+                            lastCheckedCell.innerHTML = '<span class="text-sm text-base-content/40">Never</span>';
                         }
                     }
                     
