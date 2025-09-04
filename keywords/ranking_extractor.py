@@ -14,7 +14,6 @@ from django.utils import timezone
 from services.google_search_parser import GoogleSearchParser
 from services.r2_storage import get_r2_service
 from .models import Keyword, Rank
-from competitors.models import Target, TargetKeywordRank
 
 logger = logging.getLogger(__name__)
 
@@ -73,8 +72,8 @@ class RankingExtractor:
             # Detect SERP features
             serp_features = self._detect_serp_features(parsed_results)
             
-            # Track competitor rankings BEFORE creating the Rank record
-            self._track_competitors(keyword, parsed_results)
+            # Extract and store top 3 competitors in keyword
+            self._update_keyword_competitors(keyword, parsed_results)
             
             # Create Rank record
             rank = self._create_rank_record(
@@ -318,10 +317,10 @@ class RankingExtractor:
             'has_related_searches': bool(parsed_results.get('related_searches')),
         }
     
-    def _track_competitors(self, keyword: Keyword, parsed_results: Dict[str, Any]) -> None:
+    def _update_keyword_competitors(self, keyword: Keyword, parsed_results: Dict[str, Any]) -> None:
         """
-        Track top 3 competitors for a keyword (excluding own domain)
-        Automatically identifies and tracks the top 3 ranking domains for each keyword
+        Update keyword's top 3 competitors (excluding own domain)
+        Stores them directly in the keyword model instead of creating Target entries
         
         Args:
             keyword: Keyword model instance
@@ -333,13 +332,17 @@ class RankingExtractor:
             
             if not organic_results:
                 logger.debug(f"No organic results found for keyword {keyword.id}")
+                keyword.top_competitors = []
+                keyword.save(update_fields=['top_competitors'])
                 return
             
             # Get project domain to exclude it
             project_domain = self._normalize_domain(keyword.project.domain)
             
-            # Find top 3 competitors (excluding own domain)
+            # Find top 3 unique competitors (excluding own domain)
             top_competitors = []
+            seen_domains = set()
+            
             for position, result in enumerate(organic_results[:20], 1):  # Check top 20 to find 3 competitors
                 result_url = result.get('url', '')
                 result_domain = self._extract_domain(result_url)
@@ -349,8 +352,10 @@ class RankingExtractor:
                     continue
                 
                 # Skip if we already have this domain
-                if any(comp['domain'] == result_domain for comp in top_competitors):
+                if result_domain in seen_domains:
                     continue
+                
+                seen_domains.add(result_domain)
                 
                 # Add to top competitors
                 top_competitors.append({
@@ -365,45 +370,16 @@ class RankingExtractor:
             
             logger.info(f"Found {len(top_competitors)} top competitors for keyword '{keyword.keyword}'")
             
-            # Delete existing TargetKeywordRank entries for this keyword
-            # This ensures we only keep current top 3 data
-            deleted_count = TargetKeywordRank.objects.filter(keyword=keyword).delete()[0]
-            if deleted_count > 0:
-                logger.info(f"Deleted {deleted_count} old competitor rankings for keyword {keyword.id}")
-            
-            # Create or get Target entries for each competitor and create rankings
-            for comp_data in top_competitors:
-                # Get or create Target for this competitor domain
-                target, created = Target.objects.get_or_create(
-                    project=keyword.project,
-                    domain=comp_data['domain'],
-                    defaults={
-                        'name': comp_data['domain'],
-                        'is_manual': False,  # Auto-discovered
-                        'created_by': None  # System-generated
-                    }
-                )
-                
-                if created:
-                    logger.info(f"Auto-created new competitor target: {comp_data['domain']}")
-                
-                # Create new TargetKeywordRank entry
-                TargetKeywordRank.objects.create(
-                    target=target,
-                    keyword=keyword,
-                    rank=comp_data['position'],
-                    rank_url=comp_data['url'],
-                    scraped_at=timezone.now()
-                )
-                
-                logger.info(f"Tracked competitor {comp_data['domain']} at position {comp_data['position']} for keyword '{keyword.keyword}'")
+            # Update keyword with top competitors
+            keyword.top_competitors = top_competitors
+            keyword.save(update_fields=['top_competitors'])
             
             # If we found fewer than 3 competitors in top 20, log it
             if len(top_competitors) < 3:
-                logger.warning(f"Only found {len(top_competitors)} competitors in top 20 for keyword '{keyword.keyword}'")
+                logger.info(f"Only found {len(top_competitors)} competitors in top 20 for keyword '{keyword.keyword}'")
                         
         except Exception as e:
-            logger.error(f"Error tracking competitors for keyword {keyword.id}: {str(e)}")
+            logger.error(f"Error updating competitors for keyword {keyword.id}: {str(e)}")
             # Don't raise - competitor tracking shouldn't break main keyword tracking
     
     def _create_rank_record(

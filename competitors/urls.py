@@ -5,6 +5,7 @@ app_name = 'competitors'
 
 urlpatterns = [
     path('keywords/', views.CompetitorKeywordsView.as_view(), name='keywords'),
+    path('keywords/table/', views.competitor_keywords_table, name='keywords-table'),
     path('keywords/data/', views.CompetitorKeywordsDataView.as_view(), name='keywords_data'),
     path('target/', views.TargetView.as_view(), name='target'),
     path('target/add/<int:project_id>/', views.add_target, name='add_target'),

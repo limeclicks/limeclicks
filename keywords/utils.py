@@ -107,8 +107,8 @@ class KeywordRankTracker:
             
             keyword.save()
             
-            # Track competitor rankings for this keyword
-            self._track_competitors(keyword, parsed_results)
+            # Update top competitors in the keyword
+            self._update_keyword_competitors(keyword, parsed_results)
             
             return {
                 'success': True,
@@ -311,85 +311,66 @@ class KeywordRankTracker:
             logger.error(f"Failed to store rank data: {result.get('error')}")
             return ''
     
-    def _track_competitors(self, keyword: Keyword, parsed_results: Dict[str, Any]) -> None:
+    def _update_keyword_competitors(self, keyword: Keyword, parsed_results: Dict[str, Any]) -> None:
         """
-        Track competitor rankings for a keyword
+        Update keyword's top 3 competitors (excluding own domain)
         
         Args:
             keyword: Keyword model instance
             parsed_results: Parsed search results
         """
         try:
-            # Import here to avoid circular imports
-            from competitors.models import Target, TargetKeywordRank
-            
-            # Get competitors for this project
-            competitors = Target.objects.filter(project=keyword.project)
-            
-            if not competitors.exists():
-                return
-            
-            logger.info(f"Tracking {competitors.count()} competitors for keyword: {keyword.keyword}")
-            
             # Get organic results
             organic_results = parsed_results.get('organic_results', [])
             
-            for competitor in competitors:
-                # Clean competitor domain for matching
-                comp_domain = competitor.domain.lower().replace('www.', '').replace('http://', '').replace('https://', '')
-                found = False
+            if not organic_results:
+                logger.debug(f"No organic results found for keyword {keyword.keyword}")
+                keyword.top_competitors = []
+                keyword.save(update_fields=['top_competitors'])
+                return
+            
+            # Clean project domain for comparison
+            project_domain = keyword.project.domain.lower().replace('www.', '').replace('http://', '').replace('https://', '')
+            
+            # Find top 3 unique competitors (excluding own domain)
+            top_competitors = []
+            seen_domains = set()
+            
+            for i, result in enumerate(organic_results[:20], 1):  # Check top 20 to find 3 competitors
+                result_url = result.get('url', '')
+                # Extract domain from URL
+                domain_parts = result_url.lower().replace('http://', '').replace('https://', '').split('/')
+                result_domain = domain_parts[0].replace('www.', '') if domain_parts else ''
                 
-                # Search for competitor in results
-                for i, result in enumerate(organic_results, 1):
-                    result_url = result.get('url', '').lower()
-                    
-                    if comp_domain in result_url:
-                        # Found competitor ranking
-                        logger.info(f"Found {competitor.domain} at position {i} for keyword {keyword.keyword}")
-                        
-                        # Ensure the target is marked as manual if it was created by a user
-                        if competitor.created_by:
-                            competitor.is_manual = True
-                            competitor.save(update_fields=['is_manual'])
-                        
-                        # Create or update TargetKeywordRank
-                        target_rank, created = TargetKeywordRank.objects.update_or_create(
-                            target=competitor,
-                            keyword=keyword,
-                            defaults={
-                                'rank': i,
-                                'rank_url': result.get('url', ''),
-                                'scraped_at': timezone.now()
-                            }
-                        )
-                        
-                        if created:
-                            logger.info(f"Created new rank entry for {competitor.domain}")
-                        else:
-                            logger.info(f"Updated rank entry for {competitor.domain}")
-                        
-                        found = True
-                        break
+                # Skip if empty or if it's the project's own domain
+                if not result_domain or project_domain in result_domain or result_domain in project_domain:
+                    continue
                 
-                if not found:
-                    # Competitor not found in results - create entry with rank 0
-                    logger.info(f"{competitor.domain} not found in top 100 for keyword {keyword.keyword}")
-                    
-                    target_rank, created = TargetKeywordRank.objects.update_or_create(
-                        target=competitor,
-                        keyword=keyword,
-                        defaults={
-                            'rank': 0,
-                            'rank_url': '',
-                            'scraped_at': timezone.now()
-                        }
-                    )
-                    
-                    if created:
-                        logger.info(f"Created not-ranking entry for {competitor.domain}")
+                # Skip if we already have this domain
+                if result_domain in seen_domains:
+                    continue
+                
+                seen_domains.add(result_domain)
+                
+                # Add to top competitors
+                top_competitors.append({
+                    'domain': result_domain,
+                    'position': i,
+                    'url': result.get('url', '')
+                })
+                
+                # Stop once we have 3 competitors
+                if len(top_competitors) >= 3:
+                    break
+            
+            logger.info(f"Found {len(top_competitors)} top competitors for keyword '{keyword.keyword}'")
+            
+            # Update keyword with top competitors
+            keyword.top_competitors = top_competitors
+            keyword.save(update_fields=['top_competitors'])
                         
         except Exception as e:
-            logger.error(f"Error tracking competitors: {str(e)}")
+            logger.error(f"Error updating competitors for keyword {keyword.keyword}: {str(e)}")
             # Don't raise - competitor tracking shouldn't break main keyword tracking
 
 

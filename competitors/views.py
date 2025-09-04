@@ -2,7 +2,7 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.utils.decorators import method_decorator
 from django.views.generic import TemplateView, View
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 from django.db.models import Q, Count, Avg, Case, When, IntegerField, Value, Prefetch
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.contrib import messages
@@ -31,6 +31,68 @@ class CompetitorKeywordsView(TemplateView):
         context['selected_project_id'] = self.request.GET.get('project')
         
         return context
+
+
+@login_required
+def competitor_keywords_table(request):
+    """HTMX endpoint that returns the keywords table fragment"""
+    # Get filter parameters
+    search_query = request.GET.get('search', '')
+    project_id = request.GET.get('project', '')
+    page = request.GET.get('page', 1)
+    per_page = int(request.GET.get('per_page', 50))
+    
+    # Base queryset - get all keywords user has access to
+    keywords = Keyword.objects.filter(
+        Q(project__user=request.user) |
+        Q(project__members=request.user)
+    ).filter(
+        archive=False
+    ).select_related('project').distinct()
+    
+    # Apply project filter
+    if project_id:
+        keywords = keywords.filter(project_id=project_id)
+    
+    # Apply search filter
+    if search_query:
+        keywords = keywords.filter(
+            Q(keyword__icontains=search_query) |
+            Q(project__domain__icontains=search_query)
+        )
+    
+    # Order by rank (0 means not ranking, so put them last)
+    keywords = keywords.annotate(
+        rank_order=Case(
+            When(rank=0, then=Value(10000)),
+            default='rank',
+            output_field=IntegerField(),
+        )
+    ).order_by('rank_order', 'keyword')
+    
+    # Paginate
+    paginator = Paginator(keywords, per_page)
+    
+    try:
+        keywords_page = paginator.page(page)
+    except PageNotAnInteger:
+        keywords_page = paginator.page(1)
+    except EmptyPage:
+        keywords_page = paginator.page(paginator.num_pages)
+    
+    # Get page range for pagination
+    page_range = list(paginator.get_elided_page_range(keywords_page.number, on_each_side=2, on_ends=1))
+    
+    context = {
+        'keywords_page': keywords_page,
+        'paginator': paginator,
+        'page_range': page_range,
+        'search_query': search_query,
+        'project_id': project_id,
+        'per_page': per_page,
+    }
+    
+    return render(request, 'competitors/keywords_table.html', context)
 
 
 @method_decorator(login_required, name='dispatch')
@@ -84,37 +146,16 @@ class CompetitorKeywordsDataView(View):
         # Format data for response
         keywords_data = []
         for keyword in keywords_page:
-            # Parse ranking_pages data for top 3 unique competitors (excluding own domain)
+            # Use top_competitors field from keyword model
             competitors = []
-            seen_domains = set()
-            project_domain = keyword.project.domain.lower().replace('www.', '')
             
-            if keyword.ranking_pages:
-                for page_data in keyword.ranking_pages:
-                    if len(competitors) >= 3:
-                        break
-                        
-                    if isinstance(page_data, dict):
-                        url = page_data.get('url', '')
-                        position = page_data.get('position', 0)
-                    else:
-                        # Handle old format if any
-                        url = page_data if isinstance(page_data, str) else ''
-                        position = 0
-                    
-                    if url:
-                        domain = self._extract_domain(url).lower()
-                        
-                        # Skip if it's the project's own domain or if we've already seen this domain
-                        if domain == project_domain or domain in seen_domains:
-                            continue
-                        
-                        seen_domains.add(domain)
-                        competitors.append({
-                            'position': position if position > 0 else len(competitors) + 1,
-                            'domain': domain,
-                            'url': url
-                        })
+            if keyword.top_competitors:
+                for comp_data in keyword.top_competitors[:3]:
+                    competitors.append({
+                        'position': comp_data.get('position', 0),
+                        'domain': comp_data.get('domain', '-'),
+                        'url': comp_data.get('url', '')
+                    })
             
             # Fill empty slots if less than 3 competitors
             while len(competitors) < 3:

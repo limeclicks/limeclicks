@@ -67,6 +67,13 @@ class Keyword(models.Model):
         help_text='Top 3 ranking pages with URL and position'
     )
     
+    # Top 3 competitors (stored as JSON array)
+    top_competitors = models.JSONField(
+        default=list,
+        blank=True,
+        help_text='Top 3 competitor domains with their rankings'
+    )
+    
     # Management fields
     impact = models.CharField(max_length=20, choices=IMPACT_CHOICES, default='no')
     processing = models.BooleanField(default=False, db_index=True)

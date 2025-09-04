@@ -1,0 +1,158 @@
+<!-- Keywords Table Fragment -->
+<div class="bg-base-100 rounded-lg shadow-sm border border-base-300">
+    <div class="overflow-x-auto">
+        <table class="table table-zebra">
+            <thead>
+                <tr>
+                    <th class="min-w-[200px]">Keyword</th>
+                    <th>Project</th>
+                    <th class="text-center">Your Rank</th>
+                    <th class="text-center">#1</th>
+                    <th class="text-center">#2</th>
+                    <th class="text-center">#3</th>
+                    <th>Country</th>
+                    <th>Last Scraped</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if keywords_page %}
+                    {% for keyword in keywords_page %}
+                    <tr>
+                        <td>
+                            <div class="font-medium">{{ keyword.keyword }}</div>
+                        </td>
+                        <td>
+                            <a href="{% url 'keywords:project_keywords' keyword.project.id %}" class="link link-primary">
+                                {{ keyword.project.domain }}
+                            </a>
+                        </td>
+                        <td class="text-center">
+                            {% if keyword.rank > 0 and keyword.rank <= 100 %}
+                                {% if keyword.rank_status == 'up' %}
+                                    <span class="badge badge-success">#{{ keyword.rank }}
+                                        <i class="fas fa-arrow-up text-xs ml-1"></i>
+                                    </span>
+                                {% elif keyword.rank_status == 'down' %}
+                                    <span class="badge badge-error">#{{ keyword.rank }}
+                                        <i class="fas fa-arrow-down text-xs ml-1"></i>
+                                    </span>
+                                {% elif keyword.rank_status == 'new' %}
+                                    <span class="badge badge-info">#{{ keyword.rank }}
+                                        <i class="fas fa-star text-xs ml-1"></i>
+                                    </span>
+                                {% else %}
+                                    <span class="badge badge-neutral">#{{ keyword.rank }}</span>
+                                {% endif %}
+                            {% else %}
+                                <span class="badge badge-ghost">NR</span>
+                            {% endif %}
+                        </td>
+                        
+                        <!-- Top 3 Competitors from keyword.top_competitors -->
+                        {% with competitors_count=keyword.top_competitors|length %}
+                        {% if keyword.top_competitors %}
+                            {% for comp in keyword.top_competitors|slice:":3" %}
+                            <td class="text-center">
+                                <a href="{{ comp.url }}" target="_blank" rel="noopener" 
+                                   class="link link-primary text-sm truncate max-w-[150px] inline-block"
+                                   title="{{ comp.domain }}">
+                                    {{ comp.domain|truncatechars:20 }}
+                                </a>
+                            </td>
+                            {% endfor %}
+                            <!-- Fill empty slots if less than 3 -->
+                            {% if competitors_count == 1 %}
+                                <td class="text-center text-base-content/50">-</td>
+                                <td class="text-center text-base-content/50">-</td>
+                            {% elif competitors_count == 2 %}
+                                <td class="text-center text-base-content/50">-</td>
+                            {% endif %}
+                        {% else %}
+                            <td class="text-center text-base-content/50">-</td>
+                            <td class="text-center text-base-content/50">-</td>
+                            <td class="text-center text-base-content/50">-</td>
+                        {% endif %}
+                        {% endwith %}
+                        
+                        <td>
+                            <span class="badge badge-outline">{{ keyword.country }}</span>
+                        </td>
+                        <td class="text-sm text-base-content/70">
+                            {% if keyword.scraped_at %}
+                                {{ keyword.scraped_at|date:"Y-m-d H:i" }}
+                            {% else %}
+                                Never
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="8" class="text-center py-8 text-base-content/70">
+                            No keywords found
+                        </td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+    
+    <!-- Pagination -->
+    <div class="p-4 border-t border-base-300">
+        <div class="flex flex-col md:flex-row justify-between items-center gap-4">
+            <div class="text-sm text-base-content/70">
+                {% if paginator.count > 0 %}
+                    Showing 
+                    <span class="font-medium">{{ keywords_page.start_index }}</span> to 
+                    <span class="font-medium">{{ keywords_page.end_index }}</span> of 
+                    <span class="font-medium">{{ paginator.count }}</span> keywords
+                {% else %}
+                    No keywords to display
+                {% endif %}
+            </div>
+            {% if keywords_page.has_other_pages %}
+            <div class="join">
+                <!-- Previous button -->
+                {% if keywords_page.has_previous %}
+                    <button class="join-item btn btn-sm"
+                            hx-get="{% url 'competitors:keywords-table' %}?page={{ keywords_page.previous_page_number }}"
+                            hx-target="#keywords-table"
+                            hx-include="[name='search'], [name='project'], [name='per_page']">
+                        «
+                    </button>
+                {% else %}
+                    <button class="join-item btn btn-sm btn-disabled">«</button>
+                {% endif %}
+                
+                <!-- Page numbers -->
+                {% for page_num in page_range %}
+                    {% if page_num == '...' %}
+                        <button class="join-item btn btn-sm btn-disabled">...</button>
+                    {% elif page_num == keywords_page.number %}
+                        <button class="join-item btn btn-sm btn-active">{{ page_num }}</button>
+                    {% else %}
+                        <button class="join-item btn btn-sm"
+                                hx-get="{% url 'competitors:keywords-table' %}?page={{ page_num }}"
+                                hx-target="#keywords-table"
+                                hx-include="[name='search'], [name='project'], [name='per_page']">
+                            {{ page_num }}
+                        </button>
+                    {% endif %}
+                {% endfor %}
+                
+                <!-- Next button -->
+                {% if keywords_page.has_next %}
+                    <button class="join-item btn btn-sm"
+                            hx-get="{% url 'competitors:keywords-table' %}?page={{ keywords_page.next_page_number }}"
+                            hx-target="#keywords-table"
+                            hx-include="[name='search'], [name='project'], [name='per_page']">
+                        »
+                    </button>
+                {% else %}
+                    <button class="join-item btn btn-sm btn-disabled">»</button>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>

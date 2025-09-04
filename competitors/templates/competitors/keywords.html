@@ -15,9 +15,15 @@
                     <span class="label-text">Search Keywords</span>
                 </label>
                 <div class="relative">
-                    <input type="text" id="search-input" placeholder="Search keywords..." 
-                           class="input input-bordered w-full pr-10" />
-                    <button class="btn btn-ghost btn-sm absolute right-1 top-1/2 -translate-y-1/2" id="search-btn">
+                    <input type="text" 
+                           name="search"
+                           placeholder="Search keywords..." 
+                           class="input input-bordered w-full pr-10"
+                           hx-get="{% url 'competitors:keywords-table' %}"
+                           hx-trigger="keyup changed delay:500ms, search"
+                           hx-target="#keywords-table"
+                           hx-include="[name='project'], [name='per_page']" />
+                    <button class="btn btn-ghost btn-sm absolute right-1 top-1/2 -translate-y-1/2">
                         <i class="fas fa-search"></i>
                     </button>
                 </div>
@@ -28,7 +34,12 @@
                 <label class="label">
                     <span class="label-text">Filter by Project</span>
                 </label>
-                <select id="project-filter" class="select select-bordered w-full">
+                <select name="project" 
+                        class="select select-bordered w-full"
+                        hx-get="{% url 'competitors:keywords-table' %}"
+                        hx-trigger="change"
+                        hx-target="#keywords-table"
+                        hx-include="[name='search'], [name='per_page']">
                     <option value="">All Projects</option>
                     {% for project in projects %}
                         <option value="{{ project.id }}" {% if selected_project_id == project.id|stringformat:"s" %}selected{% endif %}>
@@ -43,7 +54,12 @@
                 <label class="label">
                     <span class="label-text">Items Per Page</span>
                 </label>
-                <select id="per-page" class="select select-bordered w-full">
+                <select name="per_page" 
+                        class="select select-bordered w-full"
+                        hx-get="{% url 'competitors:keywords-table' %}"
+                        hx-trigger="change"
+                        hx-target="#keywords-table"
+                        hx-include="[name='search'], [name='project']">
                     <option value="25">25</option>
                     <option value="50" selected>50</option>
                     <option value="100">100</option>
@@ -53,282 +69,38 @@
         </div>
     </div>
     
-    <!-- Keywords Table -->
-    <div class="bg-base-100 rounded-lg shadow-sm border border-base-300">
-        <div class="overflow-x-auto">
-            <table class="table table-zebra">
-                <thead>
-                    <tr>
-                        <th class="min-w-[200px]">Keyword</th>
-                        <th>Project</th>
-                        <th class="text-center">Your Rank</th>
-                        <th class="text-center">#1</th>
-                        <th class="text-center">#2</th>
-                        <th class="text-center">#3</th>
-                        <th>Country</th>
-                        <th>Last Scraped</th>
-                    </tr>
-                </thead>
-                <tbody id="keywords-tbody">
-                    <!-- Data will be loaded here via AJAX -->
-                    <tr>
-                        <td colspan="8" class="text-center py-8">
-                            <div class="loading loading-spinner loading-lg"></div>
-                            <p class="mt-2">Loading keywords...</p>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-        
-        <!-- Pagination -->
-        <div class="p-4 border-t border-base-300">
-            <div class="flex flex-col md:flex-row justify-between items-center gap-4">
-                <div id="pagination-info" class="text-sm text-base-content/70">
-                    <!-- Pagination info will be inserted here -->
-                </div>
-                <div class="join" id="pagination-controls">
-                    <!-- Pagination controls will be inserted here -->
-                </div>
+    <!-- Keywords Table Container -->
+    <div id="keywords-table" 
+         hx-get="{% url 'competitors:keywords-table' %}"
+         hx-trigger="load"
+         hx-include="[name='search'], [name='project'], [name='per_page']">
+        <div class="bg-base-100 rounded-lg shadow-sm border border-base-300">
+            <div class="overflow-x-auto">
+                <table class="table table-zebra">
+                    <thead>
+                        <tr>
+                            <th class="min-w-[200px]">Keyword</th>
+                            <th>Project</th>
+                            <th class="text-center">Your Rank</th>
+                            <th class="text-center">#1</th>
+                            <th class="text-center">#2</th>
+                            <th class="text-center">#3</th>
+                            <th>Country</th>
+                            <th>Last Scraped</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td colspan="8" class="text-center py-8">
+                                <div class="loading loading-spinner loading-lg"></div>
+                                <p class="mt-2">Loading keywords...</p>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
 </div>
 
-<script>
-// Global variables
-let currentPage = 1;
-let totalPages = 1;
-let searchQuery = '';
-let projectFilter = '{{ selected_project_id|default:"" }}';
-let perPage = 50;
-
-// Initialize on page load
-document.addEventListener('DOMContentLoaded', function() {
-    loadKeywords();
-    
-    // Search functionality
-    const searchInput = document.getElementById('search-input');
-    const searchBtn = document.getElementById('search-btn');
-    
-    searchBtn.addEventListener('click', performSearch);
-    searchInput.addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') {
-            performSearch();
-        }
-    });
-    
-    // Project filter
-    document.getElementById('project-filter').addEventListener('change', function(e) {
-        projectFilter = e.target.value;
-        currentPage = 1;
-        loadKeywords();
-    });
-    
-    // Per page filter
-    document.getElementById('per-page').addEventListener('change', function(e) {
-        perPage = parseInt(e.target.value);
-        currentPage = 1;
-        loadKeywords();
-    });
-});
-
-function performSearch() {
-    searchQuery = document.getElementById('search-input').value;
-    currentPage = 1;
-    loadKeywords();
-}
-
-function loadKeywords() {
-    const tbody = document.getElementById('keywords-tbody');
-    tbody.innerHTML = `
-        <tr>
-            <td colspan="9" class="text-center py-8">
-                <div class="loading loading-spinner loading-lg"></div>
-                <p class="mt-2">Loading keywords...</p>
-            </td>
-        </tr>
-    `;
-    
-    // Build query parameters
-    const params = new URLSearchParams({
-        page: currentPage,
-        per_page: perPage,
-        search: searchQuery,
-        project: projectFilter
-    });
-    
-    fetch(`/competitors/keywords/data/?${params}`)
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                displayKeywords(data.data);
-                updatePagination(data.pagination);
-            } else {
-                tbody.innerHTML = `
-                    <tr>
-                        <td colspan="9" class="text-center py-8 text-error">
-                            Failed to load keywords
-                        </td>
-                    </tr>
-                `;
-            }
-        })
-        .catch(error => {
-            console.error('Error loading keywords:', error);
-            tbody.innerHTML = `
-                <tr>
-                    <td colspan="9" class="text-center py-8 text-error">
-                        Error loading keywords
-                    </td>
-                </tr>
-            `;
-        });
-}
-
-function displayKeywords(keywords) {
-    const tbody = document.getElementById('keywords-tbody');
-    
-    if (keywords.length === 0) {
-        tbody.innerHTML = `
-            <tr>
-                <td colspan="9" class="text-center py-8 text-base-content/70">
-                    No keywords found
-                </td>
-            </tr>
-        `;
-        return;
-    }
-    
-    tbody.innerHTML = keywords.map(keyword => {
-        // Rank badge with status
-        let rankBadge = '';
-        if (keyword.rank === '-' || keyword.rank === 0 || keyword.rank > 100) {
-            rankBadge = '<span class="badge badge-ghost">NR</span>';
-        } else {
-            let statusClass = '';
-            let statusIcon = '';
-            
-            if (keyword.rank_status === 'up') {
-                statusClass = 'badge-success';
-                statusIcon = '<i class="fas fa-arrow-up text-xs ml-1"></i>';
-            } else if (keyword.rank_status === 'down') {
-                statusClass = 'badge-error';
-                statusIcon = '<i class="fas fa-arrow-down text-xs ml-1"></i>';
-            } else if (keyword.rank_status === 'new') {
-                statusClass = 'badge-info';
-                statusIcon = '<i class="fas fa-star text-xs ml-1"></i>';
-            } else {
-                statusClass = 'badge-neutral';
-            }
-            
-            const diff = keyword.rank_diff !== 0 ? ` (${keyword.rank_diff > 0 ? '+' : ''}${keyword.rank_diff})` : '';
-            rankBadge = `<span class="badge ${statusClass}">#${keyword.rank}${statusIcon}</span>`;
-        }
-        
-        // Competitor cells - only first 3
-        const competitorCells = keyword.competitors.slice(0, 3).map(comp => {
-            if (comp.domain === '-') {
-                return '<td class="text-center text-base-content/50">-</td>';
-            }
-            return `
-                <td class="text-center">
-                    <a href="${comp.url}" target="_blank" rel="noopener" 
-                       class="link link-primary text-sm truncate max-w-[150px] inline-block"
-                       title="${comp.domain}">
-                        ${comp.domain}
-                    </a>
-                </td>
-            `;
-        }).join('');
-        
-        return `
-            <tr>
-                <td>
-                    <div class="font-medium">${escapeHtml(keyword.keyword)}</div>
-                </td>
-                <td>
-                    <a href="/project/${keyword.project_id}/" class="link link-primary">
-                        ${escapeHtml(keyword.project)}
-                    </a>
-                </td>
-                <td class="text-center">${rankBadge}</td>
-                ${competitorCells}
-                <td>
-                    <span class="badge badge-outline">${keyword.country}</span>
-                </td>
-                <td class="text-sm text-base-content/70">
-                    ${keyword.scraped_at}
-                </td>
-            </tr>
-        `;
-    }).join('');
-}
-
-function updatePagination(pagination) {
-    currentPage = pagination.current_page;
-    totalPages = pagination.total_pages;
-    
-    // Update info
-    const infoDiv = document.getElementById('pagination-info');
-    const startItem = (currentPage - 1) * pagination.per_page + 1;
-    const endItem = Math.min(currentPage * pagination.per_page, pagination.total_items);
-    
-    infoDiv.innerHTML = `
-        Showing <span class="font-medium">${startItem}</span> to 
-        <span class="font-medium">${endItem}</span> of 
-        <span class="font-medium">${pagination.total_items}</span> keywords
-    `;
-    
-    // Update controls
-    const controlsDiv = document.getElementById('pagination-controls');
-    
-    if (totalPages <= 1) {
-        controlsDiv.innerHTML = '';
-        return;
-    }
-    
-    let paginationHTML = '';
-    
-    // Previous button
-    if (pagination.has_previous) {
-        paginationHTML += `<button class="join-item btn btn-sm" onclick="goToPage(${pagination.previous_page})">«</button>`;
-    } else {
-        paginationHTML += `<button class="join-item btn btn-sm btn-disabled">«</button>`;
-    }
-    
-    // Page numbers
-    pagination.page_range.forEach(page => {
-        if (page === '...') {
-            paginationHTML += `<button class="join-item btn btn-sm btn-disabled">...</button>`;
-        } else if (page === currentPage) {
-            paginationHTML += `<button class="join-item btn btn-sm btn-active">${page}</button>`;
-        } else {
-            paginationHTML += `<button class="join-item btn btn-sm" onclick="goToPage(${page})">${page}</button>`;
-        }
-    });
-    
-    // Next button
-    if (pagination.has_next) {
-        paginationHTML += `<button class="join-item btn btn-sm" onclick="goToPage(${pagination.next_page})">»</button>`;
-    } else {
-        paginationHTML += `<button class="join-item btn btn-sm btn-disabled">»</button>`;
-    }
-    
-    controlsDiv.innerHTML = paginationHTML;
-}
-
-function goToPage(page) {
-    currentPage = page;
-    loadKeywords();
-    // Scroll to top of table
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-}
-
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
-</script>
 {% endblock %}

@@ -143,6 +143,62 @@ def fetch_keyword_serp_html(self, keyword_id: int) -> None:
         cache.delete(lock_key)
 
 
+def _extract_top_competitors(html_content: str, project_domain: str, limit: int = 3) -> list:
+    """
+    Extract top competitor domains from SERP HTML (excluding project domain)
+    
+    Args:
+        html_content: Raw HTML from Google search
+        project_domain: The project's own domain to exclude
+        limit: Number of top competitors to extract (default 3)
+        
+    Returns:
+        List of dictionaries with position, domain, and url
+    """
+    from services.google_search_parser import GoogleSearchParser
+    
+    try:
+        parser = GoogleSearchParser()
+        parsed_results = parser.parse(html_content)
+        
+        organic_results = parsed_results.get('organic_results', [])
+        top_competitors = []
+        seen_domains = set()
+        
+        # Clean project domain
+        project_domain = project_domain.lower().replace('www.', '').replace('http://', '').replace('https://', '')
+        
+        for i, result in enumerate(organic_results[:20], 1):  # Check top 20 to find competitors
+            if result.get('url'):
+                # Extract domain from URL
+                url = result['url']
+                domain_parts = url.lower().replace('http://', '').replace('https://', '').split('/')
+                result_domain = domain_parts[0].replace('www.', '') if domain_parts else ''
+                
+                # Skip if it's the project's own domain or already seen
+                if not result_domain or project_domain in result_domain or result_domain in project_domain:
+                    continue
+                    
+                if result_domain in seen_domains:
+                    continue
+                    
+                seen_domains.add(result_domain)
+                
+                top_competitors.append({
+                    'position': i,
+                    'domain': result_domain,
+                    'url': url
+                })
+                
+                if len(top_competitors) >= limit:
+                    break
+        
+        return top_competitors
+    except Exception as e:
+        logger.warning(f"Failed to extract top competitors: {e}")
+        return []
+
+
 def _extract_top_pages(html_content: str, limit: int = 3) -> list:
     """
     Extract top ranking pages from SERP HTML
@@ -202,11 +258,15 @@ def _handle_successful_fetch(keyword: Keyword, html_content: str) -> None:
         # Extract top 10 ranking pages (to ensure we have enough after filtering own domain)
         top_pages = _extract_top_pages(html_content, limit=10)
         
+        # Extract top 3 competitors (excluding project domain)
+        top_competitors = _extract_top_competitors(html_content, keyword.project.domain, limit=3)
+        
         # Update database to reflect the fetch attempt
         keyword.success_api_hit_count += 1
         keyword.last_error_message = None
         keyword.processing = False  # Reset processing flag
         keyword.ranking_pages = top_pages  # Update top 10 pages
+        keyword.top_competitors = top_competitors  # Update top 3 competitors
         # Update file path if it's different
         if not keyword.scrape_do_file_path or keyword.scrape_do_file_path != relative_path:
             keyword.scrape_do_file_path = relative_path
@@ -267,6 +327,9 @@ def _handle_successful_fetch(keyword: Keyword, html_content: str) -> None:
     # Extract top 10 ranking pages before updating database (to ensure we have enough after filtering own domain)
     top_pages = _extract_top_pages(html_content, limit=10)
     
+    # Extract top 3 competitors (excluding project domain)
+    top_competitors = _extract_top_competitors(html_content, keyword.project.domain, limit=3)
+    
     # Update database
     keyword.scrape_do_file_path = relative_path
     keyword.scrape_do_files = file_list
@@ -274,6 +337,7 @@ def _handle_successful_fetch(keyword: Keyword, html_content: str) -> None:
     keyword.last_error_message = None
     keyword.processing = False  # Reset processing flag
     keyword.ranking_pages = top_pages  # Store top 10 pages
+    keyword.top_competitors = top_competitors  # Store top 3 competitors
     # Don't save yet - let ranking process first
     
     # Process ranking extraction for new file
