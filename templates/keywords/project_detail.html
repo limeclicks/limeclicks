@@ -133,60 +133,29 @@
         opacity: 1 !important;
     }
     
-    /* Custom table styling without DaisyUI constraints */
-    #keywords-table table {
+    /* Table styles - ensure full width and proper display */
+    .table {
         width: 100%;
-        border-collapse: collapse;
     }
     
-    #keywords-table thead th {
-        padding: 0.75rem 1rem;
-        text-align: left;
-        font-weight: 600;
-        color: var(--fallback-bc, oklch(var(--bc)));
+    /* Table header styling */
+    .table thead th {
         background: var(--fallback-b1, oklch(var(--b1)));
         border-bottom: 2px solid var(--fallback-b3, oklch(var(--b3)));
         white-space: nowrap;
+        position: relative;
     }
     
-    #keywords-table thead th.text-center {
-        text-align: center;
+    /* Remove any height constraints from card */
+    .card {
+        height: auto !important;
+        max-height: none !important;
     }
     
-    #keywords-table tbody td {
-        padding: 0.75rem 1rem;
-        border-bottom: 1px solid var(--fallback-b3, oklch(var(--b3) / 0.3));
-    }
-    
-    #keywords-table tbody td.text-center {
-        text-align: center;
-    }
-    
-    #keywords-table tbody td.text-right {
-        text-align: right;
-    }
-    
-    #keywords-table tbody tr:hover {
-        background: var(--fallback-b2, oklch(var(--b2) / 0.3));
-    }
-    
-    /* Ensure the table container has no height limits */
-    #keywords-table {
-        display: block;
-        width: 100%;
+    /* Ensure overflow-x-auto only adds horizontal scroll when needed */
+    .overflow-x-auto {
+        overflow-y: visible !important;
         overflow-x: auto;
-        overflow-y: visible;
-    }
-    
-    /* For mobile responsiveness */
-    @media (max-width: 768px) {
-        #keywords-table {
-            overflow-x: scroll;
-        }
-        
-        #keywords-table table {
-            min-width: 768px;
-        }
     }
     
 </style>
@@ -452,10 +421,10 @@
     </div>
     
     <!-- Keywords Table -->
-    {% if keywords %}
-    <div class="bg-base-100 shadow-sm border border-base-300 rounded-lg">
-        <div id="keywords-table" class="w-full">
-            <table class="w-full">
+    <div class="card bg-base-100 shadow-sm border border-base-300">
+        {% if keywords %}
+        <div id="keywords-table" class="overflow-x-auto">
+            <table class="table">
                         <thead>
                             <tr>
                                 <th>
@@ -644,10 +613,8 @@
                         </tbody>
                 </table>
         </div>
-    </div>
-    {% else %}
-    <!-- Empty State -->
-    <div class="card bg-base-100 shadow-sm border border-base-300">
+        {% else %}
+        <!-- Empty State -->
         <div class="p-12 text-center">
                     <div class="w-20 h-20 bg-base-200 rounded-full flex items-center justify-center mx-auto mb-4">
                         <i class="fas fa-key text-2xl text-base-content/40"></i>
