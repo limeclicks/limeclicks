@@ -174,7 +174,8 @@ def page_rankings_data(request):
     # Generate elided page range (with ellipsis)
     page_range = []
     for page_num in paginator.get_elided_page_range(pages.number, on_each_side=2, on_ends=1):
-        if page_num == paginator.ELLIPSIS:
+        # Check if it's an ellipsis (not an integer)
+        if not isinstance(page_num, int):
             page_range.append('...')
         else:
             page_range.append(page_num)
