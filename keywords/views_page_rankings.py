@@ -171,6 +171,14 @@ def page_rankings_data(request):
         return str(int(num))
     
     # Prepare pagination info
+    # Generate elided page range (with ellipsis)
+    page_range = []
+    for page_num in paginator.get_elided_page_range(pages.number, on_each_side=2, on_ends=1):
+        if page_num == paginator.ELLIPSIS:
+            page_range.append('...')
+        else:
+            page_range.append(page_num)
+    
     pagination = {
         'current_page': pages.number,
         'total_pages': paginator.num_pages,
@@ -180,7 +188,7 @@ def page_rankings_data(request):
         'has_previous': pages.has_previous(),
         'next_page': pages.next_page_number() if pages.has_next() else None,
         'previous_page': pages.previous_page_number() if pages.has_previous() else None,
-        'page_range': list(paginator.get_elided_page_range(pages.number, on_each_side=2, on_ends=1))
+        'page_range': page_range
     }
     
     context = {

@@ -1,8 +1,12 @@
-<!-- Update metrics -->
+<!-- Update metrics and page state -->
 <script>
     document.getElementById('totalPages').textContent = '{{ total_pages }}';
     document.getElementById('totalKeywords').textContent = '{{ total_keywords }}';
     document.getElementById('avgPosition').textContent = '{{ avg_position }}';
+    // Update current page in the form
+    if (document.getElementById('currentPage')) {
+        document.getElementById('currentPage').value = '{{ pagination.current_page }}';
+    }
 </script>
 
 {% if pages %}

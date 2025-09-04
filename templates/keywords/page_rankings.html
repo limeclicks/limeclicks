@@ -162,10 +162,12 @@
     
     <!-- Filters -->
     <div class="bg-white rounded-lg p-4 mb-6 border border-gray-200">
-        <form hx-get="{% url 'keywords:page_rankings_data' %}"
+        <form id="filterForm" 
+              hx-get="{% url 'keywords:page_rankings_data' %}"
               hx-target="#pagesContainer"
               hx-trigger="change from:find select, keyup delay:500ms from:find input[type='text']"
               hx-indicator="#loadingIndicator">
+            <input type="hidden" name="page" value="1" id="currentPage">
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <!-- Search -->
                 <div>
@@ -263,6 +265,18 @@
     // This is just for debugging
     document.addEventListener('DOMContentLoaded', function() {
         console.log('Page Rankings: Ready');
+        
+        // Reset page to 1 when filters change
+        document.querySelectorAll('#filterForm select, #filterForm input[type="text"]').forEach(element => {
+            element.addEventListener('change', function() {
+                document.getElementById('currentPage').value = '1';
+            });
+            if (element.type === 'text') {
+                element.addEventListener('keyup', function() {
+                    document.getElementById('currentPage').value = '1';
+                });
+            }
+        });
         
         // Debug logging for HTMX events
         document.body.addEventListener('htmx:afterSwap', function(event) {
