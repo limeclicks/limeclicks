@@ -124,6 +124,42 @@ def run_site_audit(self, site_audit_id: int) -> dict:
             # Hand over to new process_results method
             result = site_audit.process_results()
             
+            # Upload CSV files to R2 after processing results
+            try:
+                from .r2_upload import AuditFileUploader
+                uploader = AuditFileUploader(site_audit)
+                
+                # Upload all CSV files from the audit directory
+                upload_results = uploader.upload_audit_files(site_audit.temp_audit_dir)
+                
+                if upload_results.get('file_count', 0) > 0:
+                    logger.info(
+                        f"Uploaded {upload_results['file_count']} CSV files to R2, "
+                        f"total size: {upload_results['total_size'] / 1024 / 1024:.2f} MB"
+                    )
+                    result['r2_upload'] = {
+                        'status': 'success',
+                        'files_uploaded': upload_results['file_count'],
+                        'total_size_mb': round(upload_results['total_size'] / 1024 / 1024, 2)
+                    }
+                else:
+                    logger.warning("No CSV files uploaded to R2")
+                    result['r2_upload'] = {
+                        'status': 'no_files',
+                        'message': 'No CSV files found to upload'
+                    }
+                    
+                # Get summary of uploaded files
+                files_summary = uploader.get_audit_files_summary()
+                result['r2_files_summary'] = files_summary
+                
+            except Exception as e:
+                logger.error(f"Failed to upload CSV files to R2: {e}")
+                result['r2_upload'] = {
+                    'status': 'error',
+                    'message': str(e)
+                }
+            
             # Trigger PageSpeed Insights collection in parallel
             try:
                 psi_task = collect_pagespeed_insights.apply_async(
@@ -328,6 +364,7 @@ def cleanup_old_site_audits(days_to_keep=90):
     """
     Clean up old completed site audits to prevent database bloat.
     Keep only the most recent audit for each project.
+    Also cleans up associated R2 files.
     
     Args:
         days_to_keep: Number of days of completed audits to keep
@@ -336,9 +373,12 @@ def cleanup_old_site_audits(days_to_keep=90):
         dict: Cleanup statistics
     """
     from project.models import Project
+    from .models import AuditFile
+    from .r2_upload import cleanup_old_r2_files
     
     cutoff_date = timezone.now() - timedelta(days=days_to_keep)
     deleted_count = 0
+    r2_files_deleted = 0
     
     # For each project, keep only the most recent audit and delete older ones
     for project in Project.objects.all():
@@ -353,14 +393,28 @@ def cleanup_old_site_audits(days_to_keep=90):
             ).order_by('-last_audit_date').values_list('id', flat=True)[:1]
         )
         
+        # Delete associated R2 files before deleting audits
+        for audit in old_audits:
+            audit_files = AuditFile.objects.filter(site_audit=audit)
+            r2_files_deleted += audit_files.count()
+            # Files will be deleted via cascade when audit is deleted
+        
         count_for_project = old_audits.count()
         old_audits.delete()
         deleted_count += count_for_project
     
-    logger.info(f"Deleted {deleted_count} old site audits older than {days_to_keep} days")
+    # Also run general R2 cleanup for orphaned files
+    try:
+        orphaned_files_deleted = cleanup_old_r2_files(days_to_keep)
+        r2_files_deleted += orphaned_files_deleted
+    except Exception as e:
+        logger.warning(f"Failed to cleanup orphaned R2 files: {e}")
+    
+    logger.info(f"Deleted {deleted_count} old site audits and {r2_files_deleted} R2 files older than {days_to_keep} days")
     
     return {
         "deleted_count": deleted_count,
+        "r2_files_deleted": r2_files_deleted,
         "cutoff_date": cutoff_date.isoformat()
     }
 

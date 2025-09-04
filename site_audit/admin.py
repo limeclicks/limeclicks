@@ -7,13 +7,14 @@ from django.db.models import Count, Q
 from unfold.admin import ModelAdmin, TabularInline
 from unfold.contrib.filters.admin import RangeNumericFilter, RangeDateFilter, ChoicesDropdownFilter
 from unfold.decorators import display
-from .models import SiteAudit, SiteIssue
+from .models import SiteAudit, SiteIssue, AuditFile
 import json
 
 
 class IssuesFromJSONInline(TabularInline):
     """Display issues from JSON field as inline (read-only)"""
     model = SiteIssue
+    fk_name = 'site_audit'  # Specify the foreign key to use
     extra = 0
     max_num = 0
     can_delete = False
@@ -31,6 +32,41 @@ class IssuesFromJSONInline(TabularInline):
             # Return empty queryset but we'll show JSON data in the template
             return qs
         return qs
+
+
+class AuditFileInline(TabularInline):
+    """Display uploaded audit files as inline"""
+    model = AuditFile
+    extra = 0
+    can_delete = False
+    fields = ('file_type', 'original_filename', 'file_size_display', 'uploaded_at', 'download_link')
+    readonly_fields = ('file_type', 'original_filename', 'file_size_display', 'uploaded_at', 'download_link')
+    
+    def has_add_permission(self, request, obj=None):
+        return False
+    
+    def has_change_permission(self, request, obj=None):
+        return False
+    
+    @display(description="Size")
+    def file_size_display(self, obj):
+        """Display file size in human readable format"""
+        if obj.file_size < 1024:
+            return f"{obj.file_size} B"
+        elif obj.file_size < 1024 * 1024:
+            return f"{obj.file_size / 1024:.2f} KB"
+        else:
+            return f"{obj.file_size / 1024 / 1024:.2f} MB"
+    
+    @display(description="Download")
+    def download_link(self, obj):
+        """Generate download link for the file"""
+        if not obj.r2_path:
+            return "-"
+        return format_html(
+            '<a href="#" onclick="alert(\'R2 path: {}\')" style="color: #3b82f6;">View Path</a>',
+            obj.r2_path
+        )
 
 
 @admin.register(SiteAudit)
@@ -100,6 +136,8 @@ class SiteAuditAdmin(ModelAdmin):
             'classes': ('wide',)
         }),
     )
+    
+    inlines = [AuditFileInline, IssuesFromJSONInline]
     
     @display(description="Project")
     def project_display(self, obj):
@@ -444,3 +482,97 @@ class SiteIssueAdmin(ModelAdmin):
         css = {
             'all': ('admin/css/site_audit_admin.css',)
         }
+
+
+@admin.register(AuditFile)
+class AuditFileAdmin(ModelAdmin):
+    """Admin for viewing audit files uploaded to R2"""
+    list_display = (
+        'id',
+        'site_audit_link',
+        'file_type',
+        'original_filename',
+        'file_size_display',
+        'uploaded_at',
+        'r2_path_display'
+    )
+    
+    list_filter = (
+        'file_type',
+        ('uploaded_at', RangeDateFilter),
+        ('file_size', RangeNumericFilter),
+    )
+    
+    search_fields = (
+        'original_filename',
+        'r2_path',
+        'site_audit__project__domain'
+    )
+    
+    ordering = ('-uploaded_at',)
+    list_per_page = 50
+    
+    readonly_fields = (
+        'site_audit',
+        'file_type',
+        'original_filename',
+        'r2_path',
+        'file_size',
+        'mime_type',
+        'checksum',
+        'uploaded_at'
+    )
+    
+    fieldsets = (
+        ('Audit Information', {
+            'fields': ('site_audit',)
+        }),
+        ('File Information', {
+            'fields': (
+                'file_type',
+                'original_filename',
+                'r2_path',
+                'file_size',
+                'mime_type'
+            )
+        }),
+        ('Metadata', {
+            'fields': ('checksum', 'uploaded_at'),
+            'classes': ('collapse',)
+        }),
+    )
+    
+    @display(description="Site Audit")
+    def site_audit_link(self, obj):
+        """Link to parent audit"""
+        if not obj.site_audit:
+            return "-"
+        
+        audit_url = reverse('admin:site_audit_siteaudit_change', args=[obj.site_audit.id])
+        return format_html(
+            '<a href="{}" style="color: #3b82f6;">{}</a>',
+            audit_url,
+            obj.site_audit.project.domain if obj.site_audit.project else f'Audit #{obj.site_audit.id}'
+        )
+    
+    @display(description="Size", ordering="file_size")
+    def file_size_display(self, obj):
+        """Display file size in human readable format"""
+        if obj.file_size < 1024:
+            return f"{obj.file_size} B"
+        elif obj.file_size < 1024 * 1024:
+            return f"{obj.file_size / 1024:.2f} KB"
+        else:
+            return f"{obj.file_size / 1024 / 1024:.2f} MB"
+    
+    @display(description="R2 Path")
+    def r2_path_display(self, obj):
+        """Display truncated R2 path"""
+        if not obj.r2_path:
+            return "-"
+        
+        # Show only the last part of the path
+        parts = obj.r2_path.split('/')
+        if len(parts) > 2:
+            return f".../{'/'.join(parts[-2:])}"
+        return obj.r2_path

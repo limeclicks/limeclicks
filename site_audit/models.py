@@ -6,6 +6,9 @@ from datetime import timedelta
 import json
 import csv
 import os
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class SiteAudit(models.Model):
@@ -271,6 +274,110 @@ class SiteAudit(models.Model):
                 breakdown[severity] = item['count']
         return breakdown
     
+    def get_audit_comparison(self, compare_with=None):
+        """
+        Get comparison data between this audit and a previous one.
+        
+        Args:
+            compare_with: Previous SiteAudit to compare with. If None, uses the most recent previous audit.
+            
+        Returns:
+            Dict with comparison metrics
+        """
+        if not compare_with:
+            # Get the most recent previous audit
+            previous_audits = SiteAudit.objects.filter(
+                project=self.project,
+                status='completed',
+                last_audit_date__lt=self.last_audit_date if self.last_audit_date else timezone.now()
+            ).order_by('-last_audit_date')
+            
+            if not previous_audits.exists():
+                return None
+            
+            compare_with = previous_audits.first()
+        
+        comparison = {
+            'current_audit': {
+                'id': self.id,
+                'date': self.last_audit_date.isoformat() if self.last_audit_date else None,
+                'health_score': self.overall_site_health_score,
+                'pages_crawled': self.total_pages_crawled,
+                'total_issues': self.issues.count()
+            },
+            'previous_audit': {
+                'id': compare_with.id,
+                'date': compare_with.last_audit_date.isoformat() if compare_with.last_audit_date else None,
+                'health_score': compare_with.overall_site_health_score,
+                'pages_crawled': compare_with.total_pages_crawled,
+                'total_issues': compare_with.issues.count()
+            },
+            'changes': {}
+        }
+        
+        # Calculate changes
+        if self.overall_site_health_score and compare_with.overall_site_health_score:
+            comparison['changes']['health_score'] = round(
+                self.overall_site_health_score - compare_with.overall_site_health_score, 2
+            )
+        
+        comparison['changes']['pages_crawled'] = self.total_pages_crawled - compare_with.total_pages_crawled
+        comparison['changes']['total_issues'] = self.issues.count() - compare_with.issues.count()
+        
+        # Compare issues by severity
+        current_severity = self.issues.values('severity').annotate(count=models.Count('id'))
+        previous_severity = compare_with.issues.values('severity').annotate(count=models.Count('id'))
+        
+        severity_changes = {}
+        for item in current_severity:
+            severity = item['severity']
+            current_count = item['count']
+            previous_count = next((p['count'] for p in previous_severity if p['severity'] == severity), 0)
+            severity_changes[severity] = current_count - previous_count
+        
+        comparison['changes']['by_severity'] = severity_changes
+        
+        # Get files for both audits
+        comparison['current_audit']['files'] = list(
+            self.audit_files.values('file_type', 'r2_path', 'file_size')
+        )
+        comparison['previous_audit']['files'] = list(
+            compare_with.audit_files.values('file_type', 'r2_path', 'file_size')
+        )
+        
+        return comparison
+    
+    def get_r2_files_urls(self):
+        """
+        Get signed URLs for accessing audit CSV files from R2.
+        
+        Returns:
+            Dict with file types and their R2 URLs
+        """
+        from limeclicks.storage_backends import CloudflareR2Storage
+        
+        storage = CloudflareR2Storage()
+        files_urls = {}
+        
+        for audit_file in self.audit_files.all():
+            file_type = audit_file.get_file_type_display()
+            if file_type not in files_urls:
+                files_urls[file_type] = []
+            
+            # Generate URL for the file (R2 will handle authentication)
+            try:
+                url = storage.url(audit_file.r2_path)
+                files_urls[file_type].append({
+                    'filename': audit_file.original_filename,
+                    'url': url,
+                    'size': audit_file.file_size,
+                    'uploaded_at': audit_file.uploaded_at.isoformat()
+                })
+            except Exception as e:
+                logger.error(f"Failed to generate URL for {audit_file.r2_path}: {e}")
+        
+        return files_urls
+    
     def process_results(self):
         """
         Process crawl results from temp_audit_dir and update audit.
@@ -517,3 +624,74 @@ class SiteIssue(models.Model):
                 return severity
         
         return 'medium'  # Default severity
+
+
+class AuditFile(models.Model):
+    """Track audit files uploaded to R2 storage"""
+    
+    FILE_TYPE_CHOICES = [
+        ('crawl_overview', 'Crawl Overview'),
+        ('issues_overview', 'Issues Overview'),
+        ('internal_all', 'Internal All'),
+        ('external_all', 'External All'),
+        ('response_codes', 'Response Codes'),
+        ('page_titles', 'Page Titles'),
+        ('meta_descriptions', 'Meta Descriptions'),
+        ('h1', 'H1 Tags'),
+        ('h2', 'H2 Tags'),
+        ('images', 'Images'),
+        ('canonicals', 'Canonicals'),
+        ('directives', 'Directives'),
+        ('hreflang', 'Hreflang'),
+        ('structured_data', 'Structured Data'),
+        ('links', 'Links'),
+        ('javascript', 'JavaScript'),
+        ('validation', 'Validation'),
+        ('other', 'Other'),
+    ]
+    
+    site_audit = models.ForeignKey(
+        SiteAudit,
+        on_delete=models.CASCADE,
+        related_name='audit_files'
+    )
+    
+    file_type = models.CharField(
+        max_length=50,
+        choices=FILE_TYPE_CHOICES,
+        db_index=True
+    )
+    
+    original_filename = models.CharField(max_length=255)
+    r2_path = models.CharField(
+        max_length=500,
+        help_text="Path to file in R2 storage"
+    )
+    file_size = models.BigIntegerField(
+        help_text="File size in bytes"
+    )
+    
+    # Metadata
+    mime_type = models.CharField(
+        max_length=100,
+        default='text/csv'
+    )
+    checksum = models.CharField(
+        max_length=64,
+        blank=True,
+        help_text="MD5 or SHA256 checksum of the file"
+    )
+    
+    # Timestamps
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        db_table = 'audit_files'
+        ordering = ['-uploaded_at']
+        indexes = [
+            models.Index(fields=['site_audit', 'file_type']),
+            models.Index(fields=['uploaded_at']),
+        ]
+    
+    def __str__(self):
+        return f"{self.get_file_type_display()} - {self.site_audit.project.domain} - {self.uploaded_at}"
