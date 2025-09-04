@@ -7,22 +7,85 @@
 {% block extra_css %}
 <style>
     .metric-card {
-        background: white;
-        border-radius: 8px;
-        padding: 16px 20px;
-        border: 1px solid #e5e7eb;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 1rem;
+        padding: 1.5rem;
+        position: relative;
+        overflow: hidden;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+    
+    .metric-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 15px 40px rgba(0, 0, 0, 0.15);
+    }
+    
+    .metric-card.card-blue {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+    
+    .metric-card.card-green {
+        background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+    }
+    
+    .metric-card.card-orange {
+        background: linear-gradient(135deg, #fc5c7d 0%, #fd8b47 100%);
+    }
+    
+    .metric-card::before {
+        content: '';
+        position: absolute;
+        top: -50%;
+        right: -50%;
+        width: 200%;
+        height: 200%;
+        background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+        transform: rotate(45deg);
+    }
+    
+    .metric-icon {
+        width: 48px;
+        height: 48px;
+        background: rgba(255, 255, 255, 0.2);
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 1rem;
+    }
+    
+    .metric-icon i {
+        font-size: 1.5rem;
+        color: white;
     }
     
     .metric-value {
-        font-size: 2rem;
-        font-weight: 700;
-        line-height: 1.2;
+        font-size: 2.5rem;
+        font-weight: 800;
+        line-height: 1;
+        color: white;
+        margin-bottom: 0.5rem;
     }
     
     .metric-label {
         font-size: 0.875rem;
-        color: #6b7280;
-        margin-top: 4px;
+        color: rgba(255, 255, 255, 0.9);
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+    
+    .metric-change {
+        position: absolute;
+        top: 1.5rem;
+        right: 1.5rem;
+        padding: 0.25rem 0.75rem;
+        background: rgba(255, 255, 255, 0.2);
+        border-radius: 9999px;
+        font-size: 0.75rem;
+        color: white;
+        font-weight: 600;
     }
     
     
@@ -102,18 +165,32 @@
     </div>
     
     <!-- Metrics Cards -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-        <div class="metric-card">
-            <div class="metric-value text-gray-900" id="totalPages">0</div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
+        <!-- Total Pages Card -->
+        <div class="metric-card card-blue">
+            <div class="metric-icon">
+                <i class="fas fa-file-alt"></i>
+            </div>
+            <div class="metric-value" id="totalPages">0</div>
             <div class="metric-label">Total Pages</div>
         </div>
-        <div class="metric-card">
-            <div class="metric-value text-blue-600" id="totalKeywords">0</div>
+        
+        <!-- Total Keywords Card -->
+        <div class="metric-card card-green">
+            <div class="metric-icon">
+                <i class="fas fa-key"></i>
+            </div>
+            <div class="metric-value" id="totalKeywords">0</div>
             <div class="metric-label">Total Keywords</div>
         </div>
-        <div class="metric-card">
-            <div class="metric-value text-green-600" id="avgPosition">0</div>
-            <div class="metric-label">Avg. Position</div>
+        
+        <!-- Average Position Card -->
+        <div class="metric-card card-orange">
+            <div class="metric-icon">
+                <i class="fas fa-chart-line"></i>
+            </div>
+            <div class="metric-value">#<span id="avgPosition">0</span></div>
+            <div class="metric-label">Average Position</div>
         </div>
     </div>
     
