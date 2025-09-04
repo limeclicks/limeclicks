@@ -94,13 +94,13 @@ def page_rankings_data(request):
                 'rank': keyword.rank,
                 'rank_diff': keyword.rank_diff_from_last_time,
                 'cpc': 0,  # CPC field doesn't exist in current model
-                'search_volume': keyword.search_volume or 0,
-                'traffic': keyword.traffic or 0,
+                'search_volume': 0,  # search_volume field doesn't exist in current model
+                'traffic': 0,  # traffic field doesn't exist in current model
                 'country': keyword.country
             })
             
             page_data[page_url]['total_keywords'] += 1
-            page_data[page_url]['total_traffic'] += keyword.traffic or 0
+            page_data[page_url]['total_traffic'] += 0  # traffic field doesn't exist
             
             # Track best ranking keyword
             if keyword.rank < page_data[page_url]['best_position']:
@@ -130,7 +130,6 @@ def page_rankings_data(request):
     # Format response
     pages_data = []
     total_keywords_sum = 0
-    total_traffic_sum = 0
     position_sum = 0
     
     for page_item in pages:
@@ -158,7 +157,6 @@ def page_rankings_data(request):
         
         # Calculate totals for metrics
         total_keywords_sum += page_item['total_keywords']
-        total_traffic_sum += page_item['total_traffic']
         position_sum += page_item['avg_position']
     
     # Calculate overall metrics
@@ -191,7 +189,6 @@ def page_rankings_data(request):
         'total_pages': len(pages_data),
         'total_keywords': format_number(total_keywords_sum),
         'avg_position': avg_position,
-        'total_traffic': format_number(total_traffic_sum),
         'request': request
     }
     
@@ -250,9 +247,9 @@ def page_keywords_detail(request):
             'rank_change_class': rank_change_class,
             'search_engine': 'Google',  # Assuming Google for now
             'country': keyword.country.upper() if keyword.country else 'US',
-            'search_volume': keyword.search_volume or 0,
+            'search_volume': 0,  # search_volume field doesn't exist in current model
             'cpc': 0,  # CPC not available in current model
-            'traffic': keyword.traffic or 0
+            'traffic': 0  # traffic field doesn't exist in current model
         })
     
     # Extract page title

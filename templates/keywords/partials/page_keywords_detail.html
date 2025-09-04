@@ -17,8 +17,6 @@
                 <th>Search Engine</th>
                 <th>Country</th>
                 <th>Ranking</th>
-                <th>Search Volume</th>
-                <th>Traffic</th>
             </tr>
         </thead>
         <tbody>
@@ -44,8 +42,6 @@
                     </span>
                     {% endif %}
                 </td>
-                <td>{{ keyword.search_volume|floatformat:0 }}</td>
-                <td>{{ keyword.traffic|floatformat:0 }}</td>
             </tr>
             {% endfor %}
         </tbody>

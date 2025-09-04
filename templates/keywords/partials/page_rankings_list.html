@@ -3,7 +3,6 @@
     document.getElementById('totalPages').textContent = '{{ total_pages }}';
     document.getElementById('totalKeywords').textContent = '{{ total_keywords }}';
     document.getElementById('avgPosition').textContent = '{{ avg_position }}';
-    document.getElementById('totalTraffic').textContent = '{{ total_traffic }}';
 </script>
 
 {% if pages %}
@@ -26,10 +25,6 @@
                 <div class="page-metric">
                     <span class="page-metric-value text-green-600">#{{ page.avg_position }}</span>
                     <span class="page-metric-label">avg position</span>
-                </div>
-                <div class="page-metric">
-                    <span class="page-metric-value text-amber-600">{{ page.total_traffic|floatformat:0 }}</span>
-                    <span class="page-metric-label">traffic</span>
                 </div>
             </div>
             
