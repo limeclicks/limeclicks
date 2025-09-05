@@ -764,10 +764,16 @@ def api_rank_serp(request, rank_id):
         from urllib.parse import urlparse
         
         # Get the rank and ensure user owns it
-        rank = Rank.objects.select_related('keyword__project').get(
-            id=rank_id,
-            keyword__project__user=request.user
-        )
+        rank = Rank.objects.select_related('keyword__project').filter(
+            Q(id=rank_id) &
+            (Q(keyword__project__user=request.user) | Q(keyword__project__members=request.user))
+        ).distinct().first()
+        
+        if not rank:
+            return create_ajax_response(
+                success=False,
+                message="Rank not found or access denied"
+            )
         
         if not rank.search_results_file:
             return create_ajax_response(

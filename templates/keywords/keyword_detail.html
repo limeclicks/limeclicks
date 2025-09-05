@@ -555,9 +555,16 @@ function showNotification(message, type = 'info') {
 
 // Function to view historical SERP data
 function viewHistoricalSERP(rankId, date, position) {
+    console.log('viewHistoricalSERP called with:', rankId, date, position);
+    
     const modal = document.getElementById('historicalSerpModal');
     const modalTitle = document.getElementById('modalTitle');
     const modalContent = document.getElementById('modalContent');
+    
+    if (!modal) {
+        console.error('Modal element not found');
+        return;
+    }
     
     // Update modal title
     modalTitle.textContent = `SERP Results - ${date} (Rank #${position})`;
@@ -567,17 +574,24 @@ function viewHistoricalSERP(rankId, date, position) {
     
     // Fetch historical SERP data
     fetch(`/keywords/api/rank/${rankId}/serp/`)
-        .then(response => response.json())
+        .then(response => {
+            console.log('Response status:', response.status);
+            return response.json();
+        })
         .then(data => {
-            if (data.success && data.serp_results) {
+            console.log('Response data:', data);
+            
+            if (data.success && data.data && data.data.serp_results) {
+                const serpResults = data.data.serp_results;
+                const localPack = data.data.local_pack;
                 // Build HTML for SERP results
                 let html = '<div class="space-y-3">';
                 
                 // Local Pack
-                if (data.local_pack && data.local_pack.length > 0) {
+                if (localPack && localPack.length > 0) {
                     html += '<h4 class="font-semibold mb-2">Local Pack Results</h4>';
                     html += '<div class="grid grid-cols-1 md:grid-cols-3 gap-2 mb-4">';
-                    data.local_pack.forEach(local => {
+                    localPack.forEach(local => {
                         html += `
                             <div class="card bg-base-100 border p-3">
                                 <div class="font-medium text-sm">${local.title || local.name}</div>
@@ -590,7 +604,7 @@ function viewHistoricalSERP(rankId, date, position) {
                 
                 // Organic Results
                 html += '<h4 class="font-semibold mb-2">Organic Results</h4>';
-                data.serp_results.forEach(result => {
+                serpResults.forEach(result => {
                     const isOwnSite = result.is_own_site;
                     html += `
                         <div class="p-3 rounded border ${isOwnSite ? 'border-primary bg-primary/5' : 'border-base-300'}">
@@ -610,12 +624,13 @@ function viewHistoricalSERP(rankId, date, position) {
                 
                 modalContent.innerHTML = html;
             } else {
+                console.error('No SERP data in response:', data);
                 modalContent.innerHTML = '<div class="text-center py-8 text-base-content/60">No SERP data available for this rank.</div>';
             }
         })
         .catch(error => {
             console.error('Error loading SERP data:', error);
-            modalContent.innerHTML = '<div class="text-center py-8 text-error">Failed to load SERP data.</div>';
+            modalContent.innerHTML = '<div class="text-center py-8 text-error">Failed to load SERP data. Please check the console for details.</div>';
         });
 }
 </script>
