@@ -17,6 +17,7 @@ from django.utils import timezone
 from django.urls import reverse
 
 from project.models import Project
+from core.permissions import require_project_access, require_project_owner
 from services.r2_storage import get_r2_service
 from .models_reports import KeywordReport, ReportSchedule
 from .models import Keyword
@@ -25,15 +26,10 @@ from .tasks_reports import generate_keyword_report
 logger = logging.getLogger(__name__)
 
 
-@login_required
-def report_list_view(request, project_id):
+@require_project_access
+def report_list_view(request, project_id, project=None):
     """List all reports for a project"""
-    project = get_object_or_404(Project, id=project_id)
-    
-    # Check permissions - user must be owner or member
-    if project.user != request.user and request.user not in project.members.all():
-        messages.error(request, "You don't have access to this project")
-        return redirect('project:dashboard')
+    # project is automatically injected by the decorator
     
     # Get reports for this project
     reports = KeywordReport.objects.filter(
@@ -87,15 +83,10 @@ def report_list_view(request, project_id):
     return render(request, 'keywords/reports/list.html', context)
 
 
-@login_required
-def create_report_view(request, project_id):
+@require_project_access
+def create_report_view(request, project_id, project=None):
     """Create a new report"""
-    project = get_object_or_404(Project, id=project_id)
-    
-    # Check permissions - user must be owner or member
-    if project.user != request.user and request.user not in project.members.all():
-        messages.error(request, "You don't have access to this project")
-        return redirect('project:dashboard')
+    # project is automatically injected by the decorator
     
     if request.method == 'POST':
         try:
@@ -246,16 +237,10 @@ def create_report_view(request, project_id):
     return render(request, 'keywords/reports/create.html', context)
 
 
-@login_required
-def report_detail_view(request, project_id, report_id):
+@require_project_access
+def report_detail_view(request, project_id, report_id, project=None):
     """View report details"""
-    project = get_object_or_404(Project, id=project_id)
     report = get_object_or_404(KeywordReport, id=report_id, project=project)
-    
-    # Check permissions - user must be owner or member
-    if project.user != request.user and request.user not in project.members.all():
-        messages.error(request, "You don't have access to this project")
-        return redirect('project:dashboard')
     
     context = {
         'project': project,
@@ -266,15 +251,10 @@ def report_detail_view(request, project_id, report_id):
     return render(request, 'keywords/reports/detail.html', context)
 
 
-@login_required
-def download_report_view(request, project_id, report_id):
+@require_project_access
+def download_report_view(request, project_id, report_id, project=None):
     """Download report file"""
-    project = get_object_or_404(Project, id=project_id)
     report = get_object_or_404(KeywordReport, id=report_id, project=project)
-    
-    # Check permissions
-    if project.user != request.user and request.user not in project.members.all():
-        raise Http404("Report not found")
     
     # Check if report is ready
     if report.status != 'completed':
@@ -333,17 +313,11 @@ def download_report_view(request, project_id, report_id):
         return redirect('keywords:report_detail', project_id=project.id, report_id=report.id)
 
 
-@login_required
+@require_project_owner
 @require_http_methods(["POST"])
-def delete_report_view(request, project_id, report_id):
+def delete_report_view(request, project_id, report_id, project=None):
     """Delete a report and its associated R2 files"""
-    project = get_object_or_404(Project, id=project_id)
     report = get_object_or_404(KeywordReport, id=report_id, project=project)
-    
-    # Check permissions - only project owner can delete reports
-    if project.user != request.user:
-        messages.error(request, "Only the project owner can delete reports")
-        return JsonResponse({'error': 'Permission denied'}, status=403)
     
     try:
         # Delete R2 files if they exist
@@ -393,15 +367,10 @@ def delete_report_view(request, project_id, report_id):
         return JsonResponse({'error': f'Failed to delete report: {str(e)}'}, status=500)
 
 
-@login_required
-def schedule_list_view(request, project_id):
+@require_project_access
+def schedule_list_view(request, project_id, project=None):
     """List report schedules"""
-    project = get_object_or_404(Project, id=project_id)
-    
-    # Check permissions - user must be owner or member
-    if project.user != request.user and request.user not in project.members.all():
-        messages.error(request, "You don't have access to this project")
-        return redirect('project:dashboard')
+    # project is automatically injected by the decorator
     
     schedules = ReportSchedule.objects.filter(
         project=project
@@ -415,15 +384,10 @@ def schedule_list_view(request, project_id):
     return render(request, 'keywords/reports/schedules.html', context)
 
 
-@login_required
-def create_schedule_view(request, project_id):
+@require_project_access
+def create_schedule_view(request, project_id, project=None):
     """Create a report schedule"""
-    project = get_object_or_404(Project, id=project_id)
-    
-    # Check permissions - user must be owner or member
-    if project.user != request.user and request.user not in project.members.all():
-        messages.error(request, "You don't have access to this project")
-        return redirect('project:dashboard')
+    # project is automatically injected by the decorator
     
     if request.method == 'POST':
         try:
@@ -522,16 +486,11 @@ def create_schedule_view(request, project_id):
     return render(request, 'keywords/reports/create_schedule.html', context)
 
 
-@login_required
+@require_project_access
 @require_http_methods(["POST"])
-def toggle_schedule_view(request, project_id, schedule_id):
+def toggle_schedule_view(request, project_id, schedule_id, project=None):
     """Toggle schedule active status"""
-    project = get_object_or_404(Project, id=project_id)
     schedule = get_object_or_404(ReportSchedule, id=schedule_id, project=project)
-    
-    # Check permissions
-    if project.user != request.user and request.user not in project.members.all():
-        return JsonResponse({'error': 'Permission denied'}, status=403)
     
     try:
         schedule.is_active = not schedule.is_active
@@ -553,16 +512,11 @@ def toggle_schedule_view(request, project_id, schedule_id):
         return JsonResponse({'error': str(e)}, status=500)
 
 
-@login_required
+@require_project_access
 @require_http_methods(["POST"])
-def delete_schedule_view(request, project_id, schedule_id):
+def delete_schedule_view(request, project_id, schedule_id, project=None):
     """Delete a report schedule"""
-    project = get_object_or_404(Project, id=project_id)
     schedule = get_object_or_404(ReportSchedule, id=schedule_id, project=project)
-    
-    # Check permissions
-    if project.user != request.user and request.user not in project.members.all():
-        return JsonResponse({'error': 'Permission denied'}, status=403)
     
     try:
         schedule.delete()
