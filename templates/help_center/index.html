@@ -1,0 +1,551 @@
+{% extends "dashboard_base.html" %}
+{% load static %}
+
+{% block title %}Help Center - Keyword Rankings{% endblock %}
+
+{% block page_title %}Help Center{% endblock %}
+
+{% block extra_head %}
+<style>
+    .help-section {
+        animation: fadeInUp 0.3s ease-out;
+    }
+    
+    @keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+    
+    .collapse-icon {
+        transition: transform 0.2s ease;
+    }
+    
+    .collapse input:checked ~ .collapse-title .collapse-icon {
+        transform: rotate(90deg);
+    }
+    
+    .performance-card {
+        background: linear-gradient(135deg, var(--p) 0%, var(--pf) 100%);
+        color: var(--pc);
+    }
+    
+    .metric-badge {
+        backdrop-filter: blur(10px);
+        background: rgba(255, 255, 255, 0.2);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto">
+    <!-- Hero Section -->
+    <div class="hero bg-gradient-to-r from-primary to-primary-focus text-primary-content rounded-2xl mb-8">
+        <div class="hero-content py-12">
+            <div class="max-w-full w-full">
+                <h1 class="text-4xl font-bold mb-4">Keyword Rankings Help Center</h1>
+                <p class="text-xl opacity-90">Master your SEO with our comprehensive keyword tracking platform</p>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Quick Stats -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <div class="card bg-base-100 shadow-xl">
+            <div class="card-body p-4">
+                <div class="flex items-center gap-3">
+                    <div class="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center">
+                        <i class="fas fa-book text-primary text-lg"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm text-base-content/60">Documentation</p>
+                        <p class="text-2xl font-bold">Complete Guide</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card bg-base-100 shadow-xl">
+            <div class="card-body p-4">
+                <div class="flex items-center gap-3">
+                    <div class="w-12 h-12 bg-success/10 rounded-xl flex items-center justify-center">
+                        <i class="fas fa-rocket text-success text-lg"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm text-base-content/60">Quick Start</p>
+                        <p class="text-2xl font-bold">Get Started</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card bg-base-100 shadow-xl">
+            <div class="card-body p-4">
+                <div class="flex items-center gap-3">
+                    <div class="w-12 h-12 bg-warning/10 rounded-xl flex items-center justify-center">
+                        <i class="fas fa-lightbulb text-warning text-lg"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm text-base-content/60">Pro Tips</p>
+                        <p class="text-2xl font-bold">Best Practices</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card bg-base-100 shadow-xl">
+            <div class="card-body p-4">
+                <div class="flex items-center gap-3">
+                    <div class="w-12 h-12 bg-info/10 rounded-xl flex items-center justify-center">
+                        <i class="fas fa-question-circle text-info text-lg"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm text-base-content/60">Support</p>
+                        <p class="text-2xl font-bold">FAQs</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content Grid -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Left Column - Main Documentation -->
+        <div class="lg:col-span-2 space-y-6">
+            <!-- Overview Section -->
+            <div class="card bg-base-100 shadow-xl help-section">
+                <div class="card-body">
+                    <h2 class="card-title text-2xl mb-4">
+                        <i class="fas fa-compass text-primary mr-2"></i>
+                        Overview
+                    </h2>
+                    <p class="text-base-content/80 leading-relaxed mb-4">
+                        Use this page to track and manage how your domain ranks in Google for each keyword.
+                    </p>
+                    
+                    <!-- What You're Looking At -->
+                    <div class="divider">What you're looking at</div>
+                    
+                    <div class="space-y-3">
+                        <div class="flex gap-3">
+                            <div class="badge badge-primary badge-sm mt-1">Header</div>
+                            <p class="text-sm">Project/domain name and the Add keywords button.</p>
+                        </div>
+                        
+                        <div class="flex gap-3">
+                            <div class="badge badge-info badge-sm mt-1">Search & Filters</div>
+                            <p class="text-sm">Narrow the list by text search, country, tags, and rank range; plus a simple Rank sorter.</p>
+                        </div>
+                        
+                        <div class="flex gap-3">
+                            <div class="badge badge-success badge-sm mt-1">Performance</div>
+                            <p class="text-sm">Snapshot of your keyword set with key metrics.</p>
+                        </div>
+                        
+                        <div class="flex gap-3">
+                            <div class="badge badge-warning badge-sm mt-1">Table</div>
+                            <p class="text-sm">Row-by-row detail with comprehensive keyword data.</p>
+                        </div>
+                        
+                        <div class="flex gap-3">
+                            <div class="badge badge-secondary badge-sm mt-1">Pagination</div>
+                            <p class="text-sm">Choose how many rows to show per page.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Performance Cards Explanation -->
+            <div class="card bg-base-100 shadow-xl help-section">
+                <div class="card-body">
+                    <h2 class="card-title text-2xl mb-4">
+                        <i class="fas fa-chart-line text-success mr-2"></i>
+                        Performance Metrics
+                    </h2>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="card bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20">
+                            <div class="card-body p-4">
+                                <h3 class="font-bold text-primary">Total Keywords</h3>
+                                <p class="text-sm text-base-content/70">Count of all tracked keywords in your project</p>
+                            </div>
+                        </div>
+                        
+                        <div class="card bg-gradient-to-br from-info/10 to-info/5 border border-info/20">
+                            <div class="card-body p-4">
+                                <h3 class="font-bold text-info">Average Rank</h3>
+                                <p class="text-sm text-base-content/70">Mean position across keywords with numeric ranks</p>
+                            </div>
+                        </div>
+                        
+                        <div class="card bg-gradient-to-br from-success/10 to-success/5 border border-success/20">
+                            <div class="card-body p-4">
+                                <h3 class="font-bold text-success">Top 10</h3>
+                                <p class="text-sm text-base-content/70">Keywords ranking in positions 1-10</p>
+                            </div>
+                        </div>
+                        
+                        <div class="card bg-gradient-to-br from-warning/10 to-warning/5 border border-warning/20">
+                            <div class="card-body p-4">
+                                <h3 class="font-bold text-warning">Improved/Declined</h3>
+                                <p class="text-sm text-base-content/70">Movement since last ranking check</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Filters & Search -->
+            <div class="card bg-base-100 shadow-xl help-section">
+                <div class="card-body">
+                    <h2 class="card-title text-2xl mb-4">
+                        <i class="fas fa-filter text-info mr-2"></i>
+                        Filters & Search
+                    </h2>
+                    
+                    <div class="space-y-4">
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle"></i>
+                            <span>Combine filters to focus on specific campaign slices</span>
+                        </div>
+                        
+                        <div class="collapse collapse-plus bg-base-200">
+                            <input type="checkbox" />
+                            <div class="collapse-title font-medium flex items-center gap-2">
+                                <i class="fas fa-search text-primary"></i>
+                                Search
+                            </div>
+                            <div class="collapse-content">
+                                <p class="text-sm">Find any keyword by typing part of the phrase.</p>
+                            </div>
+                        </div>
+                        
+                        <div class="collapse collapse-plus bg-base-200">
+                            <input type="checkbox" />
+                            <div class="collapse-title font-medium flex items-center gap-2">
+                                <i class="fas fa-globe text-success"></i>
+                                Country
+                            </div>
+                            <div class="collapse-content">
+                                <p class="text-sm">Limit results to one or more locations (e.g., 🇬🇧 UK).</p>
+                            </div>
+                        </div>
+                        
+                        <div class="collapse collapse-plus bg-base-200">
+                            <input type="checkbox" />
+                            <div class="collapse-title font-medium flex items-center gap-2">
+                                <i class="fas fa-tags text-warning"></i>
+                                Tags
+                            </div>
+                            <div class="collapse-content">
+                                <p class="text-sm">Show only keywords with selected tags (e.g., Bristol, Heathrow, Core).</p>
+                            </div>
+                        </div>
+                        
+                        <div class="collapse collapse-plus bg-base-200">
+                            <input type="checkbox" />
+                            <div class="collapse-title font-medium flex items-center gap-2">
+                                <i class="fas fa-sort text-error"></i>
+                                Ranks
+                            </div>
+                            <div class="collapse-content">
+                                <p class="text-sm">Quick pills for Top 10, Improved, Declined, Not Ranking, or custom range sorter.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Table Columns Guide -->
+            <div class="card bg-base-100 shadow-xl help-section">
+                <div class="card-body">
+                    <h2 class="card-title text-2xl mb-4">
+                        <i class="fas fa-table text-warning mr-2"></i>
+                        Table Columns Guide
+                    </h2>
+                    
+                    <div class="overflow-x-auto">
+                        <table class="table table-zebra">
+                            <thead>
+                                <tr>
+                                    <th>Column</th>
+                                    <th>Description</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><div class="badge badge-ghost">✓</div></td>
+                                    <td>Select keyword for multi-select actions</td>
+                                </tr>
+                                <tr>
+                                    <td><div class="badge badge-primary">Keyword</div></td>
+                                    <td>The tracked query with URL and tags</td>
+                                </tr>
+                                <tr>
+                                    <td><div class="badge badge-success">Current Rank</div></td>
+                                    <td>Latest position (NE = Not in top-100)</td>
+                                </tr>
+                                <tr>
+                                    <td><div class="badge badge-warning">Change</div></td>
+                                    <td>Movement since last check (+/- positions)</td>
+                                </tr>
+                                <tr>
+                                    <td><div class="badge badge-info">Country</div></td>
+                                    <td>Tracking location (flag + code)</td>
+                                </tr>
+                                <tr>
+                                    <td><div class="badge badge-secondary">Last Checked</div></td>
+                                    <td>Data freshness indicator</td>
+                                </tr>
+                                <tr>
+                                    <td><div class="badge">Actions</div></td>
+                                    <td>Per-keyword options (edit, remove, refresh)</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Column - Quick Actions & FAQs -->
+        <div class="space-y-6">
+            <!-- Common Tasks -->
+            <div class="card bg-base-100 shadow-xl help-section">
+                <div class="card-body">
+                    <h2 class="card-title text-xl mb-4">
+                        <i class="fas fa-tasks text-secondary mr-2"></i>
+                        Common Tasks
+                    </h2>
+                    
+                    <div class="space-y-3">
+                        <div class="collapse collapse-arrow bg-base-200">
+                            <input type="checkbox" />
+                            <div class="collapse-title font-medium">
+                                Add Keywords
+                            </div>
+                            <div class="collapse-content">
+                                <ol class="list-decimal list-inside text-sm space-y-1">
+                                    <li>Click Add keywords (top-right)</li>
+                                    <li>Paste or type one keyword per line</li>
+                                    <li>Pick Country and optional Tags</li>
+                                    <li>Save to start tracking</li>
+                                </ol>
+                            </div>
+                        </div>
+                        
+                        <div class="collapse collapse-arrow bg-base-200">
+                            <input type="checkbox" />
+                            <div class="collapse-title font-medium">
+                                Find "Quick Wins"
+                            </div>
+                            <div class="collapse-content">
+                                <ol class="list-decimal list-inside text-sm space-y-1">
+                                    <li>Filter Country as needed</li>
+                                    <li>Sort by Rank or filter ranks 11-20</li>
+                                    <li>Target these pages with on-page improvements</li>
+                                    <li>Add internal links to boost rankings</li>
+                                </ol>
+                            </div>
+                        </div>
+                        
+                        <div class="collapse collapse-arrow bg-base-200">
+                            <input type="checkbox" />
+                            <div class="collapse-title font-medium">
+                                Monitor Declines
+                            </div>
+                            <div class="collapse-content">
+                                <ol class="list-decimal list-inside text-sm space-y-1">
+                                    <li>Click Declined on filter pills</li>
+                                    <li>Sort by Change to see biggest drops</li>
+                                    <li>Inspect the listed URL</li>
+                                    <li>Ensure correct page is ranking</li>
+                                </ol>
+                            </div>
+                        </div>
+                        
+                        <div class="collapse collapse-arrow bg-base-200">
+                            <input type="checkbox" />
+                            <div class="collapse-title font-medium">
+                                Triage "Not Ranking"
+                            </div>
+                            <div class="collapse-content">
+                                <ol class="list-decimal list-inside text-sm space-y-1">
+                                    <li>Click Not Ranking filter</li>
+                                    <li>Check if relevant page exists</li>
+                                    <li>Verify page is indexable</li>
+                                    <li>Create/optimize target page</li>
+                                    <li>Add internal links</li>
+                                </ol>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Best Practices -->
+            <div class="card bg-gradient-to-br from-primary to-primary-focus text-primary-content shadow-xl help-section">
+                <div class="card-body">
+                    <h2 class="card-title text-xl mb-4">
+                        <i class="fas fa-star mr-2"></i>
+                        Best Practices
+                    </h2>
+                    
+                    <ul class="space-y-3 text-sm">
+                        <li class="flex gap-2">
+                            <i class="fas fa-check-circle mt-0.5"></i>
+                            <span>Tag everything (location, service type, funnel stage)</span>
+                        </li>
+                        <li class="flex gap-2">
+                            <i class="fas fa-check-circle mt-0.5"></i>
+                            <span>Group by intent and optimize pages accordingly</span>
+                        </li>
+                        <li class="flex gap-2">
+                            <i class="fas fa-check-circle mt-0.5"></i>
+                            <span>Watch URL mismatches and strengthen internal links</span>
+                        </li>
+                        <li class="flex gap-2">
+                            <i class="fas fa-check-circle mt-0.5"></i>
+                            <span>Track plurals, synonyms, and near-variants</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- FAQs -->
+            <div class="card bg-base-100 shadow-xl help-section">
+                <div class="card-body">
+                    <h2 class="card-title text-xl mb-4">
+                        <i class="fas fa-question-circle text-info mr-2"></i>
+                        FAQs
+                    </h2>
+                    
+                    <div class="space-y-3">
+                        <details class="collapse collapse-arrow bg-base-200">
+                            <summary class="collapse-title text-sm font-medium">
+                                Why does a keyword show NE?
+                            </summary>
+                            <div class="collapse-content">
+                                <p class="text-sm pt-2">It's outside the top-100 in the selected country or temporarily unavailable.</p>
+                            </div>
+                        </details>
+                        
+                        <details class="collapse collapse-arrow bg-base-200">
+                            <summary class="collapse-title text-sm font-medium">
+                                My rank changed but the page didn't—why?
+                            </summary>
+                            <div class="collapse-content">
+                                <p class="text-sm pt-2">Competitors may have changed, SERP layout shifted, or Google re-interpreted intent.</p>
+                            </div>
+                        </details>
+                        
+                        <details class="collapse collapse-arrow bg-base-200">
+                            <summary class="collapse-title text-sm font-medium">
+                                Can I focus on one country only?
+                            </summary>
+                            <div class="collapse-content">
+                                <p class="text-sm pt-2">Yes—use the Country filter. All metrics and counts will respect your active filters.</p>
+                            </div>
+                        </details>
+                        
+                        <details class="collapse collapse-arrow bg-base-200">
+                            <summary class="collapse-title text-sm font-medium">
+                                What does the colored rank chip mean?
+                            </summary>
+                            <div class="collapse-content">
+                                <p class="text-sm pt-2">Visual severity: green (good), amber (needs work), red (poor/NE).</p>
+                            </div>
+                        </details>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Troubleshooting -->
+            <div class="card bg-base-100 shadow-xl border-2 border-error/20 help-section">
+                <div class="card-body">
+                    <h2 class="card-title text-xl mb-4">
+                        <i class="fas fa-tools text-error mr-2"></i>
+                        Troubleshooting
+                    </h2>
+                    
+                    <div class="space-y-3 text-sm">
+                        <div class="alert alert-warning">
+                            <i class="fas fa-clock"></i>
+                            <div>
+                                <p class="font-semibold">Stale data</p>
+                                <p class="text-xs">Use refresh option or wait for scheduled update</p>
+                            </div>
+                        </div>
+                        
+                        <div class="alert alert-error">
+                            <i class="fas fa-link"></i>
+                            <div>
+                                <p class="font-semibold">Wrong URL ranking</p>
+                                <p class="text-xs">Strengthen on-page relevance of preferred URL</p>
+                            </div>
+                        </div>
+                        
+                        <div class="alert">
+                            <i class="fas fa-eye-slash"></i>
+                            <div>
+                                <p class="font-semibold">No keywords visible</p>
+                                <p class="text-xs">Clear filters using the Clear button</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Keyboard Shortcuts -->
+            <div class="card bg-base-100 shadow-xl help-section">
+                <div class="card-body">
+                    <h2 class="card-title text-xl mb-4">
+                        <i class="fas fa-keyboard text-secondary mr-2"></i>
+                        Keyboard Shortcuts
+                    </h2>
+                    
+                    <div class="space-y-2">
+                        <div class="flex justify-between items-center p-2 bg-base-200 rounded">
+                            <span class="text-sm">/</span>
+                            <kbd class="kbd kbd-sm">Focus search bar</kbd>
+                        </div>
+                        <div class="flex justify-between items-center p-2 bg-base-200 rounded">
+                            <span class="text-sm">Esc</span>
+                            <kbd class="kbd kbd-sm">Clear filters</kbd>
+                        </div>
+                        <div class="flex justify-between items-center p-2 bg-base-200 rounded">
+                            <span class="text-sm">?</span>
+                            <kbd class="kbd kbd-sm">Show help</kbd>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer Help Section -->
+    <div class="mt-8 p-6 bg-base-100 rounded-2xl shadow-xl">
+        <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+            <div>
+                <h3 class="text-lg font-bold mb-2">Need More Help?</h3>
+                <p class="text-sm text-base-content/70">Our support team is here to assist you with any questions.</p>
+            </div>
+            <div class="flex gap-3">
+                <button class="btn btn-primary">
+                    <i class="fas fa-envelope mr-2"></i>
+                    Contact Support
+                </button>
+                <button class="btn btn-outline">
+                    <i class="fas fa-book mr-2"></i>
+                    View Docs
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

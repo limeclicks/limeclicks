@@ -12,6 +12,7 @@ urlpatterns = [
     path("keywords/", include("keywords.urls")),
     path("site-audit/", include("site_audit.urls")),
     path("competitors/", include("competitors.urls")),
+    path("help/", include("help_center.urls")),
 ]
 
 # Serve media files in development

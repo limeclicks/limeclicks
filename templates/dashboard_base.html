@@ -363,7 +363,7 @@
                                     </a>
                                 </li>
                                 <li>
-                                    <a href="#" class="flex items-center gap-3 hover:bg-base-100 dark:hover:bg-base-200 rounded-lg py-2.5">
+                                    <a href="{% url 'help_center:index' %}" class="flex items-center gap-3 hover:bg-base-100 dark:hover:bg-base-200 rounded-lg py-2.5">
                                         <span class="w-8 h-8 rounded-lg bg-base-200 dark:bg-base-300 flex items-center justify-center">
                                             <i class="fas fa-question-circle text-sm"></i>
                                         </span>
@@ -523,7 +523,7 @@
                         <span class="text-xs uppercase font-semibold text-base-content/60">Support</span>
                     </li>
                     <li>
-                        <a href="#" class="flex items-center gap-3">
+                        <a href="{% url 'help_center:index' %}" class="flex items-center gap-3 {% if request.resolver_match.app_name == 'help_center' %}active{% endif %}">
                             <i class="fas fa-question-circle w-4"></i>
                             <span>Help Center</span>
                         </a>
