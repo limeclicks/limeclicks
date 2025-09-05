@@ -392,11 +392,10 @@
 </div>
 
 <!-- Modal for Historical SERP Data -->
+<input type="checkbox" id="historicalSerpModalToggle" class="modal-toggle" />
 <div id="historicalSerpModal" class="modal">
     <div class="modal-box max-w-5xl">
-        <form method="dialog">
-            <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">✕</button>
-        </form>
+        <label for="historicalSerpModalToggle" class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">✕</label>
         <h3 class="font-bold text-lg mb-4">
             <span id="modalTitle">Historical SERP Results</span>
         </h3>
@@ -407,9 +406,7 @@
             </div>
         </div>
     </div>
-    <form method="dialog" class="modal-backdrop">
-        <button>close</button>
-    </form>
+    <label for="historicalSerpModalToggle" class="modal-backdrop">Close</label>
 </div>
 
 <script>
@@ -561,20 +558,28 @@ function showNotification(message, type = 'info') {
 function viewHistoricalSERP(rankId, date, position) {
     console.log('viewHistoricalSERP called with:', rankId, date, position);
     
-    const modal = document.getElementById('historicalSerpModal');
+    const modalToggle = document.getElementById('historicalSerpModalToggle');
     const modalTitle = document.getElementById('modalTitle');
     const modalContent = document.getElementById('modalContent');
     
-    if (!modal) {
-        console.error('Modal element not found');
+    if (!modalToggle) {
+        console.error('Modal toggle element not found');
         return;
     }
+    
+    // Reset modal content to loading state
+    modalContent.innerHTML = `
+        <div class="text-center py-8">
+            <span class="loading loading-spinner loading-lg"></span>
+            <p class="mt-2">Loading SERP data...</p>
+        </div>
+    `;
     
     // Update modal title
     modalTitle.textContent = `SERP Results - ${date} (Rank #${position})`;
     
-    // Show modal
-    modal.showModal();
+    // Show modal using DaisyUI's checkbox method
+    modalToggle.checked = true;
     
     // Fetch historical SERP data
     fetch(`/keywords/api/rank/${rankId}/serp/`, {
@@ -595,9 +600,12 @@ function viewHistoricalSERP(rankId, date, position) {
         .then(data => {
             console.log('Response data:', data);
             
-            if (data.success && data.data && data.data.serp_results) {
-                const serpResults = data.data.serp_results;
-                const localPack = data.data.local_pack;
+            if (data.success && data.data) {
+                console.log('Data structure valid, processing results...');
+                const serpResults = data.data.serp_results || [];
+                const localPack = data.data.local_pack || [];
+                
+                console.log(`Processing ${serpResults.length} SERP results and ${localPack.length} local pack results`);
                 // Build HTML for SERP results
                 let html = '<div class="space-y-3">';
                 
