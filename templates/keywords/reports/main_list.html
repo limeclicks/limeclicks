@@ -199,7 +199,7 @@
                                     <i class="fas fa-eye"></i>
                                 </a>
                                 {% if report.project.user == request.user %}
-                                    <button onclick="showDeleteModal({{ report.id }}, '{{ report.created_at|date:'M d, Y' }}')" 
+                                    <button onclick="showDeleteModal({{ report.project.id }}, {{ report.id }}, '{{ report.created_at|date:'M d, Y' }}')" 
                                             class="btn btn-sm btn-ghost text-error" title="Delete Report">
                                         <i class="fas fa-trash"></i>
                                     </button>
@@ -322,15 +322,17 @@
 
 <script>
 let reportToDelete = null;
+let projectToDelete = null;
 
-function showDeleteModal(reportId, reportDate) {
+function showDeleteModal(projectId, reportId, reportDate) {
+    projectToDelete = projectId;
     reportToDelete = reportId;
     document.getElementById('deleteReportDate').textContent = reportDate;
     document.getElementById('deleteReportModal').showModal();
 }
 
 document.getElementById('confirmDeleteBtn').addEventListener('click', function() {
-    if (!reportToDelete) return;
+    if (!reportToDelete || !projectToDelete) return;
     
     const btn = this;
     const originalContent = btn.innerHTML;
@@ -339,8 +341,11 @@ document.getElementById('confirmDeleteBtn').addEventListener('click', function()
     btn.disabled = true;
     btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Deleting...';
     
+    // Build the delete URL dynamically
+    const deleteUrl = `/keywords/project/${projectToDelete}/reports/${reportToDelete}/delete/`;
+    
     // Send delete request
-    fetch(`{% url 'keywords:delete_report' project.id 0 %}`.replace('0', reportToDelete), {
+    fetch(deleteUrl, {
         method: 'POST',
         headers: {
             'X-CSRFToken': '{{ csrf_token }}',
