@@ -13,7 +13,7 @@ from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 from django.db import transaction
 from django.utils import timezone
-from limeclicks.storage_backends import CloudflareR2Storage
+from core.storage import CloudflareR2Storage
 
 logger = logging.getLogger(__name__)
 
@@ -338,6 +338,7 @@ def cleanup_old_r2_files(days_to_keep: int = 90):
     # Find old audit files
     old_files = AuditFile.objects.filter(uploaded_at__lt=cutoff_date)
     
+    from core.storage import CloudflareR2Storage
     storage = CloudflareR2Storage()
     deleted_count = 0
     

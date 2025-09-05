@@ -439,7 +439,7 @@ AWS_DEFAULT_ACL = None
 AWS_S3_VERIFY = True
 
 # Optional: Use R2 for media files
-# DEFAULT_FILE_STORAGE = 'services.storage_backends.R2MediaStorage'
+# DEFAULT_FILE_STORAGE = 'core.storage.R2MediaStorage'
 # MEDIA_URL = f'{R2_ENDPOINT_URL}/{R2_BUCKET_NAME}/media/'
 
 # Celery Configuration

@@ -1,6 +1,6 @@
 from django.db import models
 from django.utils import timezone
-from limeclicks.storage_backends import CloudflareR2Storage
+from core.storage import CloudflareR2Storage
 import uuid
 from datetime import timedelta
 import json
@@ -427,7 +427,7 @@ class SiteAudit(models.Model):
         Returns:
             Dict with file types and their R2 URLs
         """
-        from limeclicks.storage_backends import CloudflareR2Storage
+        from core.storage import CloudflareR2Storage
         
         storage = CloudflareR2Storage()
         files_urls = {}

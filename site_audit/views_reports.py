@@ -13,7 +13,7 @@ import logging
 from project.models import Project
 from project.permissions import user_can_view_project
 from .models import SiteAudit, AuditFile
-from limeclicks.storage_backends import CloudflareR2Storage
+from core.storage import CloudflareR2Storage
 
 logger = logging.getLogger(__name__)
 

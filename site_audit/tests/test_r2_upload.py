@@ -89,7 +89,7 @@ class AuditFileUploaderTestCase(TestCase):
         
         return created_files
     
-    @patch('site_audit.r2_upload.CloudflareR2Storage')
+    @patch('core.storage.CloudflareR2Storage')
     def test_upload_audit_files(self, mock_storage_class):
         """Test uploading CSV files to R2"""
         # Mock R2 storage
@@ -122,7 +122,7 @@ class AuditFileUploaderTestCase(TestCase):
         self.assertIn('issues_overview', file_types)
         self.assertIn('internal_all', file_types)
     
-    @patch('site_audit.r2_upload.CloudflareR2Storage')
+    @patch('core.storage.CloudflareR2Storage')
     def test_retention_policy(self, mock_storage_class):
         """Test retention policy to keep only recent audits"""
         # Mock R2 storage

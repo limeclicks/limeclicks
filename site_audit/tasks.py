@@ -519,7 +519,7 @@ def collect_pagespeed_insights(self, site_audit_id: int) -> dict:
     import json
     import io
     from datetime import datetime
-    from limeclicks.storage_backends import CloudflareR2Storage
+    from core.storage import CloudflareR2Storage
     
     try:
         # Fetch site audit
