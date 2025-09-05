@@ -1017,12 +1017,13 @@ def keyword_updates_sse(request, project_id):
 @login_required
 def keyword_detail(request, keyword_id):
     """Display detailed information for a specific keyword"""
-    try:
-        keyword = Keyword.objects.select_related('project').get(
-            Q(id=keyword_id) &
-            (Q(project__user=request.user) | Q(project__members=request.user))
-        )
-    except Keyword.DoesNotExist:
+    # Use distinct() to avoid duplicates when user is both owner and member
+    keyword = Keyword.objects.select_related('project').filter(
+        Q(id=keyword_id) &
+        (Q(project__user=request.user) | Q(project__members=request.user))
+    ).distinct().first()
+    
+    if not keyword:
         return redirect('keywords:list')
     
     # Get ranking history (last 30 entries)
