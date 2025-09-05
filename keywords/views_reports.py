@@ -336,33 +336,61 @@ def download_report_view(request, project_id, report_id):
 @login_required
 @require_http_methods(["POST"])
 def delete_report_view(request, project_id, report_id):
-    """Delete a report"""
+    """Delete a report and its associated R2 files"""
     project = get_object_or_404(Project, id=project_id)
     report = get_object_or_404(KeywordReport, id=report_id, project=project)
     
-    # Check permissions
-    if project.user != request.user and request.user not in project.members.all():
+    # Check permissions - only project owner can delete reports
+    if project.user != request.user:
+        messages.error(request, "Only the project owner can delete reports")
         return JsonResponse({'error': 'Permission denied'}, status=403)
     
     try:
-        # Delete R2 files
-        r2_service = get_r2_service()
+        # Delete R2 files if they exist
+        deleted_files = []
+        try:
+            r2_service = get_r2_service()
+            
+            if report.csv_file_path:
+                try:
+                    r2_service.delete_file(report.csv_file_path)
+                    deleted_files.append(f"CSV: {report.csv_file_path}")
+                    logger.info(f"Deleted R2 file: {report.csv_file_path}")
+                except Exception as e:
+                    logger.warning(f"Failed to delete CSV from R2: {e}")
+            
+            if report.pdf_file_path:
+                try:
+                    r2_service.delete_file(report.pdf_file_path)
+                    deleted_files.append(f"PDF: {report.pdf_file_path}")
+                    logger.info(f"Deleted R2 file: {report.pdf_file_path}")
+                except Exception as e:
+                    logger.warning(f"Failed to delete PDF from R2: {e}")
+                    
+        except Exception as e:
+            logger.error(f"R2 service error: {e}")
+            # Continue with report deletion even if R2 deletion fails
         
-        if report.csv_file_path:
-            r2_service.delete_file(report.csv_file_path)
+        # Store report info for logging
+        report_info = f"Report #{report.id} for {report.project.domain}"
         
-        if report.pdf_file_path:
-            r2_service.delete_file(report.pdf_file_path)
-        
-        # Delete report
+        # Delete the database record
         report.delete()
         
-        messages.success(request, "Report deleted successfully")
-        return JsonResponse({'success': True})
+        logger.info(f"Deleted {report_info}. Removed files: {deleted_files}")
+        messages.success(request, f"Report deleted successfully")
+        
+        # Return success with redirect URL for HTMX
+        return JsonResponse({
+            'success': True,
+            'message': 'Report deleted successfully',
+            'redirect': reverse('keywords:report_list', args=[project_id])
+        })
         
     except Exception as e:
-        logger.error(f"Error deleting report: {e}", exc_info=True)
-        return JsonResponse({'error': str(e)}, status=500)
+        logger.error(f"Error deleting report {report_id}: {e}", exc_info=True)
+        messages.error(request, f"Error deleting report: {str(e)}")
+        return JsonResponse({'error': f'Failed to delete report: {str(e)}'}, status=500)
 
 
 @login_required

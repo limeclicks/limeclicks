@@ -33,6 +33,11 @@
                 </a>
                 {% endif %}
             {% endif %}
+            {% if project.user == request.user %}
+                <button onclick="showDeleteModal()" class="btn btn-error btn-outline">
+                    <i class="fas fa-trash"></i> Delete Report
+                </button>
+            {% endif %}
         </div>
     </div>
 
@@ -327,5 +332,95 @@ setTimeout(function() {
 }, 10000); // Refresh every 10 seconds
 </script>
 {% endif %}
+
+<!-- Delete Report Confirmation Modal -->
+<dialog id="deleteReportModal" class="modal">
+    <div class="modal-box">
+        <h3 class="font-bold text-lg">Delete Report</h3>
+        <p class="py-4">
+            Are you sure you want to delete the report "<strong>{{ report.name }}</strong>"?
+        </p>
+        <div class="alert alert-warning">
+            <i class="fas fa-exclamation-triangle"></i>
+            <div>
+                <p class="font-semibold">This action cannot be undone!</p>
+                <p class="text-sm">The report and all associated files will be permanently deleted from storage.</p>
+            </div>
+        </div>
+        
+        <div class="modal-action">
+            <form method="dialog">
+                <button class="btn btn-ghost">Cancel</button>
+            </form>
+            <button id="confirmDeleteBtn" class="btn btn-error">
+                <i class="fas fa-trash mr-2"></i> Delete Report
+            </button>
+        </div>
+    </div>
+    <form method="dialog" class="modal-backdrop">
+        <button>close</button>
+    </form>
+</dialog>
+
+<script>
+function showDeleteModal() {
+    document.getElementById('deleteReportModal').showModal();
+}
+
+document.getElementById('confirmDeleteBtn').addEventListener('click', function() {
+    const btn = this;
+    const originalContent = btn.innerHTML;
+    
+    // Show loading state
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Deleting...';
+    
+    // Send delete request
+    fetch(`{% url 'keywords:delete_report' project.id report.id %}`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': '{{ csrf_token }}',
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Show success message
+            const alertDiv = document.createElement('div');
+            alertDiv.className = 'alert alert-success mb-4';
+            alertDiv.innerHTML = `
+                <i class="fas fa-check-circle"></i>
+                <span>${data.message || 'Report deleted successfully'}</span>
+            `;
+            document.querySelector('.container').insertBefore(alertDiv, document.querySelector('.container').firstChild);
+            
+            // Redirect to report list after delay
+            setTimeout(() => {
+                window.location.href = data.redirect || `{% url 'keywords:report_list' project.id %}`;
+            }, 1500);
+        } else {
+            throw new Error(data.error || 'Failed to delete report');
+        }
+    })
+    .catch(error => {
+        // Show error message
+        const alertDiv = document.createElement('div');
+        alertDiv.className = 'alert alert-error mb-4';
+        alertDiv.innerHTML = `
+            <i class="fas fa-exclamation-circle"></i>
+            <span>Error: ${error.message}</span>
+        `;
+        document.querySelector('.container').insertBefore(alertDiv, document.querySelector('.container').firstChild);
+        
+        // Reset button
+        btn.disabled = false;
+        btn.innerHTML = originalContent;
+        
+        // Close modal
+        document.getElementById('deleteReportModal').close();
+    });
+});
+</script>
 
 {% endblock %}
