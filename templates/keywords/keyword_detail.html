@@ -308,6 +308,10 @@
                 <h3 class="text-lg font-semibold mb-4">
                     Complete Ranking History 
                     <span class="text-sm text-base-content/60">({{ ranking_history|length }} checks)</span>
+                    <!-- Debug button -->
+                    <button onclick="viewHistoricalSERP(796, 'Sep 04, 2025 00:00', 4)" class="btn btn-sm btn-primary ml-4">
+                        Test SERP (Rank 796)
+                    </button>
                 </h3>
                 {% if ranking_history %}
                 <div class="max-h-[600px] overflow-y-auto custom-scrollbar">
@@ -573,9 +577,19 @@ function viewHistoricalSERP(rankId, date, position) {
     modal.showModal();
     
     // Fetch historical SERP data
-    fetch(`/keywords/api/rank/${rankId}/serp/`)
+    fetch(`/keywords/api/rank/${rankId}/serp/`, {
+        credentials: 'same-origin',  // Include cookies for authentication
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+        }
+    })
         .then(response => {
             console.log('Response status:', response.status);
+            console.log('Response headers:', response.headers);
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
             return response.json();
         })
         .then(data => {
@@ -604,22 +618,31 @@ function viewHistoricalSERP(rankId, date, position) {
                 
                 // Organic Results
                 html += '<h4 class="font-semibold mb-2">Organic Results</h4>';
+                html += '<div class="max-h-[500px] overflow-y-auto space-y-2">';
+                
                 serpResults.forEach(result => {
-                    const isOwnSite = result.is_own_site;
+                    const isOwnSite = result.is_own_site || false;
+                    const title = result.title || 'Untitled';
+                    const url = result.url || '#';
+                    const snippet = result.snippet || '';
+                    const position = result.position || 0;
+                    
                     html += `
                         <div class="p-3 rounded border ${isOwnSite ? 'border-primary bg-primary/5' : 'border-base-300'}">
                             <div class="flex items-start gap-3">
-                                <span class="badge ${isOwnSite ? 'badge-primary' : ''}">${result.position}</span>
+                                <span class="badge ${isOwnSite ? 'badge-primary' : 'badge-ghost'}">${position}</span>
                                 <div class="flex-1">
                                     ${isOwnSite ? '<span class="badge badge-primary badge-sm mb-1">YOUR SITE</span>' : ''}
-                                    <div class="font-medium text-sm">${result.title}</div>
-                                    <div class="text-xs text-base-content/60">${result.url}</div>
-                                    ${result.snippet ? `<div class="text-xs mt-1">${result.snippet.substring(0, 150)}...</div>` : ''}
+                                    <div class="font-medium text-sm">${title}</div>
+                                    <div class="text-xs text-base-content/60">${url}</div>
+                                    ${snippet ? `<div class="text-xs mt-1">${snippet.substring(0, 150)}${snippet.length > 150 ? '...' : ''}</div>` : ''}
                                 </div>
                             </div>
                         </div>
                     `;
                 });
+                
+                html += '</div>';
                 html += '</div>';
                 
                 modalContent.innerHTML = html;

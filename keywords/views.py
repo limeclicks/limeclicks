@@ -854,10 +854,12 @@ def api_rank_serp(request, rank_id):
             message="Rank not found or you don't have permission"
         )
     except Exception as e:
+        import traceback
         logger.error(f"Error fetching SERP data for rank {rank_id}: {e}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
         return create_ajax_response(
             success=False,
-            message="Failed to load SERP data"
+            message=f"Error loading SERP data: {str(e)}"
         )
 
 
