@@ -105,12 +105,13 @@ def keywords_list(request):
 @login_required
 def project_keywords(request, project_id):
     """Display all keywords for a specific project"""
-    try:
-        project = Project.objects.get(
-            Q(id=project_id) & 
-            (Q(user=request.user) | Q(members=request.user))
-        )
-    except Project.DoesNotExist:
+    # Use distinct() to avoid duplicates when user is both owner and member
+    project = Project.objects.filter(
+        Q(id=project_id) & 
+        (Q(user=request.user) | Q(members=request.user))
+    ).distinct().first()
+    
+    if not project:
         return redirect('keywords:list')
     
     # Get filter parameters
@@ -300,11 +301,11 @@ def add_keywords(request):
     if not countries:
         countries = ['US']  # Default to US if no country selected
     
-    try:
-        project = Project.objects.get(
-            Q(id=project_id) & (Q(user=request.user) | Q(members=request.user))
-        )
-    except Project.DoesNotExist:
+    project = Project.objects.filter(
+        Q(id=project_id) & (Q(user=request.user) | Q(members=request.user))
+    ).distinct().first()
+    
+    if not project:
         return JsonResponse({'error': 'Project not found or access denied'}, status=404)
     
     # Parse keywords from file or text
@@ -954,11 +955,11 @@ def keyword_updates_sse(request, project_id):
     from django.http import StreamingHttpResponse
     import time
     
-    try:
-        project = Project.objects.get(
-            Q(id=project_id) & (Q(user=request.user) | Q(members=request.user))
-        )
-    except Project.DoesNotExist:
+    project = Project.objects.filter(
+        Q(id=project_id) & (Q(user=request.user) | Q(members=request.user))
+    ).distinct().first()
+    
+    if not project:
         return JsonResponse({'error': 'Project not found or access denied'}, status=404)
     
     def event_stream():
