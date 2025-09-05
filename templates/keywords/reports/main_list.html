@@ -329,6 +329,12 @@ function showDeleteModal(projectId, reportId, reportDate) {
     projectToDelete = projectId;
     reportToDelete = reportId;
     document.getElementById('deleteReportDate').textContent = reportDate;
+    
+    // Reset button state when opening modal
+    const btn = document.getElementById('confirmDeleteBtn');
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-trash mr-2"></i> Yes, Delete Report';
+    
     document.getElementById('deleteReportModal').showModal();
 }
 
@@ -427,6 +433,14 @@ document.getElementById('confirmDeleteBtn').addEventListener('click', function()
                 alertDiv.style.opacity = '0';
                 setTimeout(() => alertDiv.remove(), 300);
             }, 3000);
+            
+            // Reset button state for next use
+            btn.disabled = false;
+            btn.innerHTML = originalContent;
+            
+            // Clear the stored IDs
+            reportToDelete = null;
+            projectToDelete = null;
         } else {
             throw new Error(data.error || 'Failed to delete report');
         }
