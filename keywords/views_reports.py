@@ -11,7 +11,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.http import JsonResponse, HttpResponse, Http404
 from django.views.decorators.http import require_http_methods
-from django.core.paginator import Paginator
+from core.utils import simple_paginate
 from django.db.models import Q
 from django.utils import timezone
 from django.urls import reverse
@@ -59,10 +59,9 @@ def report_list_view(request, project_id, project=None):
         except ValueError:
             pass
     
-    # Paginate
-    paginator = Paginator(reports, 20)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
+    # Paginate using centralized utility
+    pagination_context = simple_paginate(request, reports, 20)
+    page_obj = pagination_context['page_obj']
     
     # Get scheduled reports
     scheduled_reports = ReportSchedule.objects.filter(

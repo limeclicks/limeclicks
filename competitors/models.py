@@ -22,32 +22,8 @@ class Target(models.Model):
     @staticmethod
     def clean_domain_string(domain):
         """Clean a domain string - remove protocol, www, path, etc."""
-        if not domain:
-            return domain
-            
-        domain = domain.strip().lower()
-        
-        # Remove protocol (http://, https://, ftp://, etc.)
-        if '://' in domain:
-            domain = domain.split('://')[-1]
-        
-        # Remove www. prefix
-        if domain.startswith('www.'):
-            domain = domain[4:]
-        
-        # Remove everything after the domain (path, query string, hash)
-        domain = domain.split('/')[0]
-        domain = domain.split('?')[0]
-        domain = domain.split('#')[0]
-        
-        # Remove port if present
-        if ':' in domain and '[' not in domain:
-            domain = domain.split(':')[0]
-        
-        # Remove trailing dots
-        domain = domain.rstrip('.')
-        
-        return domain
+        from core.utils import clean_domain_string
+        return clean_domain_string(domain)
     
     def clean(self):
         # Clean domain using the static method

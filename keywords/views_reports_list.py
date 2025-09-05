@@ -4,7 +4,7 @@ Main reports list view showing all reports across projects
 
 from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
-from django.core.paginator import Paginator
+from core.utils import simple_paginate
 from django.db.models import Q
 
 from project.models import Project
@@ -43,10 +43,9 @@ def reports_main_list(request):
             Q(project__domain__icontains=search)
         )
     
-    # Paginate
-    paginator = Paginator(reports, 25)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
+    # Paginate using centralized utility
+    pagination_context = simple_paginate(request, reports, 25)
+    page_obj = pagination_context['page_obj']
     
     # Get schedules count
     schedules = ReportSchedule.objects.filter(

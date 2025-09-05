@@ -1,7 +1,7 @@
 from django.shortcuts import render, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
-from django.core.paginator import Paginator
+from core.utils import simple_paginate
 from django.db.models import Q, Count, Prefetch, Max
 from django.views.decorators.http import require_http_methods
 from django.contrib.auth import get_user_model
@@ -43,10 +43,9 @@ def project_list(request):
     # Order by creation date
     projects = projects.order_by('-created_at')
     
-    # Pagination
-    paginator = Paginator(projects, 12)  # 12 projects per page
-    page_number = request.GET.get('page')
-    projects_page = paginator.get_page(page_number)
+    # Pagination using centralized utility
+    pagination_context = simple_paginate(request, projects, 12)
+    projects_page = pagination_context['page_obj']
     
     # Add role and additional information to each project
     projects_with_info = []

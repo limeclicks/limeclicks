@@ -7,7 +7,7 @@ from django.db import transaction
 from django.core.exceptions import PermissionDenied
 from django.template.loader import render_to_string
 from django.db.models import Count, Q, Prefetch
-from django.core.paginator import Paginator
+from core.utils import simple_paginate
 import json
 from .models import Project, ProjectMember, ProjectInvitation, ProjectRole, InvitationStatus
 from .permissions import ProjectPermission, user_can_manage_team
@@ -64,10 +64,9 @@ def team_projects_list(request):
             'total_team_size': total_members + project.pending_invitations
         })
     
-    # Pagination
-    paginator = Paginator(projects_with_info, 12)  # 12 projects per page
-    page_number = request.GET.get('page', 1)
-    page_obj = paginator.get_page(page_number)
+    # Pagination using centralized utility
+    pagination_context = simple_paginate(request, projects_with_info, 12)
+    page_obj = pagination_context['page_obj']
     
     # Check if it's an HTMX request for partial updates
     if request.headers.get('HX-Request'):

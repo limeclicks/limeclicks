@@ -4,7 +4,8 @@ from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 from django.db.models import Count, Q, Max, Min, Avg
 from django.utils import timezone
-from django.core.paginator import Paginator
+from core.utils import simple_paginate
+from django.core.paginator import Paginator  # Keep for now, will remove after full refactor
 from .models import Tag, Keyword, KeywordTag
 from .crawl_scheduler import CrawlScheduler
 from common.utils import create_ajax_response, get_logger
@@ -76,10 +77,9 @@ def keywords_list(request):
     declined_count = all_keywords.filter(rank_status='down').count()
     not_ranking_count = all_keywords.filter(Q(rank=0) | Q(rank__gt=100)).count()
     
-    # Pagination
-    page_number = request.GET.get('page', 1)
-    paginator = Paginator(projects_with_keywords, 12)
-    page_obj = paginator.get_page(page_number)
+    # Pagination using centralized utility
+    pagination_context = simple_paginate(request, projects_with_keywords, 12)
+    page_obj = pagination_context['page_obj']
     
     context = {
         'projects_with_keywords': page_obj.object_list,
@@ -217,10 +217,9 @@ def project_keywords(request, project_id):
         not_ranking_count=Count('id', filter=Q(rank=0) | Q(rank__gt=100))
     )
     
-    # Pagination
-    page_number = request.GET.get('page', 1)
-    paginator = Paginator(keywords_qs, per_page)
-    page_obj = paginator.get_page(page_number)
+    # Pagination using centralized utility
+    pagination_context = simple_paginate(request, keywords_qs, per_page)
+    page_obj = pagination_context['page_obj']
     
     # Get available tags for filter dropdown
     available_tags = Tag.objects.filter(
