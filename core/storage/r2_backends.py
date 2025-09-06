@@ -53,7 +53,20 @@ class BaseR2Storage(S3Boto3Storage):
         Return a valid file name for R2
         Sanitizes the filename to be R2-compatible
         """
+        # Handle None case
+        if name is None:
+            import logging
+            logging.error("get_valid_name received None as input")
+            return ""
+        
         name = super().get_valid_name(name)
+        
+        # Handle None from parent
+        if name is None:
+            import logging
+            logging.error("Parent get_valid_name returned None")
+            return ""
+        
         # Keep only alphanumeric, dash, underscore, forward slash, and dots
         name = re.sub(r'[^a-zA-Z0-9\-_./]', '_', name)
         return name

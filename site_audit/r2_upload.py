@@ -83,10 +83,20 @@ class AuditFileUploader:
                             file_obj = io.BytesIO(excel_data)
                             
                             # Debug logging for storage configuration
-                            logger.debug(f"Storage bucket_name: {getattr(self.storage, 'bucket_name', 'NOT SET')}")
-                            logger.debug(f"Storage endpoint_url: {getattr(self.storage, 'endpoint_url', 'NOT SET')}")
+                            logger.info(f"Attempting to upload {filename} to R2 path: {r2_path}")
+                            logger.info(f"Storage bucket_name: {getattr(self.storage, 'bucket_name', 'NOT SET')}")
+                            logger.info(f"Storage endpoint_url: {getattr(self.storage, 'endpoint_url', 'NOT SET')}")
+                            logger.info(f"File size: {len(excel_data)} bytes")
                             
-                            saved_path = self.storage.save(r2_path, file_obj)
+                            # Try to save with detailed error handling
+                            try:
+                                saved_path = self.storage.save(r2_path, file_obj)
+                            except Exception as storage_error:
+                                logger.error(f"Storage.save() raised exception: {storage_error}")
+                                logger.error(f"Exception type: {type(storage_error).__name__}")
+                                import traceback
+                                logger.error(f"Traceback: {traceback.format_exc()}")
+                                raise
                             
                             # Check if save was successful
                             if saved_path is None:
