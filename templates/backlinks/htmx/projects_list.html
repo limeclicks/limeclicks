@@ -1,0 +1,174 @@
+{% load static %}
+
+{% if project_data %}
+<div class="divide-y divide-gray-100">
+    {% for item in project_data %}
+    <div class="p-6 hover:bg-gray-50 transition-colors duration-150">
+        <div class="flex items-center justify-between">
+            <!-- Project Info -->
+            <div class="flex items-center space-x-4">
+                <div class="flex-shrink-0">
+                    <img 
+                        src="{{ item.project.get_cached_favicon_url }}" 
+                        alt="{{ item.project.domain }}" 
+                        class="w-10 h-10 rounded-lg object-contain bg-gray-100 p-1"
+                        onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
+                    >
+                    <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg items-center justify-center hidden">
+                        <span class="text-white font-medium text-sm">
+                            {{ item.project.domain|slice:":2"|upper }}
+                        </span>
+                    </div>
+                </div>
+                <div>
+                    <h3 class="text-lg font-medium text-gray-900">
+                        <a href="{% url 'backlinks:detail' item.project.id %}" class="hover:text-blue-600">
+                            {% if item.project.title %}
+                                {{ item.project.title }}
+                            {% else %}
+                                {{ item.project.domain }}
+                            {% endif %}
+                        </a>
+                    </h3>
+                    <p class="text-sm text-gray-500 flex items-center space-x-2">
+                        <span>{{ item.project.domain }}</span>
+                        {% if item.profile.updated_at %}
+                            <span class="text-gray-300">•</span>
+                            <span>Updated {{ item.profile.updated_at|timesince }} ago</span>
+                        {% endif %}
+                    </p>
+                </div>
+            </div>
+
+            <!-- Backlink Stats -->
+            <div class="flex items-center space-x-8">
+                <!-- Rank Score -->
+                <div class="text-center">
+                    {% if item.profile.rank %}
+                        <div class="text-2xl font-bold {% if item.profile.rank >= 80 %}text-green-600{% elif item.profile.rank >= 60 %}text-yellow-600{% else %}text-red-600{% endif %}">
+                            {{ item.profile.rank }}/100
+                        </div>
+                        <div class="text-xs text-gray-500 font-medium">Rank Score</div>
+                        <!-- Rank Progress Bar -->
+                        <div class="w-16 bg-gray-200 rounded-full h-1.5 mt-1">
+                            <div class="{% if item.profile.rank >= 80 %}bg-green-500{% elif item.profile.rank >= 60 %}bg-yellow-500{% else %}bg-red-500{% endif %} h-1.5 rounded-full" 
+                                 style="width: {{ item.profile.rank }}%"></div>
+                        </div>
+                    {% else %}
+                        <div class="text-2xl font-bold text-gray-400">-</div>
+                        <div class="text-xs text-gray-500 font-medium">No Rank</div>
+                    {% endif %}
+                </div>
+
+                <!-- Total Backlinks -->
+                <div class="text-center">
+                    <div class="text-2xl font-bold text-blue-600">
+                        {{ item.backlinks_formatted }}
+                    </div>
+                    <div class="text-xs text-gray-500 font-medium">Total Links</div>
+                </div>
+
+                <!-- Lost Links -->
+                <div class="text-center">
+                    <div class="text-2xl font-bold {% if item.loss_links > 0 %}text-red-600{% else %}text-green-600{% endif %}">
+                        {% if item.loss_links > 0 %}
+                            -{{ item.loss_links }}
+                        {% else %}
+                            -
+                        {% endif %}
+                    </div>
+                    <div class="text-xs text-gray-500 font-medium">Lost Links</div>
+                </div>
+
+                <!-- Spam Score -->
+                <div class="text-center">
+                    <div class="text-2xl font-bold {% if item.profile.backlinks_spam_score > 30 %}text-red-600{% elif item.profile.backlinks_spam_score > 15 %}text-yellow-600{% else %}text-green-600{% endif %}">
+                        {{ item.profile.backlinks_spam_score|default:0 }}
+                    </div>
+                    <div class="text-xs text-gray-500 font-medium">Spam Score</div>
+                </div>
+
+                <!-- Actions -->
+                <div class="flex space-x-2">
+                    {% if item.profile %}
+                        <div class="dropdown dropdown-end">
+                            <label tabindex="0" class="btn btn-ghost btn-sm">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"></path>
+                                </svg>
+                            </label>
+                            <ul tabindex="0" class="dropdown-content menu p-2 shadow bg-base-100 rounded-box w-52 border">
+                                <li>
+                                    <a href="{% url 'backlinks:detail' item.project.id %}">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                                        </svg>
+                                        View Details
+                                    </a>
+                                </li>
+                                <li>
+                                    <button 
+                                        hx-post="{% url 'backlinks:fetch' item.project.id %}"
+                                        hx-confirm="Fetch fresh backlink data for {{ item.project.domain }}? This will use API credits."
+                                        class="w-full text-left"
+                                    >
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                                        </svg>
+                                        Refresh Data
+                                    </button>
+                                </li>
+                                {% if item.profile.backlinks > 0 %}
+                                <li>
+                                    <button 
+                                        hx-post="{% url 'backlinks:fetch_detailed' item.project.id %}"
+                                        hx-confirm="Collect detailed backlink data for {{ item.project.domain }}? This may take several minutes."
+                                        class="w-full text-left"
+                                    >
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                        </svg>
+                                        Get Detailed List
+                                    </button>
+                                </li>
+                                {% endif %}
+                            </ul>
+                        </div>
+                    {% else %}
+                        <button 
+                            class="btn btn-primary btn-sm"
+                            hx-post="{% url 'backlinks:fetch' item.project.id %}"
+                            hx-confirm="Fetch backlink data for {{ item.project.domain }}?"
+                        >
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
+                            </svg>
+                            Fetch Data
+                        </button>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<!-- Empty State -->
+<div class="text-center py-12">
+    <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
+    </svg>
+    <h3 class="mt-4 text-lg font-medium text-gray-900">No Projects Found</h3>
+    <p class="mt-2 text-gray-500 max-w-md mx-auto">You don't have any active projects yet, or none have backlink data.</p>
+    <div class="mt-6">
+        <a href="{% url 'project:project_list' %}" class="btn btn-primary">
+            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+            </svg>
+            Create Project
+        </a>
+    </div>
+</div>
+{% endif %}

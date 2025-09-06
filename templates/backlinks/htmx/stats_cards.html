@@ -1,0 +1,93 @@
+<!-- Stats Cards -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+    <!-- Total Projects -->
+    <div class="bg-white rounded-lg shadow-sm p-6 border border-gray-200 card-animate">
+        <div class="flex items-center">
+            <div class="flex-shrink-0">
+                <div class="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                    <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
+                    </svg>
+                </div>
+            </div>
+            <div class="ml-4">
+                <p class="text-sm font-medium text-gray-500">Total Projects</p>
+                <p class="text-2xl font-bold text-gray-900">{{ total_projects|default:0 }}</p>
+                <p class="text-xs text-gray-400">Active projects</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Projects with Backlinks -->
+    <div class="bg-white rounded-lg shadow-sm p-6 border border-gray-200 card-animate">
+        <div class="flex items-center">
+            <div class="flex-shrink-0">
+                <div class="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
+                    <svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
+                    </svg>
+                </div>
+            </div>
+            <div class="ml-4">
+                <p class="text-sm font-medium text-gray-500">With Backlinks</p>
+                <p class="text-2xl font-bold text-gray-900">{{ projects_with_backlinks|default:0 }}</p>
+                <p class="text-xs text-gray-400">
+                    {% if total_projects > 0 %}
+                        {{ projects_with_backlinks|default:0 }} of {{ total_projects }}
+                    {% else %}
+                        No data yet
+                    {% endif %}
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Total Backlinks -->
+    <div class="bg-white rounded-lg shadow-sm p-6 border border-gray-200 card-animate">
+        <div class="flex items-center">
+            <div class="flex-shrink-0">
+                <div class="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
+                    <svg class="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"></path>
+                    </svg>
+                </div>
+            </div>
+            <div class="ml-4">
+                <p class="text-sm font-medium text-gray-500">Total Backlinks</p>
+                <p class="text-2xl font-bold text-gray-900">
+                    {{ total_backlinks_formatted|default:"0" }}
+                </p>
+                <p class="text-xs text-gray-400">Across all projects</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Average Spam Score -->
+    <div class="bg-white rounded-lg shadow-sm p-6 border border-gray-200 card-animate">
+        <div class="flex items-center">
+            <div class="flex-shrink-0">
+                <div class="w-8 h-8 {% if avg_spam_score > 30 %}bg-red-100{% elif avg_spam_score > 15 %}bg-yellow-100{% else %}bg-green-100{% endif %} rounded-lg flex items-center justify-center">
+                    <svg class="w-4 h-4 {% if avg_spam_score > 30 %}text-red-600{% elif avg_spam_score > 15 %}text-yellow-600{% else %}text-green-600{% endif %}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                </div>
+            </div>
+            <div class="ml-4">
+                <p class="text-sm font-medium text-gray-500">Avg Spam Score</p>
+                <p class="text-2xl font-bold {% if avg_spam_score > 30 %}text-red-600{% elif avg_spam_score > 15 %}text-yellow-600{% else %}text-green-600{% endif %}">
+                    {{ avg_spam_score|default:0 }}
+                </p>
+                <p class="text-xs text-gray-400">
+                    {% if avg_spam_score > 30 %}
+                        High risk
+                    {% elif avg_spam_score > 15 %}
+                        Medium risk
+                    {% else %}
+                        Low risk
+                    {% endif %}
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+

@@ -1,0 +1,356 @@
+{% extends "dashboard_base.html" %}
+{% load static %}
+
+{% block title %}{{ project.domain }} Backlinks - LimeClicks{% endblock %}
+{% block page_title %}{{ project.domain }} - Backlinks{% endblock %}
+
+{% block content %}
+<div class="mx-auto max-w-7xl">
+    <!-- Page Header -->
+    <div class="flex items-center justify-between mb-8">
+        <div class="flex items-center space-x-4">
+            <a href="{% url 'backlinks:list' %}" class="btn btn-ghost btn-sm">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                </svg>
+                Back
+            </a>
+            <div>
+                <h1 class="text-3xl font-bold text-gray-900">
+                    {% if project.title %}{{ project.title }}{% else %}{{ project.domain }}{% endif %}
+                </h1>
+                <p class="text-gray-600 mt-1">{{ project.domain }} • Backlink Analysis</p>
+            </div>
+        </div>
+        <div class="flex space-x-3">
+            {% if latest_profile %}
+                <button 
+                    class="btn btn-outline btn-sm"
+                    hx-post="{% url 'backlinks:fetch' project.id %}"
+                    hx-confirm="Fetch fresh backlink data? This will use API credits."
+                >
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                    </svg>
+                    Refresh Data
+                </button>
+                {% if latest_profile.backlinks > 0 %}
+                <button 
+                    class="btn btn-primary btn-sm"
+                    hx-post="{% url 'backlinks:fetch_detailed' project.id %}"
+                    hx-confirm="Collect detailed backlink data? This may take several minutes."
+                >
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                    </svg>
+                    Get Detailed List
+                </button>
+                {% endif %}
+            {% else %}
+                <button 
+                    class="btn btn-primary btn-sm"
+                    hx-post="{% url 'backlinks:fetch' project.id %}"
+                    hx-confirm="Fetch backlink data for {{ project.domain }}?"
+                >
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
+                    </svg>
+                    Fetch Backlinks
+                </button>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if latest_profile %}
+        <!-- Current Stats -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <!-- Rank Score -->
+            <div class="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-gray-500">Domain Authority</p>
+                        <p class="text-3xl font-bold {% if latest_profile.rank >= 80 %}text-green-600{% elif latest_profile.rank >= 60 %}text-yellow-600{% else %}text-red-600{% endif %}">
+                            {% if latest_profile.rank %}{{ latest_profile.rank }}{% else %}-{% endif %}
+                        </p>
+                        <p class="text-xs text-gray-400">Out of 100</p>
+                    </div>
+                    <div class="w-12 h-12 {% if latest_profile.rank >= 80 %}bg-green-100{% elif latest_profile.rank >= 60 %}bg-yellow-100{% else %}bg-red-100{% endif %} rounded-lg flex items-center justify-center">
+                        <svg class="w-6 h-6 {% if latest_profile.rank >= 80 %}text-green-600{% elif latest_profile.rank >= 60 %}text-yellow-600{% else %}text-red-600{% endif %}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Total Backlinks -->
+            <div class="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-gray-500">Total Backlinks</p>
+                        <p class="text-3xl font-bold text-blue-600">{{ latest_profile.backlinks|floatformat:0 }}</p>
+                        <p class="text-xs text-gray-400">Total links found</p>
+                    </div>
+                    <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                        <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Referring Domains -->
+            <div class="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-gray-500">Referring Domains</p>
+                        <p class="text-3xl font-bold text-purple-600">{{ latest_profile.referring_domains|floatformat:0 }}</p>
+                        <p class="text-xs text-gray-400">Unique domains</p>
+                    </div>
+                    <div class="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+                        <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9v-9m0-9v9"></path>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Spam Score -->
+            <div class="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-gray-500">Spam Score</p>
+                        <p class="text-3xl font-bold {% if latest_profile.backlinks_spam_score > 30 %}text-red-600{% elif latest_profile.backlinks_spam_score > 15 %}text-yellow-600{% else %}text-green-600{% endif %}">
+                            {{ latest_profile.backlinks_spam_score|default:0 }}
+                        </p>
+                        <p class="text-xs text-gray-400">
+                            {% if latest_profile.backlinks_spam_score > 30 %}
+                                High risk
+                            {% elif latest_profile.backlinks_spam_score > 15 %}
+                                Medium risk
+                            {% else %}
+                                Low risk
+                            {% endif %}
+                        </p>
+                    </div>
+                    <div class="w-12 h-12 {% if latest_profile.backlinks_spam_score > 30 %}bg-red-100{% elif latest_profile.backlinks_spam_score > 15 %}bg-yellow-100{% else %}bg-green-100{% endif %} rounded-lg flex items-center justify-center">
+                        <svg class="w-6 h-6 {% if latest_profile.backlinks_spam_score > 30 %}text-red-600{% elif latest_profile.backlinks_spam_score > 15 %}text-yellow-600{% else %}text-green-600{% endif %}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Detailed Stats -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+            <!-- Referring Domains -->
+            <div class="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+                <h3 class="text-lg font-semibold text-gray-900 mb-4">Referring Domains</h3>
+                <div class="space-y-3">
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm text-gray-600">Total Domains</span>
+                        <span class="font-medium">{{ latest_profile.referring_domains|floatformat:0 }}</span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm text-gray-600">NoFollow Domains</span>
+                        <span class="font-medium">{{ latest_profile.referring_domains_nofollow|floatformat:0 }}</span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm text-gray-600">Main Domains</span>
+                        <span class="font-medium">{{ latest_profile.referring_main_domains|floatformat:0 }}</span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm text-gray-600">Main NoFollow</span>
+                        <span class="font-medium">{{ latest_profile.referring_main_domains_nofollow|floatformat:0 }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Network & Infrastructure -->
+            <div class="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+                <h3 class="text-lg font-semibold text-gray-900 mb-4">Network & Infrastructure</h3>
+                <div class="space-y-3">
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm text-gray-600">Referring IPs</span>
+                        <span class="font-medium">{{ latest_profile.referring_ips|floatformat:0 }}</span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm text-gray-600">Referring Subnets</span>
+                        <span class="font-medium">{{ latest_profile.referring_subnets|floatformat:0 }}</span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm text-gray-600">Referring Pages</span>
+                        <span class="font-medium">{{ latest_profile.referring_pages|floatformat:0 }}</span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm text-gray-600">Pages NoFollow</span>
+                        <span class="font-medium">{{ latest_profile.referring_pages_nofollow|floatformat:0 }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Link Analysis -->
+            <div class="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+                <h3 class="text-lg font-semibold text-gray-900 mb-4">Link Analysis</h3>
+                <div class="space-y-3">
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm text-gray-600">External Links</span>
+                        <span class="font-medium">{{ latest_profile.external_links_count|floatformat:0 }}</span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm text-gray-600">Internal Links</span>
+                        <span class="font-medium">{{ latest_profile.internal_links_count|floatformat:0 }}</span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm text-gray-600">Broken Backlinks</span>
+                        <span class="font-medium {% if latest_profile.broken_backlinks > 0 %}text-red-600{% endif %}">
+                            {{ latest_profile.broken_backlinks|floatformat:0 }}
+                        </span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm text-gray-600">Broken Pages</span>
+                        <span class="font-medium {% if latest_profile.broken_pages > 0 %}text-red-600{% endif %}">
+                            {{ latest_profile.broken_pages|floatformat:0 }}
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Advanced Analytics -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            <!-- TLD Distribution -->
+            <div class="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+                <h3 class="text-lg font-semibold text-gray-900 mb-4">Top-Level Domains</h3>
+                {% if latest_profile.referring_links_tld %}
+                    <div class="space-y-3">
+                        {% for tld, count in latest_profile.referring_links_tld.items|slice:":5" %}
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm text-gray-600 font-mono">.{{ tld }}</span>
+                            <span class="font-medium">{{ count|floatformat:0 }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <p class="text-gray-500 text-sm">No TLD data available</p>
+                {% endif %}
+            </div>
+
+            <!-- Country Distribution -->
+            <div class="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+                <h3 class="text-lg font-semibold text-gray-900 mb-4">Countries</h3>
+                {% if latest_profile.referring_links_countries %}
+                    <div class="space-y-3">
+                        {% for country, count in latest_profile.referring_links_countries.items|slice:":5" %}
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm text-gray-600">{{ country|upper }}</span>
+                            <span class="font-medium">{{ count|floatformat:0 }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <p class="text-gray-500 text-sm">No country data available</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Link Types and Attributes -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            <!-- Link Types -->
+            <div class="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+                <h3 class="text-lg font-semibold text-gray-900 mb-4">Link Types</h3>
+                {% if latest_profile.referring_links_types %}
+                    <div class="space-y-3">
+                        {% for link_type, count in latest_profile.referring_links_types.items|slice:":5" %}
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm text-gray-600 capitalize">{{ link_type|title }}</span>
+                            <span class="font-medium">{{ count|floatformat:0 }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <p class="text-gray-500 text-sm">No link type data available</p>
+                {% endif %}
+            </div>
+
+            <!-- Platform Types -->
+            <div class="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+                <h3 class="text-lg font-semibold text-gray-900 mb-4">Platform Types</h3>
+                {% if latest_profile.referring_links_platform_types %}
+                    <div class="space-y-3">
+                        {% for platform, count in latest_profile.referring_links_platform_types.items|slice:":5" %}
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm text-gray-600 capitalize">{{ platform|title }}</span>
+                            <span class="font-medium">{{ count|floatformat:0 }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <p class="text-gray-500 text-sm">No platform data available</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- File Download -->
+        {% if latest_profile.backlinks_file_path %}
+        <div class="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-8">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h3 class="text-lg font-semibold text-blue-900">Detailed Backlink Data Available</h3>
+                    <p class="text-blue-700 mt-1">
+                        {{ latest_profile.backlinks_count_collected|floatformat:0 }} detailed backlinks collected
+                        {% if latest_profile.backlinks_collected_at %}
+                            on {{ latest_profile.backlinks_collected_at|date:"M d, Y \a\t H:i" }}
+                        {% endif %}
+                    </p>
+                </div>
+                <button 
+                    onclick="downloadBacklinksFile()" 
+                    class="btn btn-primary"
+                >
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                    </svg>
+                    Download Data
+                </button>
+            </div>
+        </div>
+        {% endif %}
+
+
+    {% else %}
+        <!-- No Data State -->
+        <div class="text-center py-12">
+            <svg class="mx-auto h-16 w-16 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
+            </svg>
+            <h3 class="mt-4 text-xl font-medium text-gray-900">No Backlink Data</h3>
+            <p class="mt-2 text-gray-500 max-w-md mx-auto">
+                We haven't collected backlink data for {{ project.domain }} yet. Click the button below to start the analysis.
+            </p>
+            <div class="mt-8">
+                <button 
+                    class="btn btn-primary"
+                    hx-post="{% url 'backlinks:fetch' project.id %}"
+                    hx-confirm="Fetch backlink data for {{ project.domain }}? This will use API credits."
+                >
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
+                    </svg>
+                    Start Backlink Analysis
+                </button>
+            </div>
+        </div>
+    {% endif %}
+</div>
+
+{% if latest_profile.backlinks_file_path %}
+<script>
+function downloadBacklinksFile() {
+    // You could implement a signed URL generation here
+    // For now, this is a placeholder for the download functionality
+    window.location.href = '{% url "backlinks:detail" project.id %}?download=backlinks';
+}
+</script>
+{% endif %}
+{% endblock %}
