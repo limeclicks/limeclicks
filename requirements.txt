@@ -30,7 +30,6 @@ crispy-tailwind==1.0.3
 cron-descriptor==1.4.5
 cryptography==45.0.6
 cssbeautifier==1.15.4
-dataforseo-client==2.0.9
 decorator==5.2.1
 diff-match-patch==20241021
 distlib==0.4.0
