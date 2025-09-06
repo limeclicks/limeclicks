@@ -150,6 +150,70 @@ class DataForSEOClient:
         response = self._make_request("GET", endpoint)
         return response
     
+    def get_backlinks_summary(self, target: str, **kwargs) -> Dict[str, Any]:
+        """
+        Get backlinks summary for a target domain
+        
+        Args:
+            target: Domain to analyze
+            **kwargs: Additional parameters
+            
+        Returns:
+            Backlinks summary data
+        """
+        post_data = [{
+            "target": target,
+            "backlinks_status_type": "live",
+            "internal_list_limit": 10,
+            "include_subdomains": True,
+            "exclude_internal_backlinks": True,
+            "include_indirect_links": True,
+            "rank_scale": "one_hundred",
+            **kwargs
+        }]
+        
+        logger.info(f"Getting backlinks summary for: {target}")
+        response = self._make_request("POST", "/backlinks/summary/live", post_data)
+        return response
+    
+    def get_backlinks_detailed(
+        self, 
+        target: str, 
+        limit: int = 1000, 
+        offset: int = 0,
+        **kwargs
+    ) -> Dict[str, Any]:
+        """
+        Get detailed backlinks for a target domain
+        
+        Args:
+            target: Domain to analyze
+            limit: Number of backlinks to return (max 1000)
+            offset: Number of backlinks to skip
+            **kwargs: Additional parameters
+            
+        Returns:
+            Detailed backlinks data
+        """
+        post_data = [{
+            "target": target,
+            "backlinks_status_type": "live",
+            "internal_list_limit": 10,
+            "include_subdomains": True,
+            "exclude_internal_backlinks": True,
+            "mode": "as_is",
+            "order_by": ["is_new,asc"],
+            "limit": min(limit, 1000),  # Ensure we don't exceed API limit
+            "offset": offset,
+            "include_indirect_links": True,
+            "rank_scale": "one_hundred",
+            **kwargs
+        }]
+        
+        logger.info(f"Getting detailed backlinks for: {target} (limit={limit}, offset={offset})")
+        response = self._make_request("POST", "/backlinks/backlinks/live", post_data)
+        return response
+
     def check_balance(self) -> Dict[str, Any]:
         """
         Check account balance
