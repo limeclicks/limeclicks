@@ -587,11 +587,12 @@
                 ${improvements.length > 0 ? `
                 <div class="card bg-base-100 shadow-sm border border-base-300">
                     <div class="card-body">
-                        <h3 class="text-lg font-semibold mb-4">
-                            <i class="fas fa-tools text-error mr-2"></i>
-                            Improvement Suggestions
+                        <h3 class="text-lg font-semibold mb-2">
+                            <i class="fas fa-clipboard-list text-info mr-2"></i>
+                            Performance Improvement Checklist
                         </h3>
-                        <p class="text-sm text-base-content/60 mb-4">Detailed recommendations to improve your site's performance.</p>
+                        <p class="text-sm text-base-content/60 mb-1">These audits highlight areas where your site can be optimized.</p>
+                        <p class="text-xs text-base-content/50 mb-4">Click on each item to see affected resources and detailed recommendations.</p>
                         <div class="space-y-3">
                             ${improvements.map(imp => window.renderImprovement(imp)).join('')}
                         </div>
@@ -703,19 +704,48 @@
     window.renderImprovement = function(imp) {
         const hasDetails = imp.details && (imp.details.items || imp.details.headings);
         
+        // Choose icon based on score/severity
+        let iconClass = 'fa-exclamation-circle text-warning';
+        if (imp.score <= 0.2) {
+            iconClass = 'fa-times-circle text-error';
+        } else if (imp.score >= 0.8) {
+            iconClass = 'fa-info-circle text-info';
+        }
+        
+        // Format the description - if empty or same as title, provide helpful text
+        let description = imp.description || '';
+        if (!description || description === imp.title) {
+            // Provide default helpful descriptions based on common audit IDs
+            const defaultDescriptions = {
+                'errors-in-console': 'Fix JavaScript errors in the browser console to ensure your site functions properly.',
+                'total-byte-weight': 'Reduce the total size of network requests to improve load time.',
+                'unsized-images': 'Set explicit width and height on image elements to prevent layout shift.',
+                'long-tasks': 'Break up long-running JavaScript tasks to keep the page responsive.',
+                'unused-javascript': 'Remove or defer unused JavaScript to reduce bytes consumed by network activity.',
+                'unused-css-rules': 'Remove dead CSS rules to reduce bytes consumed by network activity.',
+                'non-composited-animations': 'Use CSS transform and opacity for better animation performance.',
+                'uses-text-compression': 'Enable text compression to reduce the byte size of text-based resources.',
+                'uses-long-cache-ttl': 'Serve static assets with an efficient cache policy.',
+                'dom-size': 'Reduce the number of DOM elements to improve page performance.'
+            };
+            description = defaultDescriptions[imp.id] || 'Review this audit item for potential performance improvements.';
+        }
+        
         return `
-            <div class="border border-base-300 rounded-lg">
+            <div class="border border-base-300 rounded-lg hover:shadow-md transition-shadow">
                 <div class="collapse collapse-arrow">
                     <input type="checkbox" id="imp-${imp.id}" />
                     <div class="collapse-title pr-12" style="min-height: auto; padding-top: 0; padding-bottom: 0;">
                         <div class="py-4">
                             <div class="flex items-start gap-3">
-                                <i class="fas fa-exclamation-circle text-error mt-1"></i>
+                                <i class="fas ${iconClass} mt-1 flex-shrink-0"></i>
                                 <div class="flex-1 pr-4">
-                                    <h4 class="font-medium text-base-content mb-1">${imp.title}</h4>
-                                    <p class="text-sm text-base-content/60">${imp.description}</p>
+                                    <h4 class="font-medium text-base-content mb-1">${imp.title.replace(/`/g, '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</h4>
+                                    <p class="text-sm text-base-content/70">${description}</p>
                                     ${imp.displayValue ? `
-                                    <p class="text-xs text-base-content/50 mt-1">${imp.displayValue}</p>
+                                    <div class="flex items-center gap-2 mt-2">
+                                        <span class="badge badge-sm badge-ghost">${imp.displayValue}</span>
+                                    </div>
                                     ` : ''}
                                 </div>
                             </div>
@@ -724,7 +754,8 @@
                     ${hasDetails ? `
                     <div class="collapse-content">
                         <div class="pt-2 px-4 pb-4">
-                            <div class="bg-base-200/50 rounded-lg p-3">
+                            <div class="bg-base-200/30 rounded-lg p-3">
+                                <p class="text-xs font-semibold text-base-content/80 mb-2">Affected Resources:</p>
                                 ${window.renderAuditDetails(imp.details)}
                             </div>
                         </div>
@@ -756,15 +787,69 @@
                                 ${items.map(item => `
                                     <tr>
                                         ${headers.map(h => {
-                                            const value = item[h.key];
-                                            if (typeof value === 'object' && value.type === 'url') {
-                                                return `<td class="text-xs truncate max-w-xs" title="${value.value}">${value.value}</td>`;
-                                            } else if (typeof value === 'object' && value.type === 'bytes') {
-                                                return `<td class="text-xs">${(value.value / 1024).toFixed(1)} KB</td>`;
-                                            } else if (typeof value === 'object' && value.type === 'ms') {
-                                                return `<td class="text-xs">${value.value} ms</td>`;
-                                            } else {
-                                                return `<td class="text-xs">${value}</td>`;
+                                            let value = item[h.key];
+                                            
+                                            // Handle complex object types
+                                            if (typeof value === 'object' && value !== null) {
+                                                // Handle node/element objects
+                                                if (value.type === 'node' || h.valueType === 'node') {
+                                                    const selector = value.selector || value.nodeLabel || value.snippet || '';
+                                                    // Clean up the selector/snippet for display
+                                                    const cleanText = selector
+                                                        .replace(/<[^>]*>/g, '') // Remove HTML tags
+                                                        .replace(/&lt;/g, '<')
+                                                        .replace(/&gt;/g, '>')
+                                                        .replace(/&amp;/g, '&')
+                                                        .substring(0, 100); // Limit length
+                                                    return `<td class="text-xs font-mono truncate max-w-xs" title="${selector.replace(/"/g, '&quot;')}">${cleanText}${cleanText.length >= 100 ? '...' : ''}</td>`;
+                                                }
+                                                // Handle URL objects
+                                                else if (value.type === 'url' || h.valueType === 'url') {
+                                                    const url = value.value || value.url || value;
+                                                    return `<td class="text-xs truncate max-w-xs" title="${url}">${url}</td>`;
+                                                }
+                                                // Handle bytes
+                                                else if (value.type === 'bytes' || h.valueType === 'bytes') {
+                                                    const bytes = value.value || value;
+                                                    return `<td class="text-xs">${(bytes / 1024).toFixed(1)} KB</td>`;
+                                                }
+                                                // Handle milliseconds
+                                                else if (value.type === 'ms' || h.valueType === 'ms') {
+                                                    const ms = value.value || value;
+                                                    return `<td class="text-xs">${ms} ms</td>`;
+                                                }
+                                                // Handle source location objects
+                                                else if (value.source || value.line || value.column) {
+                                                    const source = value.source || value.url || '';
+                                                    const line = value.line || '';
+                                                    const column = value.column || '';
+                                                    const location = line ? `:${line}${column ? ':' + column : ''}` : '';
+                                                    return `<td class="text-xs font-mono truncate max-w-xs" title="${source}${location}">${source}${location}</td>`;
+                                                }
+                                                // Default object handling - try to extract meaningful text
+                                                else {
+                                                    const text = value.text || value.label || value.value || value.snippet || value.selector || JSON.stringify(value);
+                                                    return `<td class="text-xs truncate max-w-xs" title="${text.replace(/"/g, '&quot;')}">${text}</td>`;
+                                                }
+                                            }
+                                            // Handle primitive values
+                                            else if (value === null || value === undefined) {
+                                                return `<td class="text-xs text-base-content/40">N/A</td>`;
+                                            }
+                                            else {
+                                                // Handle numbers with appropriate formatting
+                                                if (h.valueType === 'ms' && typeof value === 'number') {
+                                                    return `<td class="text-xs">${value.toFixed(0)} ms</td>`;
+                                                }
+                                                else if (h.valueType === 'bytes' && typeof value === 'number') {
+                                                    return `<td class="text-xs">${(value / 1024).toFixed(1)} KB</td>`;
+                                                }
+                                                else if (typeof value === 'number') {
+                                                    return `<td class="text-xs">${value.toFixed(2)}</td>`;
+                                                }
+                                                else {
+                                                    return `<td class="text-xs">${value}</td>`;
+                                                }
                                             }
                                         }).join('')}
                                     </tr>
@@ -780,11 +865,18 @@
                 // Simple list if no headers
                 return `
                     <ul class="list-disc list-inside text-sm space-y-1">
-                        ${items.map(item => `
-                            <li class="text-base-content/80">
-                                ${typeof item === 'string' ? item : JSON.stringify(item)}
-                            </li>
-                        `).join('')}
+                        ${items.map(item => {
+                            let text = '';
+                            if (typeof item === 'string') {
+                                text = item;
+                            } else if (typeof item === 'object' && item !== null) {
+                                // Try to extract meaningful text from object
+                                text = item.text || item.label || item.value || item.snippet || item.selector || JSON.stringify(item);
+                            } else {
+                                text = String(item);
+                            }
+                            return `<li class="text-base-content/80">${text}</li>`;
+                        }).join('')}
                     </ul>
                 `;
             }
