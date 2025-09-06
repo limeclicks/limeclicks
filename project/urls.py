@@ -1,5 +1,5 @@
 from django.urls import path
-from . import views, team_views
+from . import views, team_views, webhook_views
 from .favicon_utils import favicon_proxy
 
 app_name = 'project'
@@ -19,4 +19,7 @@ urlpatterns = [
     path('<int:project_id>/team/invitation/<int:invitation_id>/resend/', team_views.resend_invitation, name='resend_invitation'),
     path('<int:project_id>/team/invitation/<int:invitation_id>/revoke/', team_views.revoke_invitation, name='revoke_invitation'),
     path('invitation/<uuid:token>/accept/', team_views.accept_invitation, name='accept_invitation'),
+    
+    # DataForSEO webhook
+    path('webhook/dataforseo/', webhook_views.dataforseo_webhook, name='dataforseo_webhook'),
 ]

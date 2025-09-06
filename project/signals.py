@@ -33,3 +33,15 @@ def auto_queue_audits_on_project_creation(sender, instance, created, **kwargs):
         except Exception as e:
             # Don't fail project creation if audit queuing fails
             logger.error(f"Failed to auto-queue HIGH PRIORITY audits for new project {instance.domain}: {str(e)}")
+        
+        # Also queue DataForSEO keyword fetch for new projects
+        try:
+            from .tasks import fetch_domain_keywords_from_dataforseo
+            
+            # Queue DataForSEO task to fetch keywords for the domain
+            dataforseo_result = fetch_domain_keywords_from_dataforseo.delay(instance.id)
+            logger.info(f"Auto-queued DataForSEO keyword fetch for new project {instance.domain}: Task ID={dataforseo_result.id}")
+            
+        except Exception as e:
+            # Don't fail project creation if DataForSEO queuing fails
+            logger.error(f"Failed to auto-queue DataForSEO task for new project {instance.domain}: {str(e)}")

@@ -13,6 +13,10 @@ class Project(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     members = models.ManyToManyField(settings.AUTH_USER_MODEL, through='ProjectMember', related_name='shared_projects')
+    
+    # DataForSEO integration
+    dataforseo_keywords_path = models.CharField(max_length=500, blank=True, null=True, help_text="R2 path to stored DataForSEO keywords data")
+    dataforseo_keywords_updated_at = models.DateTimeField(blank=True, null=True, help_text="Last time DataForSEO keywords were fetched")
 
     @staticmethod
     def clean_domain_string(domain):

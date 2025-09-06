@@ -334,12 +334,15 @@ class Rank(models.Model):
         super().save(*args, **kwargs)
         
         if is_new and self.keyword:
-            # Get URL from the rank record if available
-            url = None
-            if hasattr(self, '_rank_url'):
-                url = self._rank_url
-            # Pass from_rank_save=True to prevent circular calls
-            self.keyword.update_rank(self.rank, url=url, from_rank_save=True)
+            # Only update keyword rank if this is an organic ranking
+            # Sponsored/ad rankings should not update the main keyword rank
+            if self.is_organic:
+                # Get URL from the rank record if available
+                url = None
+                if hasattr(self, '_rank_url'):
+                    url = self._rank_url
+                # Pass from_rank_save=True to prevent circular calls
+                self.keyword.update_rank(self.rank, url=url, from_rank_save=True)
 
 
 class Tag(models.Model):
