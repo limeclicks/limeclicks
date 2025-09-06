@@ -170,7 +170,7 @@ types-PyYAML==6.0.12.20250809
 typing-inspection==0.4.1
 typing_extensions==4.14.1
 tzdata==2025.1
-urllib3==2.2.2
+urllib3>=2.2.2,<3.0
 uvicorn==0.35.0
 vine==5.1.0
 virtualenv==20.34.0
