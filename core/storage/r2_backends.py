@@ -25,6 +25,14 @@ class BaseR2Storage(S3Boto3Storage):
         self.bucket_name = getattr(settings, 'R2_BUCKET_NAME', None)
         self.endpoint_url = getattr(settings, 'R2_ENDPOINT_URL', None) or getattr(settings, 'AWS_S3_ENDPOINT_URL', None)
         
+        # Set bucket_name in kwargs for parent class
+        if 'bucket_name' not in kwargs and self.bucket_name:
+            kwargs['bucket_name'] = self.bucket_name
+        
+        # Set endpoint_url in kwargs for parent class
+        if 'endpoint_url' not in kwargs and self.endpoint_url:
+            kwargs['endpoint_url'] = self.endpoint_url
+        
         # Set credentials
         kwargs['access_key'] = kwargs.get('access_key') or getattr(settings, 'R2_ACCESS_KEY_ID', None) or getattr(settings, 'AWS_ACCESS_KEY_ID', None)
         kwargs['secret_key'] = kwargs.get('secret_key') or getattr(settings, 'R2_SECRET_ACCESS_KEY', None) or getattr(settings, 'AWS_SECRET_ACCESS_KEY', None)

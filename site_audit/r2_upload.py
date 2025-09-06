@@ -81,6 +81,11 @@ class AuditFileUploader:
                             
                             # Upload to R2
                             file_obj = io.BytesIO(excel_data)
+                            
+                            # Debug logging for storage configuration
+                            logger.debug(f"Storage bucket_name: {getattr(self.storage, 'bucket_name', 'NOT SET')}")
+                            logger.debug(f"Storage endpoint_url: {getattr(self.storage, 'endpoint_url', 'NOT SET')}")
+                            
                             saved_path = self.storage.save(r2_path, file_obj)
                             
                             # Check if save was successful
