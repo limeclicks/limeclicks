@@ -21,8 +21,8 @@ class BaseR2Storage(S3Boto3Storage):
     object_parameters = {'CacheControl': 'max-age=86400'}
     
     def __init__(self, *args, **kwargs):
-        # Set R2 credentials from settings
-        self.bucket_name = getattr(settings, 'R2_BUCKET_NAME', None)
+        # Set R2 credentials from settings - check both R2_ and AWS_ prefixed settings
+        self.bucket_name = getattr(settings, 'R2_BUCKET_NAME', None) or getattr(settings, 'AWS_STORAGE_BUCKET_NAME', None)
         self.endpoint_url = getattr(settings, 'R2_ENDPOINT_URL', None) or getattr(settings, 'AWS_S3_ENDPOINT_URL', None)
         
         # Set bucket_name in kwargs for parent class
