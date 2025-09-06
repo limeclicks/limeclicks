@@ -17,6 +17,7 @@ class Project(models.Model):
     # DataForSEO integration
     dataforseo_keywords_path = models.CharField(max_length=500, blank=True, null=True, help_text="R2 path to stored DataForSEO keywords data")
     dataforseo_keywords_updated_at = models.DateTimeField(blank=True, null=True, help_text="Last time DataForSEO keywords were fetched")
+    dataforseo_task_id = models.CharField(max_length=255, blank=True, null=True, help_text="Latest DataForSEO task ID")
 
     @staticmethod
     def clean_domain_string(domain):
@@ -47,6 +48,68 @@ class Project(models.Model):
         """Get cached favicon URL using our proxy (reduces Google API calls)"""
         from django.urls import reverse
         return reverse('project:favicon_proxy', kwargs={'domain': self.domain}) + f'?size={size}'
+    
+    def create_dataforseo_task(self):
+        """
+        Create a DataForSEO task for this project and store the task ID.
+        Returns the task ID if successful, None otherwise.
+        """
+        from services.dataforseo_client import get_dataforseo_client
+        from django.core.cache import cache
+        from datetime import datetime
+        import logging
+        
+        logger = logging.getLogger(__name__)
+        
+        try:
+            # Initialize DataForSEO client
+            dataforseo = get_dataforseo_client()
+            
+            # Create task for Keywords for Site
+            logger.info(f"Creating DataForSEO task for domain: {self.domain}")
+            
+            response = dataforseo.create_keywords_for_site_task(
+                target=self.domain,
+                location_code=2826,  # UK location code
+                language_code="en",
+                sort_by="relevance",
+                include_webhook=True  # Using webhook for notifications
+            )
+            
+            # Check if request was successful
+            if not response or "tasks" not in response or not response["tasks"]:
+                logger.error(f"Invalid response from DataForSEO: {response}")
+                return None
+                
+            task = response["tasks"][0]
+            
+            # Check for task creation - status_code 20100 means "Task Created"
+            if task.get("status_code") not in [20000, 20100]:
+                error_message = task.get("status_message", "Unknown error")
+                logger.error(f"DataForSEO API error: {error_message}")
+                return None
+                
+            # Get the task ID
+            task_id = task.get("id")
+            logger.info(f"DataForSEO task created with ID: {task_id}")
+            
+            # Update project with DataForSEO task ID
+            self.dataforseo_task_id = task_id
+            self.save(update_fields=['dataforseo_task_id'])
+            
+            # Store task metadata in cache for webhook to use
+            cache_key = f"dataforseo_task_{task_id}"
+            cache.set(cache_key, {
+                "project_id": self.id,
+                "domain": self.domain,
+                "created_at": datetime.now().isoformat()
+            }, timeout=3600)  # Keep for 1 hour
+            
+            return task_id
+            
+        except Exception as e:
+            logger.error(f"Error creating DataForSEO task for project {self.id}: {str(e)}")
+            return None
 
     def __str__(self):
         return f"{self.domain} - {self.title or 'Untitled'}"

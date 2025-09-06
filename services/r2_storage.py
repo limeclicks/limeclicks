@@ -7,6 +7,7 @@ import os
 import boto3
 import logging
 import mimetypes
+import gzip
 from typing import Optional, Dict, Any, BinaryIO, Union
 from datetime import datetime
 from botocore.exceptions import ClientError
@@ -345,7 +346,7 @@ class R2StorageService:
     
     def download_json(self, key: str) -> Optional[Dict[str, Any]]:
         """
-        Download and parse JSON from R2
+        Download and parse JSON from R2 (supports both plain and gzipped JSON)
         
         Args:
             key: Object key in R2
@@ -356,8 +357,15 @@ class R2StorageService:
         content = self.download_file(key)
         if content:
             try:
-                return json.loads(content.decode('utf-8'))
-            except json.JSONDecodeError as e:
+                # Check if the file is gzipped by extension or content
+                if key.endswith('.gz'):
+                    # Decompress gzipped content
+                    decompressed = gzip.decompress(content)
+                    return json.loads(decompressed.decode('utf-8'))
+                else:
+                    # Regular JSON file
+                    return json.loads(content.decode('utf-8'))
+            except (json.JSONDecodeError, gzip.BadGzipFile) as e:
                 logger.error(f"Failed to parse JSON from R2: {str(e)}")
                 return None
         return None

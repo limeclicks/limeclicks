@@ -15,6 +15,7 @@ class ProjectAdmin(ModelAdmin):
         'title', 
         'user', 
         'active_status', 
+        'dataforseo_status',
         'audit_count',
         'latest_audit_status',
         'created_at'
@@ -25,7 +26,8 @@ class ProjectAdmin(ModelAdmin):
         'user'
     )
     search_fields = ('domain', 'title', 'user__email', 'user__first_name', 'user__last_name')
-    readonly_fields = ('created_at', 'updated_at', 'audit_summary')
+    readonly_fields = ('created_at', 'updated_at', 'audit_summary', 
+                       'dataforseo_task_id', 'dataforseo_keywords_path', 'dataforseo_keywords_updated_at')
     ordering = ('-created_at',)
     list_per_page = 20
     list_select_related = ('user',)
@@ -34,6 +36,11 @@ class ProjectAdmin(ModelAdmin):
         ('Project Information', {
             'fields': ('user', 'domain', 'title', 'active'),
             'description': 'Basic project details and ownership'
+        }),
+        ('DataForSEO Keywords', {
+            'fields': ('dataforseo_task_id', 'dataforseo_keywords_path', 'dataforseo_keywords_updated_at'),
+            'classes': ('collapse',),
+            'description': 'DataForSEO keyword research data and task reference'
         }),
         ('Audit Summary', {
             'fields': ('audit_summary',),
@@ -72,6 +79,37 @@ class ProjectAdmin(ModelAdmin):
             return format_html(
                 '<span style="background: #ef4444; color: white; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 500;">Inactive</span>'
             )
+    
+    @display(description="Keywords", ordering="dataforseo_keywords_path")
+    def dataforseo_status(self, obj):
+        """Display DataForSEO keywords status"""
+        if obj.dataforseo_keywords_path:
+            # Calculate how old the data is
+            if obj.dataforseo_keywords_updated_at:
+                from django.utils import timezone
+                days_old = (timezone.now() - obj.dataforseo_keywords_updated_at).days
+                if days_old == 0:
+                    age_text = "Today"
+                elif days_old == 1:
+                    age_text = "1 day ago"
+                else:
+                    age_text = f"{days_old} days ago"
+                    
+                return format_html(
+                    '<span style="background: #10b981; color: white; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 500;" title="Updated: {}">✓ {}</span>',
+                    age_text,
+                    age_text
+                )
+            else:
+                return format_html(
+                    '<span style="background: #10b981; color: white; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 500;">✓ Available</span>'
+                )
+        elif obj.dataforseo_task_id and not obj.dataforseo_keywords_path:
+            return format_html(
+                '<span style="background: #f59e0b; color: white; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 500;">⏳ Processing</span>'
+            )
+        else:
+            return format_html('<span style="color: #9ca3af; font-size: 11px;">—</span>')
     
     @display(description="Audits")
     def audit_count(self, obj):
@@ -132,7 +170,7 @@ class ProjectAdmin(ModelAdmin):
                     <div style="margin-top: 4px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; font-size: 12px;">
                         <div>Pages: <strong>{audit.total_pages_crawled}</strong></div>
                         <div>Issues: <strong>{audit.get_total_issues_count()}</strong></div>
-                        <div>Score: <strong>{audit.overall_site_health_score:.1f if audit.overall_site_health_score else "N/A"}</strong></div>
+                        <div>Score: <strong>{f"{audit.overall_site_health_score:.1f}" if audit.overall_site_health_score is not None else "N/A"}</strong></div>
                     </div>
                 </div>
             ''')

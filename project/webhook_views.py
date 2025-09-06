@@ -5,23 +5,51 @@ import json
 import logging
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_http_methods
 from .tasks import process_dataforseo_webhook
 
 logger = logging.getLogger(__name__)
 
 
 @csrf_exempt
-@require_POST
+@require_http_methods(["GET", "POST", "HEAD"])
 def dataforseo_webhook(request):
     """
     Handle webhook callbacks from DataForSEO
     
-    DataForSEO sends a POST request with task results when completed.
-    This endpoint processes those callbacks and triggers any necessary actions.
+    GET request (pingback): Lightweight notification with task_id in query params
+    POST request (postback): Full task results in request body
+    HEAD request: Connectivity check from DataForSEO
     """
     try:
-        # Parse the webhook payload
+        # Handle HEAD request (connectivity check)
+        if request.method == 'HEAD':
+            return JsonResponse({"status": "ok"})
+        
+        # Extract task_id from query params (for both GET and POST)
+        task_id = request.GET.get('task_id')
+        
+        # Handle GET request (pingback)
+        if request.method == 'GET':
+            # If no task_id, this might be a connectivity check
+            if not task_id:
+                logger.info("Received GET request without task_id - treating as connectivity check")
+                return JsonResponse({"status": "ok", "message": "Webhook endpoint is active"})
+            
+            logger.info(f"Received DataForSEO pingback for task: {task_id}")
+            
+            # Process the webhook with just the task_id
+            process_dataforseo_webhook.delay(task_id, {})
+            
+            return JsonResponse({
+                "status": "received",
+                "task_id": task_id,
+                "type": "pingback",
+                "message": "Pingback received and queued for processing"
+            })
+        
+        # Handle POST request (postback)
+        webhook_data = {}
         if request.content_type == 'application/json':
             try:
                 webhook_data = json.loads(request.body.decode('utf-8'))
@@ -33,7 +61,8 @@ def dataforseo_webhook(request):
             webhook_data = dict(request.POST)
         
         # Extract task_id from query params or payload
-        task_id = request.GET.get('task_id') or webhook_data.get('task_id')
+        if not task_id:
+            task_id = webhook_data.get('task_id')
         
         if not task_id:
             logger.warning("Received webhook without task_id")

@@ -30,7 +30,7 @@ class DataForSEOClient:
         """Initialize the DataForSEO client with credentials from environment"""
         self.username = os.getenv('DATA_FOR_SEO_USERNAME')
         self.password = os.getenv('DATA_FOR_SEO_PASSWORD')
-        self.webhook_url = os.getenv('DATA_FOR_SEO_HOOK_URL')
+        self.webhook_url = os.getenv('DATA_FOR_SEO_HOOK')
         
         if not self.username or not self.password:
             raise ValueError(
@@ -85,6 +85,7 @@ class DataForSEOClient:
         target: str,
         location_code: int = 2840,
         language_code: str = "en",
+        include_webhook: bool = True,
         **kwargs
     ) -> Dict[str, Any]:
         """
@@ -94,6 +95,7 @@ class DataForSEOClient:
             target: Domain to analyze
             location_code: Location code (default: 2840 for USA)
             language_code: Language code (default: "en")
+            include_webhook: Whether to include webhook URL for callback
             **kwargs: Additional parameters
             
         Returns:
@@ -106,7 +108,13 @@ class DataForSEOClient:
             **kwargs
         }]
         
-        # Don't add webhook URLs - we'll use long polling instead
+        # Add webhook URL if configured and requested
+        if include_webhook and self.webhook_url:
+            # Construct the full webhook URL with placeholders for task ID
+            # DataForSEO will replace $id with the actual task ID
+            webhook_endpoint = f"{self.webhook_url}/projects/webhook/dataforseo/?task_id=$id"
+            post_data[0]["pingback_url"] = webhook_endpoint
+            logger.info(f"Added pingback URL: {webhook_endpoint}")
         
         logger.info(f"Creating Keywords for Site task for: {target}")
         response = self._make_request("POST", "/keywords_data/google_ads/keywords_for_site/task_post", post_data)
