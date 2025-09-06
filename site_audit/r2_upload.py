@@ -83,6 +83,12 @@ class AuditFileUploader:
                             file_obj = io.BytesIO(excel_data)
                             saved_path = self.storage.save(r2_path, file_obj)
                             
+                            # Check if save was successful
+                            if saved_path is None:
+                                # If save returns None, use the original path
+                                saved_path = r2_path
+                                logger.warning(f"Storage save returned None for {filename}, using original path: {r2_path}")
+                            
                             # Get file size
                             file_size = len(excel_data)
                             
