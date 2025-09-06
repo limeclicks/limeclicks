@@ -2,7 +2,7 @@ import logging
 import json
 import gzip
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from celery import shared_task
 from django.utils import timezone
 from services.dataforseo_client import get_dataforseo_client
@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 @shared_task(bind=True, max_retries=3)
-def fetch_backlink_summary_from_dataforseo(self, project_id, target_domain=None):
+def fetch_backlink_summary_from_dataforseo(self, project_id, target_domain=None, force=False):
     """
     Fetch backlink summary for a project's domain from DataForSEO
     Uses Backlinks -> Summary -> Live endpoint
@@ -23,6 +23,7 @@ def fetch_backlink_summary_from_dataforseo(self, project_id, target_domain=None)
     Args:
         project_id: ID of the project to fetch backlinks for
         target_domain: Optional domain override (uses project.domain if not provided)
+        force: If True, bypass the 30-day interval check (for manual runs)
         
     Returns:
         Dict with task status and created BacklinkProfile ID
@@ -33,6 +34,27 @@ def fetch_backlink_summary_from_dataforseo(self, project_id, target_domain=None)
         project = Project.objects.get(id=project_id)
         domain = target_domain or project.domain
         logger.info(f"Starting DataForSEO backlink summary fetch for project {project_id}: {domain}")
+        
+        # Check 30-day interval unless forced
+        if not force:
+            latest_profile = BacklinkProfile.objects.filter(
+                project=project, 
+                target=domain
+            ).order_by('-created_at').first()
+            
+            if latest_profile:
+                time_since_last = timezone.now() - latest_profile.created_at
+                if time_since_last < timedelta(days=30):
+                    days_remaining = 30 - time_since_last.days
+                    logger.info(f"Skipping fetch for {domain}: last fetch was {time_since_last.days} days ago, {days_remaining} days remaining")
+                    return {
+                        "status": "skipped",
+                        "project_id": project_id,
+                        "domain": domain,
+                        "days_since_last_fetch": time_since_last.days,
+                        "days_remaining": days_remaining,
+                        "message": f"Fetch skipped - must wait {days_remaining} more days (30-day minimum interval)"
+                    }
         
         # Initialize DataForSEO client
         dataforseo = get_dataforseo_client()
@@ -80,81 +102,62 @@ def fetch_backlink_summary_from_dataforseo(self, project_id, target_domain=None)
         
         logger.info(f"DataForSEO returned backlink summary for {domain}: {result_data.get('backlinks', 0)} backlinks")
         
-        # Create or update BacklinkProfile
-        backlink_profile, created = BacklinkProfile.objects.get_or_create(
+        # Always create a new BacklinkProfile record
+        backlink_profile = BacklinkProfile.objects.create(
             project=project,
             target=domain,
-            defaults={
-                'rank': result_data.get('rank'),
-                'backlinks': result_data.get('backlinks', 0),
-                'backlinks_spam_score': result_data.get('backlinks_spam_score', 0),
-                'internal_links_count': result_data.get('internal_links_count', 0),
-                'external_links_count': result_data.get('external_links_count', 0),
-                'broken_backlinks': result_data.get('broken_backlinks', 0),
-                'broken_pages': result_data.get('broken_pages', 0),
-                'referring_domains': result_data.get('referring_domains', 0),
-                'referring_domains_nofollow': result_data.get('referring_domains_nofollow', 0),
-                'referring_main_domains': result_data.get('referring_main_domains', 0),
-                'referring_main_domains_nofollow': result_data.get('referring_main_domains_nofollow', 0),
-                'referring_ips': result_data.get('referring_ips', 0),
-                'referring_subnets': result_data.get('referring_subnets', 0),
-                'referring_pages': result_data.get('referring_pages', 0),
-                'referring_pages_nofollow': result_data.get('referring_pages_nofollow', 0),
-                'referring_links_tld': result_data.get('referring_links_tld', {}),
-                'referring_links_types': result_data.get('referring_links_types', {}),
-                'referring_links_attributes': result_data.get('referring_links_attributes', {}),
-                'referring_links_platform_types': result_data.get('referring_links_platform_types', {}),
-                'referring_links_semantic_locations': result_data.get('referring_links_semantic_locations', {}),
-                'referring_links_countries': result_data.get('referring_links_countries', {}),
-            }
+            rank=result_data.get('rank'),
+            backlinks=result_data.get('backlinks', 0),
+            backlinks_spam_score=result_data.get('backlinks_spam_score', 0),
+            internal_links_count=result_data.get('internal_links_count', 0),
+            external_links_count=result_data.get('external_links_count', 0),
+            broken_backlinks=result_data.get('broken_backlinks', 0),
+            broken_pages=result_data.get('broken_pages', 0),
+            referring_domains=result_data.get('referring_domains', 0),
+            referring_domains_nofollow=result_data.get('referring_domains_nofollow', 0),
+            referring_main_domains=result_data.get('referring_main_domains', 0),
+            referring_main_domains_nofollow=result_data.get('referring_main_domains_nofollow', 0),
+            referring_ips=result_data.get('referring_ips', 0),
+            referring_subnets=result_data.get('referring_subnets', 0),
+            referring_pages=result_data.get('referring_pages', 0),
+            referring_pages_nofollow=result_data.get('referring_pages_nofollow', 0),
+            referring_links_tld=result_data.get('referring_links_tld', {}),
+            referring_links_types=result_data.get('referring_links_types', {}),
+            referring_links_attributes=result_data.get('referring_links_attributes', {}),
+            referring_links_platform_types=result_data.get('referring_links_platform_types', {}),
+            referring_links_semantic_locations=result_data.get('referring_links_semantic_locations', {}),
+            referring_links_countries=result_data.get('referring_links_countries', {}),
         )
         
-        # If profile already exists, update it with new data (create historical record)
-        if not created:
-            # Create new record for historical tracking
-            BacklinkProfile.objects.create(
-                project=project,
-                target=domain,
-                rank=result_data.get('rank'),
-                backlinks=result_data.get('backlinks', 0),
-                backlinks_spam_score=result_data.get('backlinks_spam_score', 0),
-                internal_links_count=result_data.get('internal_links_count', 0),
-                external_links_count=result_data.get('external_links_count', 0),
-                broken_backlinks=result_data.get('broken_backlinks', 0),
-                broken_pages=result_data.get('broken_pages', 0),
-                referring_domains=result_data.get('referring_domains', 0),
-                referring_domains_nofollow=result_data.get('referring_domains_nofollow', 0),
-                referring_main_domains=result_data.get('referring_main_domains', 0),
-                referring_main_domains_nofollow=result_data.get('referring_main_domains_nofollow', 0),
-                referring_ips=result_data.get('referring_ips', 0),
-                referring_subnets=result_data.get('referring_subnets', 0),
-                referring_pages=result_data.get('referring_pages', 0),
-                referring_pages_nofollow=result_data.get('referring_pages_nofollow', 0),
-                referring_links_tld=result_data.get('referring_links_tld', {}),
-                referring_links_types=result_data.get('referring_links_types', {}),
-                referring_links_attributes=result_data.get('referring_links_attributes', {}),
-                referring_links_platform_types=result_data.get('referring_links_platform_types', {}),
-                referring_links_semantic_locations=result_data.get('referring_links_semantic_locations', {}),
-                referring_links_countries=result_data.get('referring_links_countries', {}),
-            )
-            logger.info(f"Created new historical BacklinkProfile record for {domain}")
-        else:
-            logger.info(f"Created first BacklinkProfile record for {domain}")
+        logger.info(f"Created new BacklinkProfile record for {domain} (ID: {backlink_profile.id})")
         
-        # Get the latest profile for return data
-        latest_profile = BacklinkProfile.objects.filter(project=project, target=domain).first()
+        # Implement retention policy: keep only 3 most recent profiles
+        all_profiles = BacklinkProfile.objects.filter(
+            project=project, 
+            target=domain
+        ).order_by('-created_at')
+        
+        if all_profiles.count() > 3:
+            # Get IDs of profiles to keep (3 most recent)
+            keep_ids = list(all_profiles.values_list('id', flat=True)[:3])
+            
+            # Delete profiles not in the keep list
+            profiles_to_delete = BacklinkProfile.objects.filter(
+                project=project,
+                target=domain
+            ).exclude(id__in=keep_ids)
+            
+            deleted_count = profiles_to_delete.count()
+            profiles_to_delete.delete()
+            logger.info(f"Deleted {deleted_count} old BacklinkProfile records for {domain} (retention policy: keep 3 most recent)")
+        
+        # Use the newly created profile
+        latest_profile = backlink_profile
         
         logger.info(f"Successfully stored backlink summary for {domain}: {latest_profile.backlinks} backlinks, {latest_profile.referring_domains} referring domains")
         
-        # Automatically trigger detailed backlinks collection if we have backlinks
-        if latest_profile.backlinks > 0:
-            try:
-                logger.info(f"Triggering detailed backlinks collection for {domain} with {latest_profile.backlinks} backlinks")
-                detailed_result = fetch_detailed_backlinks_from_dataforseo.delay(latest_profile.id, 5000)  # Collect all 5000 max
-                logger.info(f"Queued detailed backlinks collection for {domain} (Task ID: {detailed_result.id})")
-            except Exception as e:
-                logger.error(f"Failed to queue detailed backlinks collection for {domain}: {str(e)}")
-                # Don't fail the summary task if detailed collection fails to queue
+        # Note: Detailed backlinks collection must be manually triggered by user
+        logger.info(f"Backlink summary completed for {domain}. Detailed collection requires manual trigger.")
         
         return {
             "status": "success",
@@ -178,10 +181,13 @@ def fetch_backlink_summary_from_dataforseo(self, project_id, target_domain=None)
 
 
 @shared_task(bind=True, max_retries=3)
-def fetch_backlinks_for_all_projects(self):
+def fetch_backlinks_for_all_projects(self, force=False):
     """
     Background task to fetch backlink summaries for all active projects
-    Can be scheduled to run daily/weekly to keep backlink data up to date
+    Respects 30-day interval unless force=True
+    
+    Args:
+        force: If True, bypass the 30-day interval check for all projects
     
     Returns:
         Dict with processing summary
@@ -203,8 +209,8 @@ def fetch_backlinks_for_all_projects(self):
             try:
                 logger.info(f"Processing project {project.id}: {project.domain}")
                 
-                # Call the individual fetch task
-                result = fetch_backlink_summary_from_dataforseo.delay(project.id)
+                # Call the individual fetch task with force parameter
+                result = fetch_backlink_summary_from_dataforseo.delay(project.id, force=force)
                 
                 # You could wait for result if needed, but for background processing
                 # it's better to let tasks run async
