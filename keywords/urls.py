@@ -1,11 +1,16 @@
 from django.urls import path, include
-from . import views, views_reports_list, views_reports, views_page_rankings
+from . import views, views_reports_list, views_reports, views_page_rankings, views_keyword_magic
 
 app_name = 'keywords'
 
 urlpatterns = [
     # Main list view
     path('', views.keywords_list, name='list'),
+    
+    # Keyword Magic Tool
+    path('magic/', views_keyword_magic.keyword_magic_tool, name='keyword_magic'),
+    path('magic/load/<int:project_id>/', views_keyword_magic.load_keyword_data, name='load_keyword_data'),
+    path('magic/refresh/<int:project_id>/', views_keyword_magic.refresh_keyword_data, name='refresh_keyword_data'),
     
     # Reports main view
     path('reports/', views_reports_list.reports_main_list, name='reports_main'),

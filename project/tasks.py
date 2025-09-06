@@ -114,39 +114,21 @@ def fetch_domain_keywords_from_dataforseo(self, project_id):
                         task_data = task_result["tasks"][0]
                         
                         if task_data.get("status_code") == 20000:
-                            # Task completed successfully
-                            result = task_data.get("result", [{}])[0]
+                            # Task completed successfully - save raw response as-is
+                            # DataForSEO returns keywords directly in the result array for keywords_for_site
+                            total_count = task_data.get("result_count", 0)
                             
-                            if result and result.get("items"):
-                                # Process the keywords data
-                                keywords = result.get("items", [])
-                                total_count = result.get("items_count", len(keywords))
-                                
-                                # Structure the data for storage
-                                keywords_data = {
-                                    "domain": project.domain,
-                                    "total_count": total_count,
-                                    "keywords": keywords,
-                                    "location_code": result.get("location_code"),
-                                    "language_code": result.get("language_code"),
-                                    "fetched_at": datetime.now().isoformat(),
-                                    "task_id": self.request.id,
-                                    "dataforseo_task_id": task_id
-                                }
-                                
-                                logger.info(f"Retrieved {total_count} keywords for {project.domain}")
-                                break
-                            else:
-                                logger.warning(f"No keyword data found for domain: {project.domain}")
-                                keywords_data = {
-                                    "domain": project.domain,
-                                    "total_count": 0,
-                                    "keywords": [],
-                                    "fetched_at": datetime.now().isoformat(),
-                                    "task_id": self.request.id,
-                                    "dataforseo_task_id": task_id
-                                }
-                                break
+                            logger.info(f"DataForSEO returned {total_count} keywords for {project.domain}")
+                            
+                            # Save the entire raw response from DataForSEO
+                            keywords_data = task_data
+                            # Add our metadata
+                            keywords_data["domain"] = project.domain
+                            keywords_data["fetched_at"] = datetime.now().isoformat()
+                            keywords_data["celery_task_id"] = self.request.id
+                            
+                            logger.info(f"Saving raw DataForSEO response with {total_count} keywords")
+                            break
                         else:
                             error_msg = task_data.get("status_message", "Unknown error")
                             logger.error(f"Task {task_id} failed: {error_msg}")
@@ -166,7 +148,7 @@ def fetch_domain_keywords_from_dataforseo(self, project_id):
                 "dataforseo_task_id": task_id
             }
             
-        logger.info(f"Processed {keywords_data.get('total_count', 0)} keywords for {project.domain}")
+        logger.info(f"Processed {keywords_data.get('result_count', 0)} keywords for {project.domain}")
         
         # Store in R2 with gzip compression
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -189,7 +171,7 @@ def fetch_domain_keywords_from_dataforseo(self, project_id):
             metadata={
                 'project_id': str(project_id),
                 'domain': project.domain,
-                'keywords_count': str(keywords_data['total_count']),
+                'keywords_count': str(keywords_data.get('result_count', 0)),
                 'task_id': self.request.id,
                 'content_encoding': 'gzip',
                 'original_size': str(original_size),
@@ -287,24 +269,17 @@ def process_dataforseo_webhook(task_id, webhook_data):
             task_data = result_response["tasks"][0]
             
             if task_data.get("status_code") == 20000:
-                # Task completed successfully
-                result = task_data.get("result", [{}])[0]
-                keywords = result.get("items", [])
-                total_count = result.get("items_count", len(keywords))
+                # Task completed successfully - save raw response as-is
+                # For keywords_for_site endpoint, keywords are directly in result array
+                total_count = task_data.get("result_count", 0)
                 
-                # Structure the data for storage
-                keywords_data = {
-                    "domain": project.domain,
-                    "total_count": total_count,
-                    "keywords": keywords,
-                    "location_code": result.get("location_code"),
-                    "language_code": result.get("language_code"),
-                    "fetched_at": datetime.now().isoformat(),
-                    "task_id": task_id,
-                    "dataforseo_task_id": task_id
-                }
+                logger.info(f"DataForSEO webhook: Retrieved {total_count} keywords for {project.domain}")
                 
-                logger.info(f"Retrieved {total_count} keywords for {project.domain}")
+                # Save the entire raw task data from DataForSEO
+                keywords_data = task_data
+                # Add our metadata
+                keywords_data["domain"] = project.domain
+                keywords_data["fetched_at"] = datetime.now().isoformat()
                 
                 # Store in R2 with gzip compression
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -347,7 +322,7 @@ def process_dataforseo_webhook(task_id, webhook_data):
                     "status": "success",
                     "task_id": task_id,
                     "project_id": project.id,
-                    "keywords_count": total_count,
+                    "keywords_count": keywords_data.get('result_count', 0),
                     "r2_path": r2_path
                 }
             else:

@@ -1,0 +1,878 @@
+{% extends "dashboard_base.html" %}
+{% load static %}
+
+{% block title %}Keyword Magic Tool - {{ block.super }}{% endblock %}
+
+{% block extra_head %}
+<!-- Alpine.js -->
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+{% endblock %}
+
+{% block content %}
+{% csrf_token %}
+<div x-data="keywordMagicTool()" x-init="init()" class="min-h-screen">
+    <!-- Header -->
+    <div class="mb-6">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+                <h1 class="text-2xl font-bold text-base-content">
+                    <i class="fas fa-magic text-primary mr-2"></i>
+                    Keyword Magic Tool
+                </h1>
+                <p class="text-sm text-base-content/60 mt-1">
+                    Discover and analyze keywords for your projects
+                </p>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Project Selection Interface -->
+    <div x-show="!selectedProjectId" x-transition class="mb-6">
+        <div class="text-center mb-8">
+            <h2 class="text-xl font-semibold text-base-content mb-2">Select a Project to Analyze</h2>
+            <p class="text-base-content/60">Choose from your available projects to view keyword data</p>
+        </div>
+        
+        <!-- Project Search -->
+        <div class="max-w-2xl mx-auto mb-6">
+            <div class="relative">
+                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <i class="fas fa-search text-base-content/40"></i>
+                </div>
+                <input 
+                    type="text" 
+                    x-model="projectSearch"
+                    placeholder="Search projects..." 
+                    class="input input-bordered w-full pl-10 pr-4 py-2 bg-base-100 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary">
+            </div>
+        </div>
+        
+        <!-- Project Cards Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {% for project in projects %}
+            <div 
+                x-show="!projectSearch || '{{ project.domain }}'.toLowerCase().includes(projectSearch.toLowerCase())"
+                @click="selectProject('{{ project.id }}', '{{ project.domain }}')"
+                class="card bg-base-100 border border-base-300 hover:border-primary hover:shadow-lg transition-all cursor-pointer group">
+                <div class="card-body">
+                    <!-- Project Icon/Favicon -->
+                    <div class="flex items-start justify-between mb-3">
+                        <div class="avatar">
+                            <div class="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
+                                <img 
+                                    src="{{ project.get_favicon_url }}" 
+                                    alt="{{ project.domain }}"
+                                    onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
+                                    class="w-8 h-8">
+                                <i class="fas fa-globe text-primary text-xl" style="display:none;"></i>
+                            </div>
+                        </div>
+                        <div class="badge badge-ghost group-hover:badge-primary transition-colors">
+                            <i class="fas fa-arrow-right"></i>
+                        </div>
+                    </div>
+                    
+                    <!-- Project Domain -->
+                    <h3 class="font-semibold text-base-content truncate" title="{{ project.domain }}">
+                        {{ project.domain }}
+                    </h3>
+                    
+                    <!-- Project Stats -->
+                    <div class="mt-3 space-y-1">
+                        {% if project.dataforseo_keywords_updated_at %}
+                        <div class="flex items-center justify-between text-xs">
+                            <span class="text-base-content/60">Status</span>
+                            <span class="badge badge-sm badge-success">Data Available</span>
+                        </div>
+                        {% else %}
+                        <div class="flex items-center justify-between text-xs">
+                            <span class="text-base-content/60">Status</span>
+                            <span class="badge badge-sm badge-warning">No Data</span>
+                        </div>
+                        {% endif %}
+                    </div>
+                    
+                    <!-- Hover Effect -->
+                    <div class="mt-4 pt-3 border-t border-base-300">
+                        <span class="text-xs text-primary opacity-0 group-hover:opacity-100 transition-opacity">
+                            Click to view keywords →
+                        </span>
+                    </div>
+                </div>
+            </div>
+            {% empty %}
+            <div class="col-span-full">
+                <div class="card bg-base-200 border-2 border-dashed border-base-300">
+                    <div class="card-body text-center py-12">
+                        <i class="fas fa-folder-open text-5xl text-base-content/20 mb-4"></i>
+                        <h3 class="text-lg font-semibold text-base-content">No Projects Available</h3>
+                        <p class="text-base-content/60 max-w-md mx-auto">
+                            You don't have any projects yet. Please create a project first to start analyzing keywords.
+                        </p>
+                        <div class="mt-6">
+                            <a href="{% url 'project:add' %}" class="btn btn-primary">
+                                <i class="fas fa-plus mr-2"></i>
+                                Create Your First Project
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    
+    <!-- Selected Project Header -->
+    <div x-show="selectedProjectId" x-transition class="mb-6">
+        <div class="flex items-center gap-4">
+            <button 
+                @click="deselectProject()"
+                class="btn btn-ghost btn-sm">
+                <i class="fas fa-arrow-left mr-2"></i>
+                Back to Projects
+            </button>
+            <div class="divider divider-horizontal"></div>
+            <div class="flex items-center gap-3">
+                <div class="avatar">
+                    <div class="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                        <i class="fas fa-globe text-primary text-sm"></i>
+                    </div>
+                </div>
+                <div>
+                    <h2 class="font-semibold text-base-content" x-text="selectedProjectDomain"></h2>
+                    <p class="text-xs text-base-content/60">Keyword Analysis</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Stats Cards -->
+    <div x-show="selectedProjectId && !loading && stats !== null" x-transition class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <!-- Total Keywords -->
+        <div class="stat bg-base-100 rounded-lg shadow-sm border border-base-300">
+            <div class="stat-figure text-primary">
+                <i class="fas fa-key text-2xl"></i>
+            </div>
+            <div class="stat-title text-xs">Total Keywords</div>
+            <div class="stat-value text-2xl" x-text="stats?.total_keywords?.toLocaleString() || '0'"></div>
+            <div class="stat-desc">Available for analysis</div>
+        </div>
+        
+        <!-- Total Search Volume -->
+        <div class="stat bg-base-100 rounded-lg shadow-sm border border-base-300">
+            <div class="stat-figure text-info">
+                <i class="fas fa-search text-2xl"></i>
+            </div>
+            <div class="stat-title text-xs">Total Search Volume</div>
+            <div class="stat-value text-2xl" x-text="formatNumber(stats?.total_search_volume || 0)"></div>
+            <div class="stat-desc">Monthly searches</div>
+        </div>
+        
+        <!-- Average CPC -->
+        <div class="stat bg-base-100 rounded-lg shadow-sm border border-base-300">
+            <div class="stat-figure text-success">
+                <i class="fas fa-dollar-sign text-2xl"></i>
+            </div>
+            <div class="stat-title text-xs">Average CPC</div>
+            <div class="stat-value text-2xl">$<span x-text="(stats?.avg_cpc || 0).toFixed(2)"></span></div>
+            <div class="stat-desc">Cost per click</div>
+        </div>
+        
+        <!-- Competition Distribution -->
+        <div class="stat bg-base-100 rounded-lg shadow-sm border border-base-300">
+            <div class="stat-figure">
+                <div class="flex flex-col gap-1 text-xs">
+                    <span class="text-error">High: <span x-text="stats?.high_competition || 0"></span></span>
+                    <span class="text-warning">Med: <span x-text="stats?.medium_competition || 0"></span></span>
+                    <span class="text-success">Low: <span x-text="stats?.low_competition || 0"></span></span>
+                </div>
+            </div>
+            <div class="stat-title text-xs">Competition</div>
+            <div class="stat-value text-2xl">
+                <div class="flex gap-1">
+                    <div class="badge badge-sm badge-error" x-text="stats?.total_keywords ? Math.round((stats.high_competition / stats.total_keywords) * 100) + '%' : '0%'"></div>
+                    <div class="badge badge-sm badge-warning" x-text="stats?.total_keywords ? Math.round((stats.medium_competition / stats.total_keywords) * 100) + '%' : '0%'"></div>
+                    <div class="badge badge-sm badge-success" x-text="stats?.total_keywords ? Math.round((stats.low_competition / stats.total_keywords) * 100) + '%' : '0%'"></div>
+                </div>
+            </div>
+            <div class="stat-desc">Distribution</div>
+        </div>
+    </div>
+    
+    <!-- Filters and Search -->
+    <div x-show="selectedProjectId && !loading && keywords.length > 0" x-transition class="card bg-base-100 shadow-sm border border-base-300 mb-6">
+        <div class="card-body p-4">
+            <div class="flex flex-col lg:flex-row gap-4">
+                <!-- Search -->
+                <div class="form-control flex-1">
+                    <div class="input-group">
+                        <span class="bg-base-200">
+                            <i class="fas fa-search"></i>
+                        </span>
+                        <input 
+                            type="text" 
+                            x-model="searchTerm"
+                            @input="filterKeywords()"
+                            placeholder="Search keywords..." 
+                            class="input input-bordered flex-1">
+                    </div>
+                </div>
+                
+                <!-- Competition Filter -->
+                <div class="form-control">
+                    <select x-model="competitionFilter" @change="filterKeywords()" class="select select-bordered">
+                        <option value="">All Competition</option>
+                        <option value="low">Low Competition (< 0.3)</option>
+                        <option value="medium">Medium Competition (0.3-0.7)</option>
+                        <option value="high">High Competition (> 0.7)</option>
+                    </select>
+                </div>
+                
+                <!-- Volume Filter -->
+                <div class="form-control">
+                    <select x-model="volumeFilter" @change="filterKeywords()" class="select select-bordered">
+                        <option value="">All Volumes</option>
+                        <option value="0-100">0-100 searches</option>
+                        <option value="100-1000">100-1K searches</option>
+                        <option value="1000-10000">1K-10K searches</option>
+                        <option value="10000+">10K+ searches</option>
+                    </select>
+                </div>
+                
+                <!-- CPC Filter -->
+                <div class="form-control">
+                    <select x-model="cpcFilter" @change="filterKeywords()" class="select select-bordered">
+                        <option value="">All CPC</option>
+                        <option value="0-1">$0-$1</option>
+                        <option value="1-5">$1-$5</option>
+                        <option value="5-10">$5-$10</option>
+                        <option value="10+">$10+</option>
+                    </select>
+                </div>
+                
+                <!-- Export Button -->
+                <div>
+                    <button 
+                        @click="exportData()" 
+                        :disabled="!filteredKeywords || filteredKeywords.length === 0"
+                        class="btn btn-primary">
+                        <i class="fas fa-download mr-2"></i>
+                        Export CSV
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Active Filters -->
+            <div x-show="hasActiveFilters()" class="flex items-center gap-2 mt-3">
+                <span class="text-sm text-base-content/60">Active filters:</span>
+                <div class="flex gap-2">
+                    <span x-show="searchTerm" class="badge badge-sm badge-primary gap-1">
+                        Search: <span x-text="searchTerm"></span>
+                        <button @click="searchTerm = ''; filterKeywords()" class="ml-1">×</button>
+                    </span>
+                    <span x-show="competitionFilter" class="badge badge-sm badge-primary gap-1">
+                        Competition: <span x-text="competitionFilter"></span>
+                        <button @click="competitionFilter = ''; filterKeywords()" class="ml-1">×</button>
+                    </span>
+                    <span x-show="volumeFilter" class="badge badge-sm badge-primary gap-1">
+                        Volume: <span x-text="volumeFilter"></span>
+                        <button @click="volumeFilter = ''; filterKeywords()" class="ml-1">×</button>
+                    </span>
+                    <span x-show="cpcFilter" class="badge badge-sm badge-primary gap-1">
+                        CPC: <span x-text="cpcFilter"></span>
+                        <button @click="cpcFilter = ''; filterKeywords()" class="ml-1">×</button>
+                    </span>
+                </div>
+                <button @click="clearFilters()" class="btn btn-xs btn-ghost">Clear all</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Keywords Table -->
+    <div x-show="selectedProjectId" x-transition class="card bg-base-100 shadow-sm border border-base-300">
+        <div class="card-body p-0">
+            <!-- Loading State Inside Table -->
+            <div x-show="loading" class="p-12 text-center">
+                <span class="loading loading-spinner loading-lg text-primary"></span>
+                <p class="mt-4 text-base-content/60">Loading keyword data...</p>
+            </div>
+            
+            <!-- No data message -->
+            <div x-show="!loading && (!keywords || keywords.length === 0)" class="p-12 text-center">
+                <i class="fas fa-inbox text-6xl text-base-content/20 mb-4"></i>
+                <h3 class="text-lg font-semibold text-base-content mb-2">No Keyword Data Available</h3>
+                <p class="text-base-content/60">
+                    This project doesn't have keyword data yet.
+                </p>
+            </div>
+            
+            <!-- Table -->
+            <div x-show="filteredKeywords && filteredKeywords.length > 0" class="overflow-x-auto">
+                <table class="table w-full">
+                    <thead>
+                        <tr class="border-b border-base-300">
+                            <th class="cursor-pointer hover:bg-base-200" @click="sortBy('keyword')">
+                                Keyword
+                                <i class="fas fa-sort text-xs ml-1 opacity-50"></i>
+                            </th>
+                            <th class="cursor-pointer hover:bg-base-200" @click="sortBy('search_volume')">
+                                Search Volume
+                                <i class="fas fa-sort text-xs ml-1 opacity-50"></i>
+                            </th>
+                            <th class="cursor-pointer hover:bg-base-200" @click="sortBy('competition')">
+                                Competition
+                                <i class="fas fa-sort text-xs ml-1 opacity-50"></i>
+                            </th>
+                            <th class="cursor-pointer hover:bg-base-200" @click="sortBy('competition_index')">
+                                Competition Index
+                                <i class="fas fa-sort text-xs ml-1 opacity-50"></i>
+                            </th>
+                            <th class="cursor-pointer hover:bg-base-200" @click="sortBy('cpc')">
+                                CPC
+                                <i class="fas fa-sort text-xs ml-1 opacity-50"></i>
+                            </th>
+                            <th class="cursor-pointer hover:bg-base-200" @click="sortBy('low_top_of_page_bid')">
+                                Low Bid
+                                <i class="fas fa-sort text-xs ml-1 opacity-50"></i>
+                            </th>
+                            <th class="cursor-pointer hover:bg-base-200" @click="sortBy('high_top_of_page_bid')">
+                                High Bid
+                                <i class="fas fa-sort text-xs ml-1 opacity-50"></i>
+                            </th>
+                            <th>Trend</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <template x-for="keyword in paginatedKeywords" :key="keyword.keyword">
+                            <tr class="hover:bg-base-200/50 transition-colors">
+                                <td class="font-medium">
+                                    <span x-text="keyword.keyword"></span>
+                                </td>
+                                <td>
+                                    <span x-text="typeof keyword.search_volume === 'number' ? keyword.search_volume.toLocaleString() : '0'"></span>
+                                </td>
+                                <td>
+                                    <div class="flex items-center gap-2">
+                                        <div class="w-16 bg-base-300 rounded-full h-2">
+                                            <div 
+                                                class="h-2 rounded-full transition-all"
+                                                :class="getCompetitionColor(keyword.competition)"
+                                                :style="`width: ${keyword.competition * 100}%`">
+                                            </div>
+                                        </div>
+                                        <span class="text-xs" x-text="(keyword.competition * 100).toFixed(0) + '%'"></span>
+                                    </div>
+                                </td>
+                                <td>
+                                    <span x-text="keyword.competition_index || 0"></span>
+                                </td>
+                                <td>
+                                    <span class="font-mono">$<span x-text="(keyword.cpc || 0).toFixed(2)"></span></span>
+                                </td>
+                                <td>
+                                    <span class="font-mono text-sm">$<span x-text="(keyword.low_top_of_page_bid || 0).toFixed(2)"></span></span>
+                                </td>
+                                <td>
+                                    <span class="font-mono text-sm">$<span x-text="(keyword.high_top_of_page_bid || 0).toFixed(2)"></span></span>
+                                </td>
+                                <td>
+                                    <div x-show="keyword.monthly_searches && keyword.monthly_searches.length > 0" 
+                                         class="w-20 h-8">
+                                        <svg viewBox="0 0 100 30" class="w-full h-full">
+                                            <polyline
+                                                fill="none"
+                                                stroke="currentColor"
+                                                stroke-width="2"
+                                                class="text-primary"
+                                                :points="getSparklinePoints(keyword.monthly_searches)"
+                                            />
+                                        </svg>
+                                    </div>
+                                </td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- Pagination -->
+            <div x-show="totalPages > 1" class="p-4 border-t border-base-300">
+                <div class="flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <div class="text-sm text-base-content/60">
+                        Showing <span x-text="((currentPage - 1) * itemsPerPage) + 1"></span> to 
+                        <span x-text="Math.min(currentPage * itemsPerPage, filteredKeywords.length)"></span> of 
+                        <span x-text="filteredKeywords.length"></span> keywords
+                    </div>
+                    
+                    <div class="join">
+                        <button 
+                            @click="currentPage = 1" 
+                            :disabled="currentPage === 1"
+                            class="join-item btn btn-sm">
+                            <i class="fas fa-angle-double-left"></i>
+                        </button>
+                        <button 
+                            @click="currentPage--" 
+                            :disabled="currentPage === 1"
+                            class="join-item btn btn-sm">
+                            <i class="fas fa-angle-left"></i>
+                        </button>
+                        <button class="join-item btn btn-sm btn-active">
+                            Page <span x-text="currentPage"></span> of <span x-text="totalPages"></span>
+                        </button>
+                        <button 
+                            @click="currentPage++" 
+                            :disabled="currentPage === totalPages"
+                            class="join-item btn btn-sm">
+                            <i class="fas fa-angle-right"></i>
+                        </button>
+                        <button 
+                            @click="currentPage = totalPages" 
+                            :disabled="currentPage === totalPages"
+                            class="join-item btn btn-sm">
+                            <i class="fas fa-angle-double-right"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function keywordMagicTool() {
+    return {
+        selectedProjectId: '',
+        selectedProjectDomain: '',
+        projectSearch: '',
+        loading: false,
+        keywords: [],
+        filteredKeywords: [],
+        stats: null,
+        searchTerm: '',
+        competitionFilter: '',
+        volumeFilter: '',
+        cpcFilter: '',
+        sortField: 'search_volume',
+        sortDirection: 'desc',
+        currentPage: 1,
+        itemsPerPage: 50,
+        
+        init() {
+            console.log('Initializing Keyword Magic Tool');
+            
+            // Wait for Alpine to be ready before accessing DOM
+            this.$nextTick(() => {
+                // Check if we have a project in URL params
+                const urlParams = new URLSearchParams(window.location.search);
+                const projectId = urlParams.get('project');
+                
+                if (projectId) {
+                    console.log('Setting project from URL:', projectId);
+                    // Find the domain for this project ID
+                    {% for project in projects %}
+                    if ('{{ project.id }}' === projectId) {
+                        this.selectProject('{{ project.id }}', '{{ project.domain }}');
+                    }
+                    {% endfor %}
+                }
+            });
+        },
+        
+        selectProject(projectId, domain) {
+            this.selectedProjectId = projectId;
+            this.selectedProjectDomain = domain;
+            
+            // Update URL with project parameter
+            const url = new URL(window.location);
+            url.searchParams.set('project', projectId);
+            window.history.pushState({}, '', url);
+            
+            this.loadProjectData();
+        },
+        
+        deselectProject() {
+            this.selectedProjectId = '';
+            this.selectedProjectDomain = '';
+            this.keywords = [];
+            this.filteredKeywords = [];
+            this.stats = null;
+            
+            // Remove project parameter from URL
+            const url = new URL(window.location);
+            url.searchParams.delete('project');
+            window.history.pushState({}, '', url);
+        },
+        
+        async loadProjectData() {
+            if (!this.selectedProjectId) {
+                console.log('No project selected');
+                return;
+            }
+            
+            console.log('Loading data for project ID:', this.selectedProjectId);
+            this.loading = true;
+            this.keywords = [];
+            this.filteredKeywords = [];
+            this.stats = null;
+            
+            try {
+                // Get the presigned URL from backend
+                const response = await fetch(`/keywords/magic/load/${this.selectedProjectId}/`, {
+                    method: 'GET',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Accept': 'application/json',
+                    },
+                    credentials: 'same-origin'
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const result = await response.json();
+                
+                if (!result.success) {
+                    throw new Error(result.error || 'Failed to get data URL');
+                }
+                
+                console.log('Got presigned URL, fetching gzipped data from R2...');
+                
+                // Fetch the gzipped data directly from R2
+                const r2Response = await fetch(result.data.presigned_url);
+                
+                if (!r2Response.ok) {
+                    throw new Error('Failed to download keyword data from storage');
+                }
+                
+                // Get the compressed data as blob
+                const blob = await r2Response.blob();
+                console.log(`Downloaded ${blob.size} bytes of compressed data`);
+                
+                // Decompress using the browser's DecompressionStream API
+                const ds = new DecompressionStream('gzip');
+                const decompressedStream = blob.stream().pipeThrough(ds);
+                const decompressedBlob = await new Response(decompressedStream).blob();
+                const jsonText = await decompressedBlob.text();
+                const data = JSON.parse(jsonText);
+                
+                console.log('Decompressed data structure:', Object.keys(data));
+                console.log('Raw data sample:', data);
+                
+                // Handle the response structure
+                let keywords = [];
+                
+                // Extract keywords from the response
+                if (data.result && Array.isArray(data.result)) {
+                    // Keywords are directly in the result array for keywords_for_site endpoint
+                    keywords = data.result;
+                    console.log(`Found keywords in data.result: ${keywords.length} items`);
+                } else if (data.keywords && Array.isArray(data.keywords)) {
+                    // Fallback: Data might have a keywords property (older format)
+                    keywords = data.keywords;
+                    console.log(`Found keywords in data.keywords: ${keywords.length} items`);
+                } else if (Array.isArray(data)) {
+                    // Data is the keywords array directly
+                    keywords = data;
+                    console.log(`Data is keywords array directly: ${keywords.length} items`);
+                }
+                
+                console.log(`Found ${keywords.length} keywords`);
+                
+                // Process and normalize keywords
+                this.keywords = keywords.map(kw => ({
+                    keyword: kw.keyword || kw.query || kw.text || '',
+                    search_volume: typeof kw.search_volume === 'number' ? kw.search_volume : 0,
+                    competition: typeof kw.competition === 'string' ? 
+                        (kw.competition.toUpperCase() === 'HIGH' ? 0.8 : 
+                         kw.competition.toUpperCase() === 'MEDIUM' ? 0.5 : 
+                         kw.competition.toUpperCase() === 'LOW' ? 0.2 : 0.5) : 
+                        (kw.competition || 0),
+                    competition_index: kw.competition_index || 0,
+                    cpc: kw.cpc || kw.cost_per_click || 0,
+                    low_top_of_page_bid: kw.low_top_of_page_bid || kw.low_bid || 0,
+                    high_top_of_page_bid: kw.high_top_of_page_bid || kw.high_bid || 0,
+                    monthly_searches: Array.isArray(kw.monthly_searches) ? kw.monthly_searches : []
+                }));
+                
+                // Calculate stats client-side
+                if (this.keywords.length > 0) {
+                    const totalVolume = this.keywords.reduce((sum, kw) => sum + (kw.search_volume || 0), 0);
+                    const totalCpc = this.keywords.reduce((sum, kw) => sum + (kw.cpc || 0), 0);
+                    
+                    // Handle both string and numeric competition values
+                    const highComp = this.keywords.filter(kw => {
+                        const comp = typeof kw.competition === 'string' ? 
+                            (kw.competition.toUpperCase() === 'HIGH' ? 1 : 0) : 
+                            kw.competition;
+                        return comp >= 0.7;
+                    }).length;
+                    
+                    const medComp = this.keywords.filter(kw => {
+                        const comp = typeof kw.competition === 'string' ? 
+                            (kw.competition.toUpperCase() === 'MEDIUM' ? 0.5 : 0) : 
+                            kw.competition;
+                        return comp >= 0.3 && comp < 0.7;
+                    }).length;
+                    
+                    const lowComp = this.keywords.filter(kw => {
+                        const comp = typeof kw.competition === 'string' ? 
+                            (kw.competition.toUpperCase() === 'LOW' ? 0.1 : 0) : 
+                            kw.competition;
+                        return comp < 0.3;
+                    }).length;
+                    
+                    this.stats = {
+                        total_keywords: this.keywords.length,
+                        total_search_volume: totalVolume,
+                        avg_cpc: this.keywords.length > 0 ? (totalCpc / this.keywords.length) : 0,
+                        high_competition: highComp,
+                        medium_competition: medComp,
+                        low_competition: lowComp
+                    };
+                    
+                    this.filterKeywords();
+                }
+                
+            } catch (error) {
+                console.error('Error loading keyword data:', error);
+                this.showNotification('Failed to load keyword data: ' + error.message, 'error');
+            } finally {
+                this.loading = false;
+            }
+        },
+        
+        filterKeywords() {
+            let filtered = [...this.keywords];
+            
+            // Search filter
+            if (this.searchTerm) {
+                const term = this.searchTerm.toLowerCase();
+                filtered = filtered.filter(k => k.keyword.toLowerCase().includes(term));
+            }
+            
+            // Competition filter
+            if (this.competitionFilter) {
+                filtered = filtered.filter(k => {
+                    if (this.competitionFilter === 'low') return k.competition < 0.3;
+                    if (this.competitionFilter === 'medium') return k.competition >= 0.3 && k.competition < 0.7;
+                    if (this.competitionFilter === 'high') return k.competition >= 0.7;
+                    return true;
+                });
+            }
+            
+            // Volume filter
+            if (this.volumeFilter) {
+                filtered = filtered.filter(k => {
+                    const vol = k.search_volume;
+                    if (this.volumeFilter === '0-100') return vol <= 100;
+                    if (this.volumeFilter === '100-1000') return vol > 100 && vol <= 1000;
+                    if (this.volumeFilter === '1000-10000') return vol > 1000 && vol <= 10000;
+                    if (this.volumeFilter === '10000+') return vol > 10000;
+                    return true;
+                });
+            }
+            
+            // CPC filter
+            if (this.cpcFilter) {
+                filtered = filtered.filter(k => {
+                    const cpc = k.cpc;
+                    if (this.cpcFilter === '0-1') return cpc <= 1;
+                    if (this.cpcFilter === '1-5') return cpc > 1 && cpc <= 5;
+                    if (this.cpcFilter === '5-10') return cpc > 5 && cpc <= 10;
+                    if (this.cpcFilter === '10+') return cpc > 10;
+                    return true;
+                });
+            }
+            
+            // Apply sorting
+            filtered.sort((a, b) => {
+                const aVal = a[this.sortField];
+                const bVal = b[this.sortField];
+                
+                if (this.sortDirection === 'asc') {
+                    return aVal > bVal ? 1 : -1;
+                } else {
+                    return aVal < bVal ? 1 : -1;
+                }
+            });
+            
+            this.filteredKeywords = filtered;
+            this.currentPage = 1; // Reset to first page when filtering
+        },
+        
+        sortBy(field) {
+            if (this.sortField === field) {
+                this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';
+            } else {
+                this.sortField = field;
+                this.sortDirection = 'desc';
+            }
+            this.filterKeywords();
+        },
+        
+        hasActiveFilters() {
+            return this.searchTerm || this.competitionFilter || this.volumeFilter || this.cpcFilter;
+        },
+        
+        clearFilters() {
+            this.searchTerm = '';
+            this.competitionFilter = '';
+            this.volumeFilter = '';
+            this.cpcFilter = '';
+            this.filterKeywords();
+        },
+        
+        getCompetitionColor(competition) {
+            if (competition < 0.3) return 'bg-success';
+            if (competition < 0.7) return 'bg-warning';
+            return 'bg-error';
+        },
+        
+        getSparklinePoints(monthlySearches) {
+            if (!monthlySearches || monthlySearches.length === 0) return '';
+            
+            const max = Math.max(...monthlySearches.map(m => m.search_volume || 0));
+            const points = monthlySearches.map((m, i) => {
+                const x = (i / (monthlySearches.length - 1)) * 100;
+                const y = 30 - ((m.search_volume || 0) / max) * 25;
+                return `${x},${y}`;
+            });
+            
+            return points.join(' ');
+        },
+        
+        formatNumber(num) {
+            if (num >= 1000000) {
+                return (num / 1000000).toFixed(1) + 'M';
+            }
+            if (num >= 1000) {
+                return (num / 1000).toFixed(1) + 'K';
+            }
+            return num.toLocaleString();
+        },
+        
+        exportData() {
+            if (!this.filteredKeywords || this.filteredKeywords.length === 0) {
+                this.showNotification('No keywords to export', 'warning');
+                return;
+            }
+            
+            const csv = this.convertToCSV(this.filteredKeywords);
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            
+            // Get domain name for filename
+            const domain = this.keywords[0]?.domain || 'keywords';
+            const date = new Date().toISOString().split('T')[0];
+            a.download = `${domain}_keywords_${date}.csv`;
+            
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+            
+            this.showNotification(`Exported ${this.filteredKeywords.length} keywords to CSV`, 'success');
+        },
+        
+        convertToCSV(data) {
+            // CSV headers - no mention of data source
+            const headers = [
+                'Keyword',
+                'Monthly Searches',
+                'Competition Level',
+                'Competition Score',
+                'CPC ($)',
+                'Low Bid ($)',
+                'High Bid ($)',
+                'Trend'
+            ];
+            
+            // Helper function to escape CSV values
+            const escapeCSV = (value) => {
+                if (value === null || value === undefined) return '';
+                const str = String(value);
+                // Escape quotes and wrap in quotes if contains comma, quote, or newline
+                if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+                    return `"${str.replace(/"/g, '""')}"`;
+                }
+                return str;
+            };
+            
+            // Convert competition value to readable text
+            const getCompetitionLevel = (comp) => {
+                if (typeof comp === 'string') return comp;
+                if (comp >= 0.7) return 'High';
+                if (comp >= 0.3) return 'Medium';
+                return 'Low';
+            };
+            
+            // Convert monthly searches to trend indicator
+            const getTrend = (monthlySearches) => {
+                if (!monthlySearches || monthlySearches.length < 2) return 'N/A';
+                const recent = monthlySearches[0]?.search_volume || 0;
+                const previous = monthlySearches[1]?.search_volume || 0;
+                if (recent > previous) return '↑';
+                if (recent < previous) return '↓';
+                return '→';
+            };
+            
+            const rows = data.map(k => [
+                escapeCSV(k.keyword),
+                k.search_volume || 0,
+                getCompetitionLevel(k.competition),
+                k.competition_index || 0,
+                (k.cpc || 0).toFixed(2),
+                (k.low_top_of_page_bid || 0).toFixed(2),
+                (k.high_top_of_page_bid || 0).toFixed(2),
+                getTrend(k.monthly_searches)
+            ]);
+            
+            // Combine headers and rows
+            return [headers, ...rows].map(row => row.join(',')).join('\n');
+        },
+        
+        showNotification(message, type = 'info') {
+            // Create a simple toast notification
+            const toast = document.createElement('div');
+            toast.className = `alert alert-${type === 'error' ? 'error' : type === 'success' ? 'success' : 'info'} fixed top-4 right-4 z-50 shadow-lg`;
+            toast.innerHTML = `
+                <div class="flex items-center gap-2">
+                    <i class="fas fa-${type === 'error' ? 'exclamation-circle' : type === 'success' ? 'check-circle' : 'info-circle'}"></i>
+                    <span>${message}</span>
+                </div>
+            `;
+            document.body.appendChild(toast);
+            
+            // Auto remove after 5 seconds
+            setTimeout(() => {
+                toast.remove();
+            }, 5000);
+        },
+        
+        get paginatedKeywords() {
+            const start = (this.currentPage - 1) * this.itemsPerPage;
+            const end = start + this.itemsPerPage;
+            return this.filteredKeywords.slice(start, end);
+        },
+        
+        get totalPages() {
+            return Math.ceil(this.filteredKeywords.length / this.itemsPerPage);
+        }
+    }
+}
+</script>
+
+<style>
+/* Custom styles for the table */
+.table th {
+    font-weight: 600;
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
+}
+</style>
+{% endblock %}
