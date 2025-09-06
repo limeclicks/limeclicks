@@ -6,7 +6,7 @@ import re
 class ProjectForm(forms.ModelForm):
     class Meta:
         model = Project
-        fields = ['domain', 'title', 'active']
+        fields = ['domain', 'title']
         widgets = {
             'domain': forms.TextInput(attrs={
                 'class': 'input input-bordered w-full',
@@ -16,9 +16,6 @@ class ProjectForm(forms.ModelForm):
             'title': forms.TextInput(attrs={
                 'class': 'input input-bordered w-full',
                 'placeholder': 'Auto-generated if left blank'
-            }),
-            'active': forms.CheckboxInput(attrs={
-                'class': 'checkbox'
             })
         }
     
