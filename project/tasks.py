@@ -257,7 +257,6 @@ def process_dataforseo_webhook(task_id, webhook_data):
         
         # Check if keywords were already fetched today
         if project.dataforseo_keywords_path and project.dataforseo_keywords_updated_at:
-            from django.utils import timezone
             from datetime import timedelta
             
             # Check if updated today (within last 24 hours)
