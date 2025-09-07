@@ -157,6 +157,11 @@
             </button>
             {% endif %}
             
+            <a href="{% url 'backlinks:detail' item.project.id %}" class="btn btn-sm btn-outline flex-1">
+                <i class="fas fa-link"></i>
+                Backlinks
+            </a>
+            
             <a href="{% url 'keywords:project_keywords' item.project.id %}" class="btn btn-sm btn-outline flex-1">
                 <i class="fas fa-key"></i>
                 Keywords
