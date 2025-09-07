@@ -73,6 +73,18 @@ def project_list(request):
         keywords_in_top_10 = keywords.filter(rank__lte=10, rank__gt=0).count()
         keywords_tracked = keywords.filter(rank__gt=0).count()
         
+        # Get domain rank from latest backlink profile
+        domain_rank = None
+        try:
+            from backlinks.models import BacklinkProfile
+            latest_backlink_profile = BacklinkProfile.objects.filter(
+                project=project
+            ).order_by('-created_at').first()
+            if latest_backlink_profile and latest_backlink_profile.rank:
+                domain_rank = latest_backlink_profile.rank
+        except:
+            pass
+        
         projects_with_info.append({
             'project': project,
             'role': role,
@@ -86,6 +98,7 @@ def project_list(request):
             'keywords_in_top_10': keywords_in_top_10,
             'keywords_tracked': keywords_tracked,
             'member_count': project.member_count,
+            'domain_rank': domain_rank,
         })
     
     # Check if it's an HTMX request for partial updates

@@ -405,7 +405,7 @@
             <aside class="bg-base-100 min-h-full w-60 shadow-xl">
                 <!-- Sidebar Header -->
                 <div class="sidebar-header p-4 border-b border-base-300 flex items-center">
-                    <a href="{% url 'accounts:dashboard' %}" class="flex items-center flex-1">
+                    <a href="{% url 'project:project_list' %}" class="flex items-center flex-1">
                         <div class="brand-text">
                             <img src="{{ logo_light }}" alt="{{ site_name }}" class="block dark:hidden" style="height: 32px; width: auto; object-fit: contain;">
                             <img src="{{ logo_dark }}" alt="{{ site_name }}" class="hidden dark:block" style="height: 32px; width: auto; object-fit: contain;">
@@ -419,12 +419,6 @@
                     <!-- Main Navigation -->
                     <li class="menu-title">
                         <span class="text-xs uppercase font-semibold text-base-content/60">Main</span>
-                    </li>
-                    <li>
-                        <a href="{% url 'accounts:dashboard' %}" class="flex items-center gap-3 {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">
-                            <i class="fas fa-home w-4"></i>
-                            <span>Dashboard</span>
-                        </a>
                     </li>
                     <li>
                         <a href="{% url 'project:project_list' %}" class="flex items-center gap-3 {% if request.resolver_match.url_name == 'project_list' %}active{% endif %}">
@@ -487,7 +481,7 @@
                     <li>
                         <a href="{% url 'backlinks:audit' %}" class="flex items-center gap-3 {% if request.resolver_match.url_name == 'audit' %}active{% endif %}">
                             <i class="fas fa-search-plus w-4"></i>
-                            <span>Backlink Audit</span>
+                            <span>Backlinks</span>
                         </a>
                     </li>
                     <!-- On Page & Tech SEO -->
@@ -518,29 +512,6 @@
                         </a>
                     </li>
 
-                    <!-- Account -->
-                    <li class="menu-title pt-4">
-                        <span class="text-xs uppercase font-semibold text-base-content/60">Account</span>
-                    </li>
-                    <li>
-                        <a href="#" class="flex items-center gap-3">
-                            <i class="fas fa-credit-card w-4"></i>
-                            <span>Billing</span>
-                        </a>
-                    </li>
-                    <li>
-                        <a href="{% url 'accounts:profile_settings' %}" class="flex items-center gap-3 {% if request.resolver_match.url_name == 'profile_settings' %}active{% endif %}">
-                            <i class="fas fa-user-cog w-4"></i>
-                            <span>Profile Settings</span>
-                        </a>
-                    </li>
-                    <li>
-                        <a href="{% url 'accounts:security_settings' %}" class="flex items-center gap-3 {% if request.resolver_match.url_name == 'security_settings' %}active{% endif %}">
-                            <i class="fas fa-shield-alt w-4"></i>
-                            <span>Security</span>
-                        </a>
-                    </li>
-                    
                     <!-- Support -->
                     <li class="menu-title pt-4">
                         <span class="text-xs uppercase font-semibold text-base-content/60">Support</span>
