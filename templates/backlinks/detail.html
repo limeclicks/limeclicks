@@ -101,7 +101,33 @@
                     <button 
                         class="btn btn-primary btn-sm"
                         hx-post="{% url 'backlinks:fetch_detailed' project.id %}"
-                        hx-confirm="Collect detailed backlink data? This may take several minutes."
+                        hx-trigger="click"
+                        hx-swap="none"
+                        hx-on::after-request="if(event.detail.successful) { 
+                            // Show success notification
+                            const notification = document.createElement('div');
+                            notification.className = 'fixed top-4 right-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded z-50';
+                            notification.innerHTML = '<strong>Success!</strong> We are collecting detailed backlinks. This may take several minutes.';
+                            document.body.appendChild(notification);
+                            setTimeout(() => notification.remove(), 5000);
+                            
+                            // Disable button and update text
+                            this.disabled = true;
+                            this.classList.add('btn-disabled');
+                            this.textContent = 'Processing...';
+                            
+                            // Add spinner before text
+                            const spinner = document.createElement('span');
+                            spinner.className = 'loading loading-spinner loading-xs mr-2';
+                            this.prepend(spinner);
+                        } else {
+                            // Show error notification
+                            const notification = document.createElement('div');
+                            notification.className = 'fixed top-4 right-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded z-50';
+                            notification.innerHTML = '<strong>Error!</strong> Failed to fetch detailed data. Please try again.';
+                            document.body.appendChild(notification);
+                            setTimeout(() => notification.remove(), 5000);
+                        }"
                     >
                         <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
@@ -114,135 +140,187 @@
                 <button 
                     class="btn btn-primary btn-sm"
                     hx-post="{% url 'backlinks:fetch' project.id %}"
-                    hx-confirm="Fetch backlink data for {{ project.domain }}?"
+                    hx-trigger="click"
+                    hx-swap="none"
+                    hx-on::after-request="if(event.detail.successful) { 
+                        // Show success notification
+                        const notification = document.createElement('div');
+                        notification.className = 'fixed top-4 right-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded z-50';
+                        notification.innerHTML = '<strong>Success!</strong> We are collecting backlinks. Check back in a while.';
+                        document.body.appendChild(notification);
+                        setTimeout(() => notification.remove(), 5000);
+                        
+                        // Disable button and update text
+                        this.disabled = true;
+                        this.classList.add('btn-disabled');
+                        this.querySelector('span').textContent = 'Fetch Queued';
+                    } else {
+                        // Show error notification
+                        const notification = document.createElement('div');
+                        notification.className = 'fixed top-4 right-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded z-50';
+                        notification.innerHTML = '<strong>Error!</strong> Failed to fetch data. Please try again.';
+                        document.body.appendChild(notification);
+                        setTimeout(() => notification.remove(), 5000);
+                    }"
                 >
                     <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
                     </svg>
-                    Fetch Backlinks
+                    <span>Fetch Backlinks</span>
                 </button>
             {% endif %}
         </div>
     </div>
 
     {% if latest_profile %}
-        <!-- Current Stats -->
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <!-- Rank Score -->
-            <div class="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
-                <div class="flex items-center justify-between mb-3">
-                    <div>
-                        <p class="text-sm font-medium text-gray-500">Domain Authority</p>
-                        <p class="text-3xl font-bold {% if latest_profile.rank >= 80 %}text-green-600{% elif latest_profile.rank >= 60 %}text-yellow-600{% else %}text-red-600{% endif %}">
-                            {% if latest_profile.rank %}{{ latest_profile.rank }}{% else %}-{% endif %}
-                        </p>
-                        <p class="text-xs text-gray-400">Out of 100</p>
+        <!-- Primary Metrics Cards (Same style as audit page) -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <!-- Domain Authority Card -->
+            <div class="card bg-white border border-gray-200 shadow-sm hover:shadow-lg transition-all">
+                <div class="card-body p-5">
+                    <div class="flex items-center gap-1 mb-2">
+                        <i class="fas fa-chart-line text-[10px] text-primary"></i>
+                        <span class="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">Domain Authority</span>
                     </div>
-                    <div class="w-12 h-12 {% if latest_profile.rank >= 80 %}bg-green-100{% elif latest_profile.rank >= 60 %}bg-yellow-100{% else %}bg-red-100{% endif %} rounded-lg flex items-center justify-center">
-                        <svg class="w-6 h-6 {% if latest_profile.rank >= 80 %}text-green-600{% elif latest_profile.rank >= 60 %}text-yellow-600{% else %}text-red-600{% endif %}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
-                        </svg>
+                    <div class="flex items-baseline gap-2">
+                        <span class="text-3xl font-bold {% if latest_profile.rank >= 80 %}text-success{% elif latest_profile.rank >= 60 %}text-warning{% else %}text-error{% endif %}">
+                            {% if latest_profile.rank %}{{ latest_profile.rank }}{% else %}0{% endif %}
+                        </span>
+                        <span class="text-sm text-gray-400">/100</span>
                     </div>
-                </div>
-                <!-- Progress bar for Domain Authority -->
-                {% if latest_profile.rank %}
-                <div class="w-full bg-gray-200 rounded-full h-2 mb-2">
-                    <div class="{% if latest_profile.rank >= 80 %}bg-green-500{% elif latest_profile.rank >= 60 %}bg-yellow-500{% else %}bg-red-500{% endif %} h-2 rounded-full transition-all duration-500 ease-in-out" style="width: {{ latest_profile.rank }}%"></div>
-                </div>
-                <div class="flex justify-between text-xs text-gray-400">
-                    <span>0</span>
-                    <span>50</span>
-                    <span>100</span>
-                </div>
-                {% endif %}
-            </div>
-
-            <!-- Total Backlinks -->
-            <div class="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
-                <div class="flex items-center justify-between mb-3">
-                    <div>
-                        <p class="text-sm font-medium text-gray-500">Total Backlinks</p>
-                        <p class="text-3xl font-bold text-blue-600">{{ latest_profile.backlinks|floatformat:0 }}</p>
-                        <p class="text-xs text-gray-400">Total links found</p>
+                    <div class="mt-3">
+                        <div class="w-full bg-gray-200 rounded-full h-2">
+                            <div class="{% if latest_profile.rank >= 80 %}bg-success{% elif latest_profile.rank >= 60 %}bg-warning{% else %}bg-error{% endif %} h-2 rounded-full transition-all duration-500" style="width: {{ latest_profile.rank|default:0 }}%"></div>
+                        </div>
                     </div>
-                    <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                        <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
-                        </svg>
-                    </div>
-                </div>
-                <!-- Progress bar for Backlinks (relative scale) -->
-                <div class="w-full bg-gray-200 rounded-full h-2 mb-2">
-                    {% comment %} Scale backlinks to percentage (assuming 50k is 100%) {% endcomment %}
-                    {% widthratio latest_profile.backlinks 50000 100 as backlinks_percentage %}
-                    <div class="bg-blue-500 h-2 rounded-full transition-all duration-500 ease-in-out" style="width: {% if backlinks_percentage > 100 %}100{% else %}{{ backlinks_percentage }}{% endif %}%"></div>
-                </div>
-                <div class="flex justify-between text-xs text-gray-400">
-                    <span>0</span>
-                    <span>25K</span>
-                    <span>50K+</span>
                 </div>
             </div>
 
-            <!-- Referring Domains -->
-            <div class="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
-                <div class="flex items-center justify-between mb-3">
-                    <div>
-                        <p class="text-sm font-medium text-gray-500">Referring Domains</p>
-                        <p class="text-3xl font-bold text-purple-600">{{ latest_profile.referring_domains|floatformat:0 }}</p>
-                        <p class="text-xs text-gray-400">Unique domains</p>
+            <!-- Total Backlinks Card -->
+            <div class="card bg-white border border-gray-200 shadow-sm hover:shadow-lg transition-all">
+                <div class="card-body p-5">
+                    <div class="flex items-center gap-1 mb-2">
+                        <i class="fas fa-link text-[10px] text-info"></i>
+                        <span class="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">Total Backlinks</span>
                     </div>
-                    <div class="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                        <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9v-9m0-9v9"></path>
-                        </svg>
-                    </div>
-                </div>
-                <!-- Progress bar for Referring Domains (relative scale) -->
-                <div class="w-full bg-gray-200 rounded-full h-2 mb-2">
-                    {% comment %} Scale domains to percentage (assuming 5k is 100%) {% endcomment %}
-                    {% widthratio latest_profile.referring_domains 5000 100 as domains_percentage %}
-                    <div class="bg-purple-500 h-2 rounded-full transition-all duration-500 ease-in-out" style="width: {% if domains_percentage > 100 %}100{% else %}{{ domains_percentage }}{% endif %}%"></div>
-                </div>
-                <div class="flex justify-between text-xs text-gray-400">
-                    <span>0</span>
-                    <span>2.5K</span>
-                    <span>5K+</span>
-                </div>
-            </div>
-
-            <!-- Spam Score -->
-            <div class="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
-                <div class="flex items-center justify-between mb-3">
-                    <div>
-                        <p class="text-sm font-medium text-gray-500">Spam Score</p>
-                        <p class="text-3xl font-bold {% if latest_profile.backlinks_spam_score > 30 %}text-red-600{% elif latest_profile.backlinks_spam_score > 15 %}text-yellow-600{% else %}text-green-600{% endif %}">
-                            {{ latest_profile.backlinks_spam_score|default:0 }}
-                        </p>
-                        <p class="text-xs text-gray-400">
-                            {% if latest_profile.backlinks_spam_score > 30 %}
-                                High risk
-                            {% elif latest_profile.backlinks_spam_score > 15 %}
-                                Medium risk
+                    <div class="flex items-baseline gap-2">
+                        <span class="text-3xl font-bold text-info">
+                            {% if latest_profile.backlinks >= 1000000 %}
+                                {{ latest_profile.backlinks|floatformat:1|slice:":3" }}M
+                            {% elif latest_profile.backlinks >= 1000 %}
+                                {{ latest_profile.backlinks|floatformat:0|slice:":4" }}K
                             {% else %}
-                                Low risk
+                                {{ latest_profile.backlinks|default:"0" }}
                             {% endif %}
-                        </p>
+                        </span>
+                        <span class="text-sm text-gray-400">links</span>
                     </div>
-                    <div class="w-12 h-12 {% if latest_profile.backlinks_spam_score > 30 %}bg-red-100{% elif latest_profile.backlinks_spam_score > 15 %}bg-yellow-100{% else %}bg-green-100{% endif %} rounded-lg flex items-center justify-center">
-                        <svg class="w-6 h-6 {% if latest_profile.backlinks_spam_score > 30 %}text-red-600{% elif latest_profile.backlinks_spam_score > 15 %}text-yellow-600{% else %}text-green-600{% endif %}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
-                        </svg>
+                    <div class="mt-3">
+                        {% widthratio latest_profile.backlinks 50000 100 as backlinks_pct %}
+                        <div class="w-full bg-gray-200 rounded-full h-2">
+                            <div class="bg-info h-2 rounded-full transition-all duration-500" style="width: {% if backlinks_pct > 100 %}100{% else %}{{ backlinks_pct|default:0 }}{% endif %}%"></div>
+                        </div>
                     </div>
                 </div>
-                <!-- Reverse progress bar for Spam Score (higher is worse) -->
-                <div class="w-full bg-gray-200 rounded-full h-2 mb-2">
-                    <div class="{% if latest_profile.backlinks_spam_score > 30 %}bg-red-500{% elif latest_profile.backlinks_spam_score > 15 %}bg-yellow-500{% else %}bg-green-500{% endif %} h-2 rounded-full transition-all duration-500 ease-in-out" style="width: {{ latest_profile.backlinks_spam_score|default:0 }}%"></div>
+            </div>
+
+            <!-- Referring Domains Card -->
+            <div class="card bg-white border border-gray-200 shadow-sm hover:shadow-lg transition-all">
+                <div class="card-body p-5">
+                    <div class="flex items-center gap-1 mb-2">
+                        <i class="fas fa-globe text-[10px] text-primary"></i>
+                        <span class="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">Referring Domains</span>
+                    </div>
+                    <div class="flex items-baseline gap-2">
+                        <span class="text-3xl font-bold text-primary">
+                            {% if latest_profile.referring_domains >= 1000 %}
+                                {{ latest_profile.referring_domains|floatformat:0|slice:":4" }}K
+                            {% else %}
+                                {{ latest_profile.referring_domains|default:"0" }}
+                            {% endif %}
+                        </span>
+                        <span class="text-sm text-gray-400">domains</span>
+                    </div>
+                    <div class="mt-3">
+                        {% widthratio latest_profile.referring_domains 5000 100 as domains_pct %}
+                        <div class="w-full bg-gray-200 rounded-full h-2">
+                            <div class="bg-primary h-2 rounded-full transition-all duration-500" style="width: {% if domains_pct > 100 %}100{% else %}{{ domains_pct|default:0 }}{% endif %}%"></div>
+                        </div>
+                    </div>
                 </div>
-                <div class="flex justify-between text-xs text-gray-400">
-                    <span>0 (Good)</span>
-                    <span>50</span>
-                    <span>100 (Bad)</span>
+            </div>
+
+            <!-- Spam Score Card -->
+            <div class="card bg-white border border-gray-200 shadow-sm hover:shadow-lg transition-all">
+                <div class="card-body p-5">
+                    <div class="flex items-center gap-1 mb-2">
+                        <i class="fas fa-shield-alt text-[10px] {% if latest_profile.backlinks_spam_score <= 30 %}text-success{% elif latest_profile.backlinks_spam_score <= 60 %}text-warning{% else %}text-error{% endif %}"></i>
+                        <span class="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">Spam Score</span>
+                    </div>
+                    <div class="flex items-baseline gap-2">
+                        <span class="text-3xl font-bold {% if latest_profile.backlinks_spam_score <= 30 %}text-success{% elif latest_profile.backlinks_spam_score <= 60 %}text-warning{% else %}text-error{% endif %}">
+                            {{ latest_profile.backlinks_spam_score|default:0 }}
+                        </span>
+                        <span class="text-sm text-gray-400">%</span>
+                    </div>
+                    <div class="mt-3">
+                        <div class="w-full bg-gray-200 rounded-full h-2">
+                            <div class="{% if latest_profile.backlinks_spam_score <= 30 %}bg-success{% elif latest_profile.backlinks_spam_score <= 60 %}bg-warning{% else %}bg-error{% endif %} h-2 rounded-full transition-all duration-500" style="width: {{ latest_profile.backlinks_spam_score|default:0 }}%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Secondary Stats Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            <!-- Avg Spam Score -->
+            <div class="stats shadow bg-base-100">
+                <div class="stat px-4 py-3">
+                    <div class="stat-figure text-primary">
+                        <i class="fas fa-shield-virus text-2xl"></i>
+                    </div>
+                    <div class="stat-title text-xs">Avg Spam Score</div>
+                    <div class="stat-value text-2xl {% if latest_profile.backlinks_spam_score <= 30 %}text-success{% elif latest_profile.backlinks_spam_score <= 60 %}text-warning{% else %}text-error{% endif %}">{{ latest_profile.backlinks_spam_score|default:0 }}%</div>
+                </div>
+            </div>
+            
+            <!-- Avg Domain Rating -->
+            <div class="stats shadow bg-base-100">
+                <div class="stat px-4 py-3">
+                    <div class="stat-figure text-info">
+                        <i class="fas fa-star text-2xl"></i>
+                    </div>
+                    <div class="stat-title text-xs">Avg Domain Rating</div>
+                    <div class="stat-value text-2xl text-info">{{ latest_profile.rank|default:0 }}</div>
+                </div>
+            </div>
+            
+            <!-- Referring Pages -->
+            <div class="stats shadow bg-base-100">
+                <div class="stat px-4 py-3">
+                    <div class="stat-figure text-success">
+                        <i class="fas fa-file-alt text-2xl"></i>
+                    </div>
+                    <div class="stat-title text-xs">Referring Pages</div>
+                    <div class="stat-value text-2xl text-success">
+                        {% if latest_profile.referring_pages >= 1000 %}
+                            {{ latest_profile.referring_pages|floatformat:0|slice:":4" }}K
+                        {% else %}
+                            {{ latest_profile.referring_pages|default:0 }}
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Referring IPs -->
+            <div class="stats shadow bg-base-100">
+                <div class="stat px-4 py-3">
+                    <div class="stat-figure text-primary">
+                        <i class="fas fa-network-wired text-2xl"></i>
+                    </div>
+                    <div class="stat-title text-xs">Referring IPs</div>
+                    <div class="stat-value text-2xl">{{ latest_profile.referring_ips|default:0 }}</div>
                 </div>
             </div>
         </div>
@@ -338,18 +416,18 @@
                         <span class="text-sm text-gray-600">External Links</span>
                         <span class="font-medium">{{ latest_profile.external_links_count|floatformat:0 }}</span>
                     </div>
-                    <div class="w-full bg-gray-100 rounded-full h-1.5 mb-3">
-                        {% widthratio latest_profile.external_links_count 50000 100 as external_links_pct %}
-                        <div class="bg-emerald-400 h-1.5 rounded-full" style="width: {% if external_links_pct > 100 %}100{% else %}{{ external_links_pct }}{% endif %}%"></div>
+                    <div class="w-full bg-gray-100 rounded-full h-1.5 mb-3 overflow-hidden">
+                        {% widthratio latest_profile.external_links_count 200000 100 as external_links_pct %}
+                        <div class="bg-emerald-400 h-1.5 rounded-full" style="width: min(100%, {{ external_links_pct|default:0 }}%); max-width: 100%;"></div>
                     </div>
 
                     <div class="flex items-center justify-between mb-1">
                         <span class="text-sm text-gray-600">Internal Links</span>
                         <span class="font-medium">{{ latest_profile.internal_links_count|floatformat:0 }}</span>
                     </div>
-                    <div class="w-full bg-gray-100 rounded-full h-1.5 mb-3">
-                        {% widthratio latest_profile.internal_links_count 100000 100 as internal_links_pct %}
-                        <div class="bg-blue-400 h-1.5 rounded-full" style="width: {% if internal_links_pct > 100 %}100{% else %}{{ internal_links_pct }}{% endif %}%"></div>
+                    <div class="w-full bg-gray-100 rounded-full h-1.5 mb-3 overflow-hidden">
+                        {% widthratio latest_profile.internal_links_count 300000 100 as internal_links_pct %}
+                        <div class="bg-blue-400 h-1.5 rounded-full" style="width: min(100%, {{ internal_links_pct|default:0 }}%); max-width: 100%;"></div>
                     </div>
 
                     <div class="flex items-center justify-between mb-1">
@@ -358,9 +436,9 @@
                             {{ latest_profile.broken_backlinks|floatformat:0 }}
                         </span>
                     </div>
-                    <div class="w-full bg-gray-100 rounded-full h-1.5 mb-3">
-                        {% widthratio latest_profile.broken_backlinks 1000 100 as broken_backlinks_pct %}
-                        <div class="bg-red-500 h-1.5 rounded-full" style="width: {% if broken_backlinks_pct > 100 %}100{% else %}{{ broken_backlinks_pct }}{% endif %}%"></div>
+                    <div class="w-full bg-gray-100 rounded-full h-1.5 mb-3 overflow-hidden">
+                        {% widthratio latest_profile.broken_backlinks 5000 100 as broken_backlinks_pct %}
+                        <div class="bg-red-500 h-1.5 rounded-full" style="width: min(100%, {{ broken_backlinks_pct|default:0 }}%); max-width: 100%;"></div>
                     </div>
 
                     <div class="flex items-center justify-between mb-1">
@@ -369,9 +447,9 @@
                             {{ latest_profile.broken_pages|floatformat:0 }}
                         </span>
                     </div>
-                    <div class="w-full bg-gray-100 rounded-full h-1.5">
-                        {% widthratio latest_profile.broken_pages 100 100 as broken_pages_pct %}
-                        <div class="bg-red-500 h-1.5 rounded-full" style="width: {% if broken_pages_pct > 100 %}100{% else %}{{ broken_pages_pct }}{% endif %}%"></div>
+                    <div class="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
+                        {% widthratio latest_profile.broken_pages 5000 100 as broken_pages_pct %}
+                        <div class="bg-red-500 h-1.5 rounded-full" style="width: min(100%, {{ broken_pages_pct|default:0 }}%); max-width: 100%;"></div>
                     </div>
                 </div>
             </div>
@@ -542,7 +620,26 @@
                 <button 
                     class="btn btn-primary"
                     hx-post="{% url 'backlinks:fetch' project.id %}"
-                    hx-confirm="Fetch backlink data for {{ project.domain }}? This will use API credits."
+                    hx-trigger="click"
+                    hx-swap="none"
+                    hx-on::after-request="if(event.detail.successful) { 
+                        // Show success notification
+                        const notification = document.createElement('div');
+                        notification.className = 'fixed top-4 right-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded z-50';
+                        notification.innerHTML = '<strong>Success!</strong> We are collecting backlinks. Check back in a while.';
+                        document.body.appendChild(notification);
+                        setTimeout(() => notification.remove(), 5000);
+                        
+                        // Reload page after a delay
+                        setTimeout(() => location.reload(), 2000);
+                    } else {
+                        // Show error notification
+                        const notification = document.createElement('div');
+                        notification.className = 'fixed top-4 right-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded z-50';
+                        notification.innerHTML = '<strong>Error!</strong> Failed to fetch data. Please try again.';
+                        document.body.appendChild(notification);
+                        setTimeout(() => notification.remove(), 5000);
+                    }"
                 >
                     <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>

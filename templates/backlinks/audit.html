@@ -8,6 +8,50 @@
 <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
 <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
 <script src="https://unpkg.com/pako@2.1.0/dist/pako.min.js"></script>
+<style>
+    /* Custom styles for project cards */
+    .card {
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    
+    .card:hover {
+        transform: translateY(-4px);
+    }
+    
+    .card.cursor-pointer:hover {
+        border-color: rgb(59 130 246 / 0.5);
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    }
+    
+    .card.cursor-pointer:active {
+        transform: translateY(-2px);
+    }
+    
+    /* Animated badge pulse */
+    .badge-success {
+        animation: pulse-success 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+    
+    @keyframes pulse-success {
+        0%, 100% {
+            opacity: 1;
+        }
+        50% {
+            opacity: .8;
+        }
+    }
+    
+    /* Metric card hover effect */
+    .bg-gray-50:hover {
+        background-color: rgb(249 250 251);
+    }
+    
+    /* Selected card effect */
+    .card.selected {
+        border-color: rgb(59 130 246);
+        box-shadow: 0 0 0 3px rgb(59 130 246 / 0.1);
+    }
+</style>
 {% endblock %}
 
 {% block content %}
@@ -412,17 +456,147 @@
         <p class="mt-2 text-gray-500">This project doesn't have detailed backlink data yet.</p>
     </div>
 
-    <!-- Select Project Prompt -->
-    <div x-show="!selectedProjectId && !loading" class="text-center py-12">
-        <svg class="mx-auto h-16 w-16 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
-        </svg>
-        <h3 class="mt-4 text-xl font-medium text-gray-900">Select a Project</h3>
-        <p class="mt-2 text-gray-500">Choose a project from the dropdown to start auditing backlinks.</p>
+    <!-- Select Project Prompt with Project Cards -->
+    <div x-show="!selectedProjectId && !loading" class="py-8">
+        <div class="text-center mb-8">
+            <svg class="mx-auto h-16 w-16 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
+            </svg>
+            <h3 class="mt-4 text-xl font-medium text-gray-900">Select a Project</h3>
+            <p class="mt-2 text-gray-500">Choose a project from the dropdown above or click on a project below to start auditing backlinks.</p>
+        </div>
+        
+        <!-- Project Cards Grid -->
+        {% if all_projects %}
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {% for project in all_projects %}
+            <div class="card bg-white border border-gray-200 hover:shadow-xl hover:border-primary/30 transition-all {% if project.has_detailed_data %}cursor-pointer{% else %}opacity-90{% endif %}"
+                 {% if project.has_detailed_data %}onclick="selectProject('{{ project.profile_id }}')"{% endif %}>
+                <div class="card-body p-5">
+                    <!-- Header with favicon and domain -->
+                    <div class="flex items-start gap-3 mb-4">
+                        <img 
+                            src="{% url 'project:favicon_proxy' project.domain %}"
+                            alt="{{ project.domain }} favicon"
+                            class="w-10 h-10 rounded-lg shadow-sm"
+                            onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\' fill=\'%236B7280\'%3E%3Cpath d=\'M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z\'/%3E%3C/svg%3E'"
+                        >
+                        <div class="flex-1">
+                            <h4 class="font-bold text-gray-900 text-base">{{ project.domain }}</h4>
+                            {% if project.title %}
+                            <p class="text-xs text-gray-500 line-clamp-1">{{ project.title }}</p>
+                            {% endif %}
+                            <div class="flex items-center gap-2 mt-2">
+                                {% if project.has_detailed_data %}
+                                <span class="badge badge-success badge-xs">
+                                    <i class="fas fa-check mr-1 text-[8px]"></i>Ready
+                                </span>
+                                {% else %}
+                                <span class="badge badge-warning badge-xs">
+                                    <i class="fas fa-exclamation mr-1 text-[8px]"></i>No Data
+                                </span>
+                                {% endif %}
+                                {% if project.domain_rank > 0 %}
+                                <span class="badge badge-ghost badge-xs">DR: {{ project.domain_rank }}</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Metrics Grid -->
+                    <div class="grid grid-cols-2 gap-3 mb-4">
+                        <!-- Backlinks -->
+                        <div class="bg-gray-50 rounded-lg p-2">
+                            <div class="flex items-center gap-1 mb-1">
+                                <i class="fas fa-link text-[10px] text-primary"></i>
+                                <span class="text-[10px] text-gray-500 uppercase tracking-wider">Backlinks</span>
+                            </div>
+                            <div class="text-lg font-bold text-gray-900">
+                                {% if project.backlinks_count >= 1000000 %}
+                                    {{ project.backlinks_count|floatformat:1|slice:":3" }}M
+                                {% elif project.backlinks_count >= 1000 %}
+                                    {{ project.backlinks_count|floatformat:0|slice:":4" }}K
+                                {% else %}
+                                    {{ project.backlinks_count|default:"0" }}
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <!-- Referring Domains -->
+                        <div class="bg-gray-50 rounded-lg p-2">
+                            <div class="flex items-center gap-1 mb-1">
+                                <i class="fas fa-globe text-[10px] text-info"></i>
+                                <span class="text-[10px] text-gray-500 uppercase tracking-wider">Ref Domains</span>
+                            </div>
+                            <div class="text-lg font-bold text-gray-900">
+                                {% if project.referring_domains >= 1000 %}
+                                    {{ project.referring_domains|floatformat:0|slice:":4" }}K
+                                {% else %}
+                                    {{ project.referring_domains|default:"0" }}
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <!-- Spam Score -->
+                        <div class="bg-gray-50 rounded-lg p-2">
+                            <div class="flex items-center gap-1 mb-1">
+                                <i class="fas fa-shield-alt text-[10px] {% if project.spam_score <= 30 %}text-success{% elif project.spam_score <= 60 %}text-warning{% else %}text-error{% endif %}"></i>
+                                <span class="text-[10px] text-gray-500 uppercase tracking-wider">Spam Score</span>
+                            </div>
+                            <div class="text-lg font-bold {% if project.spam_score <= 30 %}text-success{% elif project.spam_score <= 60 %}text-warning{% else %}text-error{% endif %}">
+                                {{ project.spam_score }}%
+                            </div>
+                        </div>
+                        
+                        <!-- Last Fetched -->
+                        <div class="bg-gray-50 rounded-lg p-2">
+                            <div class="flex items-center gap-1 mb-1">
+                                <i class="fas fa-clock text-[10px] text-gray-400"></i>
+                                <span class="text-[10px] text-gray-500 uppercase tracking-wider">Last Fetch</span>
+                            </div>
+                            <div class="text-sm font-medium text-gray-700">
+                                {{ project.time_since_update }}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Action Button -->
+                    <div class="mt-auto pt-3 border-t border-gray-100">
+                        {% if project.has_detailed_data %}
+                        <button class="btn btn-primary btn-sm w-full group">
+                            <i class="fas fa-link mr-2 group-hover:scale-110 transition-transform"></i>
+                            <span>View Backlinks</span>
+                        </button>
+                        {% else %}
+                        <a href="{% url 'backlinks:detail' project.id %}" class="btn btn-outline btn-sm w-full hover:btn-primary">
+                            <i class="fas fa-download mr-2"></i>
+                            <span>Get Data First</span>
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center py-8">
+            <p class="text-gray-500">No projects with backlink data available.</p>
+            <a href="{% url 'backlinks:list' %}" class="btn btn-primary btn-sm mt-4">
+                <i class="fas fa-link mr-2"></i>
+                Go to Backlinks Management
+            </a>
+        </div>
+        {% endif %}
     </div>
 </div>
 
 <script>
+// Function to select project from card click
+function selectProject(profileId) {
+    // Simply navigate to the URL with the project parameter
+    window.location.href = `/backlinks/audit/?project=${profileId}`;
+}
+
 function backlinkAudit() {
     return {
         selectedProjectId: '',

@@ -40,16 +40,21 @@ def htmx_backlinks_stats(request):
         active=True
     ).distinct()
     
-    # Get latest backlink profiles for these projects
-    latest_profiles = BacklinkProfile.objects.filter(
-        project__in=user_projects
-    ).select_related('project')
+    # Get only the LATEST backlink profile for each project
+    latest_profiles = []
+    for project in user_projects:
+        latest_profile = BacklinkProfile.objects.filter(
+            project=project
+        ).order_by('-created_at').first()
+        if latest_profile:
+            latest_profiles.append(latest_profile)
     
     # Calculate stats
     total_projects = user_projects.count()
-    projects_with_backlinks = latest_profiles.values('project').distinct().count()
+    projects_with_backlinks = len(latest_profiles)
     total_backlinks = sum(profile.backlinks for profile in latest_profiles)
-    avg_spam_score = latest_profiles.aggregate(avg_spam=Avg('backlinks_spam_score'))['avg_spam'] or 0
+    avg_spam_scores = [p.backlinks_spam_score for p in latest_profiles if p.backlinks_spam_score is not None]
+    avg_spam_score = sum(avg_spam_scores) / len(avg_spam_scores) if avg_spam_scores else 0
     
     # Format total backlinks for display
     if total_backlinks >= 1000000:
@@ -299,33 +304,63 @@ def backlink_audit(request):
         active=True
     ).distinct()
     
-    # Get projects that have backlink files
+    # Get projects that have backlink data (both summary and detailed)
     projects_with_backlinks = []
+    projects_for_audit = []  # Projects specifically with detailed backlink files
+    
     for project in user_projects:
-        # Get the most recent profile with actual backlink file (not empty)
+        # Get the most recent profile (any profile)
         latest_profile = BacklinkProfile.objects.filter(
-            project=project,
-            backlinks_file_path__isnull=False
-        ).exclude(
-            backlinks_file_path=''
+            project=project
         ).order_by('-created_at').first()
         
-        # Include profile if it has a file path, even if count is 0 or None
         if latest_profile:
-            projects_with_backlinks.append({
+            # Calculate time since last data fetch
+            time_since_update = timezone.now() - latest_profile.created_at
+            if time_since_update.days > 0:
+                time_display = f"{time_since_update.days} day{'s' if time_since_update.days > 1 else ''} ago"
+            else:
+                hours = time_since_update.seconds // 3600
+                if hours > 0:
+                    time_display = f"{hours} hour{'s' if hours > 1 else ''} ago"
+                else:
+                    minutes = (time_since_update.seconds % 3600) // 60
+                    time_display = f"{minutes} minute{'s' if minutes != 1 else ''} ago"
+            
+            project_data = {
                 'id': project.id,
                 'domain': project.domain,
                 'title': project.title,
                 'profile_id': latest_profile.id,
-                'backlinks_count': latest_profile.backlinks_count_collected or 0,
-                'collected_at': latest_profile.backlinks_collected_at
-            })
+                'backlinks_count': latest_profile.backlinks or 0,
+                'referring_domains': latest_profile.referring_domains or 0,
+                'referring_pages': latest_profile.referring_pages or 0,
+                'domain_rank': latest_profile.rank or 0,
+                'spam_score': latest_profile.backlinks_spam_score or 0,
+                'collected_at': latest_profile.created_at,
+                'time_since_update': time_display,
+                'has_detailed_data': bool(latest_profile.backlinks_file_path and latest_profile.backlinks_file_path != '')
+            }
+            
+            projects_with_backlinks.append(project_data)
+            
+            # Only add to audit list if it has detailed file
+            if project_data['has_detailed_data']:
+                projects_for_audit.append({
+                    'id': project.id,
+                    'domain': project.domain,
+                    'title': project.title,
+                    'profile_id': latest_profile.id,
+                    'backlinks_count': latest_profile.backlinks_count_collected or 0,
+                    'collected_at': latest_profile.backlinks_collected_at
+                })
     
     import json
     
     context = {
-        'projects': projects_with_backlinks,
-        'projects_json': json.dumps(projects_with_backlinks, default=str),
+        'projects': projects_for_audit,  # For dropdown - only with detailed files
+        'all_projects': projects_with_backlinks,  # For project cards - all with any backlink data
+        'projects_json': json.dumps(projects_for_audit, default=str),
     }
     
     return render(request, 'backlinks/audit.html', context)
