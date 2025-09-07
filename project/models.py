@@ -18,6 +18,9 @@ class Project(models.Model):
     dataforseo_keywords_path = models.CharField(max_length=500, blank=True, null=True, help_text="R2 path to stored DataForSEO keywords data")
     dataforseo_keywords_updated_at = models.DateTimeField(blank=True, null=True, help_text="Last time DataForSEO keywords were fetched")
     dataforseo_task_id = models.CharField(max_length=255, blank=True, null=True, help_text="Latest DataForSEO task ID")
+    
+    # Backlinks lockdown - when no data is found, prevent re-fetching for 30 days
+    backlinks_no_data_until = models.DateTimeField(blank=True, null=True, help_text="Date until which backlinks fetching is blocked due to no data")
 
     @staticmethod
     def clean_domain_string(domain):
@@ -48,6 +51,21 @@ class Project(models.Model):
         """Get cached favicon URL using our proxy (reduces Google API calls)"""
         from django.urls import reverse
         return reverse('project:favicon_proxy', kwargs={'domain': self.domain}) + f'?size={size}'
+    
+    def is_backlinks_locked(self):
+        """Check if backlinks fetching is locked due to no data found"""
+        if not self.backlinks_no_data_until:
+            return False
+        return timezone.now() < self.backlinks_no_data_until
+    
+    def get_backlinks_lockdown_days_remaining(self):
+        """Get the number of days remaining in the lockdown period"""
+        if not self.backlinks_no_data_until:
+            return 0
+        if timezone.now() >= self.backlinks_no_data_until:
+            return 0
+        delta = self.backlinks_no_data_until - timezone.now()
+        return delta.days + (1 if delta.seconds > 0 else 0)  # Round up to next day
     
     def create_dataforseo_task(self):
         """

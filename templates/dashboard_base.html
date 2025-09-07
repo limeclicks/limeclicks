@@ -318,16 +318,32 @@
                     <!-- User Profile Dropdown -->
                     <div class="dropdown dropdown-end">
                         <div tabindex="0" role="button" class="btn btn-ghost btn-circle avatar">
-                            <div class="w-10 h-10 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-white shadow-md">
-                                <span class="text-sm font-bold">{{ user.first_name|first|default:user.username|first|upper }}</span>
+                            <div class="w-10 h-10 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-white shadow-md relative">
+                                <span class="text-xs font-bold absolute inset-0 flex items-center justify-center" style="line-height: 1;">
+                                    {% if user.first_name and user.last_name %}
+                                        {{ user.first_name|first|upper }}{{ user.last_name|first|upper }}
+                                    {% elif user.first_name %}
+                                        {{ user.first_name|slice:":2"|upper }}
+                                    {% else %}
+                                        {{ user.username|slice:":2"|upper }}
+                                    {% endif %}
+                                </span>
                             </div>
                         </div>
                         <div tabindex="0" class="dropdown-content mt-3 z-[100] bg-white dark:bg-base-100 rounded-2xl shadow-xl border border-base-200 w-72 overflow-hidden">
                             <!-- User Header Section -->
                             <div class="p-4 bg-gradient-to-r from-violet-50 to-purple-50 dark:from-base-200 dark:to-base-200 border-b border-base-200">
                                 <div class="flex items-center gap-3">
-                                    <div class="w-14 h-14 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-white shadow-lg">
-                                        <span class="text-xl font-bold">{{ user.first_name|first|default:user.username|first|upper }}</span>
+                                    <div class="w-14 h-14 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-white shadow-lg relative">
+                                        <span class="text-lg font-bold absolute inset-0 flex items-center justify-center" style="line-height: 1;">
+                                            {% if user.first_name and user.last_name %}
+                                                {{ user.first_name|first|upper }}{{ user.last_name|first|upper }}
+                                            {% elif user.first_name %}
+                                                {{ user.first_name|slice:":2"|upper }}
+                                            {% else %}
+                                                {{ user.username|slice:":2"|upper }}
+                                            {% endif %}
+                                        </span>
                                     </div>
                                     <div class="flex-1">
                                         <p class="font-semibold text-base-content">{{ user.first_name|default:user.username }} {{ user.last_name|default:"" }}</p>

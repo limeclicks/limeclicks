@@ -24,7 +24,9 @@
         </div>
         <div class="flex space-x-3">
             {% if latest_profile %}
-                {% if can_refresh %}
+                {% if is_locked %}
+                    <!-- Domain is locked - don't show any button -->
+                {% elif can_refresh %}
                     <!-- Can refresh - show active button with HTMX -->
                     <button 
                         class="btn btn-outline btn-sm"
@@ -609,17 +611,28 @@
     {% else %}
         <!-- No Data State -->
         <div class="text-center py-12">
-            <svg class="mx-auto h-16 w-16 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
-            </svg>
-            <h3 class="mt-4 text-xl font-medium text-gray-900">No Backlink Data</h3>
-            <p class="mt-2 text-gray-500 max-w-md mx-auto">
-                We haven't collected backlink data for {{ project.domain }} yet. Click the button below to start the analysis.
-            </p>
-            <div class="mt-8">
-                <button 
-                    class="btn btn-primary"
-                    hx-post="{% url 'backlinks:fetch' project.id %}"
+            {% if is_locked %}
+                <!-- Domain Locked State -->
+                <svg class="mx-auto h-16 w-16 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+                </svg>
+                <h3 class="mt-4 text-xl font-medium text-red-900">Domain does not have backlinks.</h3>
+                <p class="mt-2 text-red-600 max-w-md mx-auto">
+                    No backlink data was found for {{ project.domain }}. Please wait we will collect data for the domain.
+                </p>
+            {% else %}
+                <!-- Normal No Data State -->
+                <svg class="mx-auto h-16 w-16 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
+                </svg>
+                <h3 class="mt-4 text-xl font-medium text-gray-900">No Backlink Data</h3>
+                <p class="mt-2 text-gray-500 max-w-md mx-auto">
+                    We haven't collected backlink data for {{ project.domain }} yet. Click the button below to start the analysis.
+                </p>
+                <div class="mt-8">
+                    <button 
+                        class="btn btn-primary"
+                        hx-post="{% url 'backlinks:fetch' project.id %}"
                     hx-trigger="click"
                     hx-swap="none"
                     hx-on::after-request="if(event.detail.successful) { 
@@ -647,6 +660,7 @@
                     Start Backlink Analysis
                 </button>
             </div>
+            {% endif %}
         </div>
     {% endif %}
 </div>

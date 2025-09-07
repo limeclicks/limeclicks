@@ -107,8 +107,14 @@ def htmx_backlinks_projects(request):
         can_fetch = True
         days_until_next_fetch = 0
         next_fetch_date = None
+        is_locked = project.is_backlinks_locked()
+        lockdown_days_remaining = project.get_backlinks_lockdown_days_remaining()
         
-        if latest_profile:
+        # Check if domain is locked first
+        if is_locked:
+            can_fetch = False
+            days_until_next_fetch = lockdown_days_remaining
+        elif latest_profile:
             previous_profile = BacklinkProfile.objects.filter(
                 project=project,
                 created_at__lt=latest_profile.created_at
@@ -135,6 +141,8 @@ def htmx_backlinks_projects(request):
             'can_fetch': can_fetch,
             'days_until_next_fetch': days_until_next_fetch,
             'next_fetch_date': next_fetch_date,
+            'is_locked': is_locked,
+            'lockdown_days_remaining': lockdown_days_remaining,
         })
     
     context = {
@@ -169,7 +177,14 @@ def backlinks_detail(request, project_id):
     days_until_refresh = 0
     next_refresh_date = None
     
-    if latest_profile:
+    # Check if domain is locked due to no data
+    is_locked = project.is_backlinks_locked()
+    lockdown_days_remaining = project.get_backlinks_lockdown_days_remaining()
+    
+    if is_locked:
+        can_refresh = False
+        days_until_refresh = lockdown_days_remaining
+    elif latest_profile:
         days_since_fetch = (timezone.now() - latest_profile.created_at).days
         if days_since_fetch < 30:
             can_refresh = False
@@ -183,6 +198,8 @@ def backlinks_detail(request, project_id):
         'can_refresh': can_refresh,
         'days_until_refresh': days_until_refresh,
         'next_refresh_date': next_refresh_date,
+        'is_locked': is_locked,
+        'lockdown_days_remaining': lockdown_days_remaining,
     }
     
     return render(request, 'backlinks/detail.html', context)
@@ -225,17 +242,23 @@ def fetch_backlinks(request, project_id):
         # Queue the task
         task = fetch_backlink_summary_from_dataforseo.delay(project_id, force=True)
         
-        messages.success(request, f'Backlink fetch queued for {project.domain}. This may take a few minutes.')
+        messages.success(request, f'Starting backlink data collection for {project.domain}. This will take 1-2 minutes.')
         
         return JsonResponse({
             'success': True,
             'task_id': task.id,
-            'message': f'Backlink fetch queued for {project.domain}'
+            'message': f'Collecting backlink data for {project.domain}. Please wait 1-2 minutes and refresh the page.',
+            'status': 'processing',
+            'domain': project.domain
         })
     
     except Exception as e:
-        messages.error(request, f'Error queuing backlink fetch: {str(e)}')
-        return JsonResponse({'error': str(e)}, status=500)
+        messages.error(request, f'Error starting backlink collection: {str(e)}')
+        return JsonResponse({
+            'success': False,
+            'error': str(e),
+            'message': f'Failed to start backlink collection: {str(e)}'
+        }, status=500)
 
 
 @login_required
@@ -280,17 +303,24 @@ def fetch_detailed_backlinks(request, project_id):
         # Queue the detailed fetch task
         task = fetch_detailed_backlinks_from_dataforseo.delay(latest_profile.id)
         
-        messages.success(request, f'Detailed backlink fetch queued for {project.domain}. This may take several minutes.')
+        messages.success(request, f'Collecting detailed backlinks for {project.domain}. This process will take 3-5 minutes.')
         
         return JsonResponse({
             'success': True,
             'task_id': task.id,
-            'message': f'Detailed backlink fetch queued for {project.domain}'
+            'message': f'Collecting detailed backlinks for {project.domain}. This will take 3-5 minutes. The page will refresh automatically when complete.',
+            'status': 'processing',
+            'domain': project.domain,
+            'estimated_time': '3-5 minutes'
         })
     
     except Exception as e:
-        messages.error(request, f'Error queuing detailed backlink fetch: {str(e)}')
-        return JsonResponse({'error': str(e)}, status=500)
+        messages.error(request, f'Error starting detailed backlink collection: {str(e)}')
+        return JsonResponse({
+            'success': False,
+            'error': str(e),
+            'message': f'Failed to start detailed backlink collection: {str(e)}'
+        }, status=500)
 
 
 @login_required
@@ -339,7 +369,9 @@ def backlink_audit(request):
                 'spam_score': latest_profile.backlinks_spam_score or 0,
                 'collected_at': latest_profile.created_at,
                 'time_since_update': time_display,
-                'has_detailed_data': bool(latest_profile.backlinks_file_path and latest_profile.backlinks_file_path != '')
+                'has_detailed_data': bool(latest_profile.backlinks_file_path and latest_profile.backlinks_file_path != ''),
+                'is_locked': project.is_backlinks_locked(),
+                'lockdown_days_remaining': project.get_backlinks_lockdown_days_remaining()
             }
             
             projects_with_backlinks.append(project_data)

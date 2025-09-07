@@ -35,6 +35,19 @@ def fetch_backlink_summary_from_dataforseo(self, project_id, target_domain=None,
         domain = target_domain or project.domain
         logger.info(f"Starting DataForSEO backlink summary fetch for project {project_id}: {domain}")
         
+        # Check if domain is locked due to no data found previously
+        if project.is_backlinks_locked() and not force:
+            days_remaining = project.get_backlinks_lockdown_days_remaining()
+            logger.info(f"Backlinks fetch blocked for {domain}: lockdown active for {days_remaining} more days")
+            return {
+                "status": "locked",
+                "project_id": project_id,
+                "domain": domain,
+                "days_remaining": days_remaining,
+                "lockdown_until": project.backlinks_no_data_until.isoformat(),
+                "message": f"Backlinks fetch blocked - no data was found previously. Please wait {days_remaining} more days."
+            }
+        
         # Check 30-day interval unless forced
         if not force:
             latest_profile = BacklinkProfile.objects.filter(
@@ -90,11 +103,20 @@ def fetch_backlink_summary_from_dataforseo(self, project_id, target_domain=None,
         # Check if we have results
         if not task.get("result") or not task["result"]:
             logger.warning(f"No backlink data found for domain: {domain}")
+            
+            # Set 30-day lockdown for this domain
+            lockdown_until = timezone.now() + timedelta(days=30)
+            project.backlinks_no_data_until = lockdown_until
+            project.save(update_fields=['backlinks_no_data_until'])
+            logger.info(f"Set backlinks lockdown for {domain} until {lockdown_until}")
+            
             return {
                 "status": "no_data",
                 "project_id": project_id,
                 "domain": domain,
-                "message": "No backlink data found for this domain"
+                "message": "No backlink data found for this domain",
+                "lockdown_until": lockdown_until.isoformat(),
+                "lockdown_days": 30
             }
             
         # Extract the backlink summary data from the first result
