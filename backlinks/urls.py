@@ -17,4 +17,8 @@ urlpatterns = [
     # Actions
     path('project/<int:project_id>/fetch/', views.fetch_backlinks, name='fetch'),
     path('project/<int:project_id>/fetch-detailed/', views.fetch_detailed_backlinks, name='fetch_detailed'),
+    
+    # Backlink Audit
+    path('audit/', views.backlink_audit, name='audit'),
+    path('audit/presigned-url/<int:profile_id>/', views.get_backlinks_presigned_url, name='presigned_url'),
 ]

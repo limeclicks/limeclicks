@@ -415,6 +415,31 @@ class R2StorageService:
         now = datetime.now()
         return f"{base_path}/{now.year}/{now.month:02d}/{now.day:02d}"
     
+    def get_presigned_url(self, key: str, expires_in: int = 3600) -> str:
+        """
+        Generate a presigned URL for accessing a file (simplified method)
+        
+        Args:
+            key: Object key in R2
+            expires_in: URL expiration time in seconds (default 1 hour)
+        
+        Returns:
+            Presigned URL string
+        """
+        try:
+            url = self.client.generate_presigned_url(
+                'get_object',
+                Params={'Bucket': self.bucket_name, 'Key': key},
+                ExpiresIn=expires_in
+            )
+            return url
+        except ClientError as e:
+            logger.error(f"Failed to generate presigned URL: {str(e)}")
+            raise
+        except Exception as e:
+            logger.error(f"Unexpected error generating presigned URL: {str(e)}")
+            raise
+    
     def generate_presigned_url(self, key: str, expiry: int = 3600) -> Dict[str, Any]:
         """
         Generate a presigned URL for accessing a file

@@ -99,6 +99,10 @@ def htmx_backlinks_projects(request):
         
         # Calculate loss (difference from previous profile if exists)
         loss_links = 0
+        can_fetch = True
+        days_until_next_fetch = 0
+        next_fetch_date = None
+        
         if latest_profile:
             previous_profile = BacklinkProfile.objects.filter(
                 project=project,
@@ -107,6 +111,13 @@ def htmx_backlinks_projects(request):
             
             if previous_profile:
                 loss_links = max(0, previous_profile.backlinks - latest_profile.backlinks)
+            
+            # Calculate if 30 days have passed
+            days_since_fetch = (timezone.now() - latest_profile.created_at).days
+            if days_since_fetch < 30:
+                can_fetch = False
+                days_until_next_fetch = 30 - days_since_fetch
+                next_fetch_date = latest_profile.created_at + timedelta(days=30)
         
         # Format backlinks for display
         backlinks_formatted = format_backlinks(latest_profile.backlinks) if latest_profile else "0"
@@ -116,6 +127,9 @@ def htmx_backlinks_projects(request):
             'profile': latest_profile,
             'loss_links': loss_links,
             'backlinks_formatted': backlinks_formatted,
+            'can_fetch': can_fetch,
+            'days_until_next_fetch': days_until_next_fetch,
+            'next_fetch_date': next_fetch_date,
         })
     
     context = {
@@ -145,10 +159,25 @@ def backlinks_detail(request, project_id):
     
     latest_profile = profiles.first()
     
+    # Calculate if refresh is allowed (30 days check)
+    can_refresh = True
+    days_until_refresh = 0
+    next_refresh_date = None
+    
+    if latest_profile:
+        days_since_fetch = (timezone.now() - latest_profile.created_at).days
+        if days_since_fetch < 30:
+            can_refresh = False
+            days_until_refresh = 30 - days_since_fetch
+            next_refresh_date = (latest_profile.created_at + timedelta(days=30)).isoformat()
+    
     context = {
         'project': project,
         'latest_profile': latest_profile,
         'profiles': profiles[:5],  # Show last 5 profiles
+        'can_refresh': can_refresh,
+        'days_until_refresh': days_until_refresh,
+        'next_refresh_date': next_refresh_date,
     }
     
     return render(request, 'backlinks/detail.html', context)
@@ -158,6 +187,7 @@ def backlinks_detail(request, project_id):
 def fetch_backlinks(request, project_id):
     """
     Trigger backlink summary fetch for a project
+    Enforces 30-day minimum interval between fetches
     """
     if request.method != 'POST':
         return JsonResponse({'error': 'POST method required'}, status=405)
@@ -168,6 +198,23 @@ def fetch_backlinks(request, project_id):
     if not (project.user == request.user or 
             project.memberships.filter(user=request.user).exists()):
         return JsonResponse({'error': 'Access denied'}, status=403)
+    
+    # Check if there's an existing profile and if 30 days have passed
+    latest_profile = BacklinkProfile.objects.filter(
+        project=project
+    ).order_by('-created_at').first()
+    
+    if latest_profile:
+        days_since_last_fetch = (timezone.now() - latest_profile.created_at).days
+        
+        if days_since_last_fetch < 30:
+            days_remaining = 30 - days_since_last_fetch
+            return JsonResponse({
+                'error': f'Backlink data was fetched {days_since_last_fetch} days ago. Please wait {days_remaining} more days before fetching again.',
+                'days_remaining': days_remaining,
+                'last_fetch_date': latest_profile.created_at.isoformat(),
+                'next_available_date': (latest_profile.created_at + timedelta(days=30)).isoformat()
+            }, status=429)  # 429 Too Many Requests
     
     try:
         # Queue the task
@@ -190,6 +237,7 @@ def fetch_backlinks(request, project_id):
 def fetch_detailed_backlinks(request, project_id):
     """
     Trigger detailed backlinks fetch for a project's latest profile
+    Enforces 30-day minimum interval between fetches
     """
     if request.method != 'POST':
         return JsonResponse({'error': 'POST method required'}, status=405)
@@ -210,6 +258,19 @@ def fetch_detailed_backlinks(request, project_id):
         messages.error(request, 'No backlink profile found. Please fetch summary first.')
         return JsonResponse({'error': 'No backlink profile found'}, status=400)
     
+    # Check if detailed backlinks were already collected and if 30 days have passed
+    if latest_profile.backlinks_collected_at:
+        days_since_last_fetch = (timezone.now() - latest_profile.backlinks_collected_at).days
+        
+        if days_since_last_fetch < 30:
+            days_remaining = 30 - days_since_last_fetch
+            return JsonResponse({
+                'error': f'Detailed backlinks were fetched {days_since_last_fetch} days ago. Please wait {days_remaining} more days before fetching again.',
+                'days_remaining': days_remaining,
+                'last_fetch_date': latest_profile.backlinks_collected_at.isoformat(),
+                'next_available_date': (latest_profile.backlinks_collected_at + timedelta(days=30)).isoformat()
+            }, status=429)
+    
     try:
         # Queue the detailed fetch task
         task = fetch_detailed_backlinks_from_dataforseo.delay(latest_profile.id)
@@ -225,3 +286,94 @@ def fetch_detailed_backlinks(request, project_id):
     except Exception as e:
         messages.error(request, f'Error queuing detailed backlink fetch: {str(e)}')
         return JsonResponse({'error': str(e)}, status=500)
+
+
+@login_required
+def backlink_audit(request):
+    """
+    Backlink Audit interface for reviewing and filtering backlinks
+    """
+    # Get user's projects with backlink data
+    user_projects = Project.objects.filter(
+        Q(user=request.user) | Q(memberships__user=request.user),
+        active=True
+    ).distinct()
+    
+    # Get projects that have backlink files
+    projects_with_backlinks = []
+    for project in user_projects:
+        # Get the most recent profile with actual backlink file (not empty)
+        latest_profile = BacklinkProfile.objects.filter(
+            project=project,
+            backlinks_file_path__isnull=False
+        ).exclude(
+            backlinks_file_path=''
+        ).order_by('-created_at').first()
+        
+        # Include profile if it has a file path, even if count is 0 or None
+        if latest_profile:
+            projects_with_backlinks.append({
+                'id': project.id,
+                'domain': project.domain,
+                'title': project.title,
+                'profile_id': latest_profile.id,
+                'backlinks_count': latest_profile.backlinks_count_collected or 0,
+                'collected_at': latest_profile.backlinks_collected_at
+            })
+    
+    import json
+    
+    context = {
+        'projects': projects_with_backlinks,
+        'projects_json': json.dumps(projects_with_backlinks, default=str),
+    }
+    
+    return render(request, 'backlinks/audit.html', context)
+
+
+@login_required
+def get_backlinks_presigned_url(request, profile_id):
+    """
+    Generate a presigned URL for direct R2 access to backlinks file
+    """
+    if request.method != 'GET':
+        return JsonResponse({'error': 'GET method required'}, status=405)
+    
+    # Get the backlink profile
+    profile = get_object_or_404(BacklinkProfile, id=profile_id)
+    
+    # Check user has access to this project
+    if not (profile.project.user == request.user or 
+            profile.project.memberships.filter(user=request.user).exists()):
+        return JsonResponse({'error': 'Access denied'}, status=403)
+    
+    if not profile.backlinks_file_path:
+        return JsonResponse({'error': 'No backlinks file available'}, status=404)
+    
+    try:
+        # Import R2 service
+        from services.r2_storage import R2StorageService
+        
+        r2_service = R2StorageService()
+        
+        # Generate presigned URL (valid for 1 hour)
+        presigned_url = r2_service.get_presigned_url(
+            key=profile.backlinks_file_path,
+            expires_in=3600  # 1 hour
+        )
+        
+        return JsonResponse({
+            'success': True,
+            'url': presigned_url,
+            'expires_in': 3600,
+            'profile': {
+                'id': profile.id,
+                'domain': profile.project.domain,
+                'backlinks_count': profile.backlinks_count_collected or 0,
+                'spam_score': profile.backlinks_spam_score or 0,
+                'collected_at': profile.backlinks_collected_at.isoformat() if profile.backlinks_collected_at else None
+            }
+        })
+    
+    except Exception as e:
+        return JsonResponse({'error': f'Error generating presigned URL: {str(e)}'}, status=500)

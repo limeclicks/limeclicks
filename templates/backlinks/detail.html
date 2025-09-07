@@ -24,27 +24,91 @@
         </div>
         <div class="flex space-x-3">
             {% if latest_profile %}
-                <button 
-                    class="btn btn-outline btn-sm"
-                    hx-post="{% url 'backlinks:fetch' project.id %}"
-                    hx-confirm="Fetch fresh backlink data? This will use API credits."
-                >
-                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-                    </svg>
-                    Refresh Data
-                </button>
+                {% if can_refresh %}
+                    <!-- Can refresh - show active button with HTMX -->
+                    <button 
+                        class="btn btn-outline btn-sm"
+                        hx-post="{% url 'backlinks:fetch' project.id %}"
+                        hx-trigger="click"
+                        hx-swap="none"
+                        hx-on::after-request="if(event.detail.successful) { 
+                            // Show success notification
+                            const notification = document.createElement('div');
+                            notification.className = 'fixed top-4 right-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded z-50';
+                            notification.innerHTML = '<strong>Success!</strong> We are collecting backlinks. Check back in a while.';
+                            document.body.appendChild(notification);
+                            setTimeout(() => notification.remove(), 5000);
+                            
+                            // Disable button and update text
+                            this.disabled = true;
+                            this.classList.add('btn-disabled');
+                            this.querySelector('span').textContent = 'Refresh Queued';
+                        } else if(event.detail.xhr.status === 429) {
+                            // Show rate limit notification
+                            const notification = document.createElement('div');
+                            notification.className = 'fixed top-4 right-4 bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded z-50';
+                            const data = JSON.parse(event.detail.xhr.responseText);
+                            notification.innerHTML = `<strong>Please wait!</strong> ${data.error || 'Data refresh will be available in ' + data.days_remaining + ' days.'}`;
+                            document.body.appendChild(notification);
+                            setTimeout(() => notification.remove(), 5000);
+                        } else {
+                            // Show error notification
+                            const notification = document.createElement('div');
+                            notification.className = 'fixed top-4 right-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded z-50';
+                            notification.innerHTML = '<strong>Error!</strong> Failed to refresh data. Please try again.';
+                            document.body.appendChild(notification);
+                            setTimeout(() => notification.remove(), 5000);
+                        }"
+                    >
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                        </svg>
+                        <span>Refresh Data</span>
+                    </button>
+                {% else %}
+                    <!-- Cannot refresh yet - show disabled button -->
+                    <button 
+                        class="btn btn-outline btn-sm btn-disabled"
+                        title="Available in {{ days_until_refresh }} days"
+                        onclick="
+                            const notification = document.createElement('div');
+                            notification.className = 'fixed top-4 right-4 bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded z-50';
+                            notification.innerHTML = '<strong>Not available yet!</strong> Data refresh will be available in {{ days_until_refresh }} days.';
+                            document.body.appendChild(notification);
+                            setTimeout(() => notification.remove(), 5000);
+                        "
+                    >
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        <span>Available in {{ days_until_refresh }} days</span>
+                    </button>
+                {% endif %}
                 {% if latest_profile.backlinks > 0 %}
-                <button 
-                    class="btn btn-primary btn-sm"
-                    hx-post="{% url 'backlinks:fetch_detailed' project.id %}"
-                    hx-confirm="Collect detailed backlink data? This may take several minutes."
-                >
-                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                    </svg>
-                    Get Detailed List
-                </button>
+                    {% if latest_profile.backlinks_file_path %}
+                    <!-- If detailed backlinks already exist, go to audit page -->
+                    <a 
+                        href="{% url 'backlinks:audit' %}?project={{ latest_profile.id }}"
+                        class="btn btn-primary btn-sm"
+                    >
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path>
+                        </svg>
+                        View Detailed List
+                    </a>
+                    {% else %}
+                    <!-- If no detailed backlinks yet, fetch them -->
+                    <button 
+                        class="btn btn-primary btn-sm"
+                        hx-post="{% url 'backlinks:fetch_detailed' project.id %}"
+                        hx-confirm="Collect detailed backlink data? This may take several minutes."
+                    >
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                        </svg>
+                        Get Detailed List
+                    </button>
+                    {% endif %}
                 {% endif %}
             {% else %}
                 <button 
@@ -66,7 +130,7 @@
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             <!-- Rank Score -->
             <div class="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
-                <div class="flex items-center justify-between">
+                <div class="flex items-center justify-between mb-3">
                     <div>
                         <p class="text-sm font-medium text-gray-500">Domain Authority</p>
                         <p class="text-3xl font-bold {% if latest_profile.rank >= 80 %}text-green-600{% elif latest_profile.rank >= 60 %}text-yellow-600{% else %}text-red-600{% endif %}">
@@ -80,11 +144,22 @@
                         </svg>
                     </div>
                 </div>
+                <!-- Progress bar for Domain Authority -->
+                {% if latest_profile.rank %}
+                <div class="w-full bg-gray-200 rounded-full h-2 mb-2">
+                    <div class="{% if latest_profile.rank >= 80 %}bg-green-500{% elif latest_profile.rank >= 60 %}bg-yellow-500{% else %}bg-red-500{% endif %} h-2 rounded-full transition-all duration-500 ease-in-out" style="width: {{ latest_profile.rank }}%"></div>
+                </div>
+                <div class="flex justify-between text-xs text-gray-400">
+                    <span>0</span>
+                    <span>50</span>
+                    <span>100</span>
+                </div>
+                {% endif %}
             </div>
 
             <!-- Total Backlinks -->
             <div class="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
-                <div class="flex items-center justify-between">
+                <div class="flex items-center justify-between mb-3">
                     <div>
                         <p class="text-sm font-medium text-gray-500">Total Backlinks</p>
                         <p class="text-3xl font-bold text-blue-600">{{ latest_profile.backlinks|floatformat:0 }}</p>
@@ -96,11 +171,22 @@
                         </svg>
                     </div>
                 </div>
+                <!-- Progress bar for Backlinks (relative scale) -->
+                <div class="w-full bg-gray-200 rounded-full h-2 mb-2">
+                    {% comment %} Scale backlinks to percentage (assuming 50k is 100%) {% endcomment %}
+                    {% widthratio latest_profile.backlinks 50000 100 as backlinks_percentage %}
+                    <div class="bg-blue-500 h-2 rounded-full transition-all duration-500 ease-in-out" style="width: {% if backlinks_percentage > 100 %}100{% else %}{{ backlinks_percentage }}{% endif %}%"></div>
+                </div>
+                <div class="flex justify-between text-xs text-gray-400">
+                    <span>0</span>
+                    <span>25K</span>
+                    <span>50K+</span>
+                </div>
             </div>
 
             <!-- Referring Domains -->
             <div class="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
-                <div class="flex items-center justify-between">
+                <div class="flex items-center justify-between mb-3">
                     <div>
                         <p class="text-sm font-medium text-gray-500">Referring Domains</p>
                         <p class="text-3xl font-bold text-purple-600">{{ latest_profile.referring_domains|floatformat:0 }}</p>
@@ -112,11 +198,22 @@
                         </svg>
                     </div>
                 </div>
+                <!-- Progress bar for Referring Domains (relative scale) -->
+                <div class="w-full bg-gray-200 rounded-full h-2 mb-2">
+                    {% comment %} Scale domains to percentage (assuming 5k is 100%) {% endcomment %}
+                    {% widthratio latest_profile.referring_domains 5000 100 as domains_percentage %}
+                    <div class="bg-purple-500 h-2 rounded-full transition-all duration-500 ease-in-out" style="width: {% if domains_percentage > 100 %}100{% else %}{{ domains_percentage }}{% endif %}%"></div>
+                </div>
+                <div class="flex justify-between text-xs text-gray-400">
+                    <span>0</span>
+                    <span>2.5K</span>
+                    <span>5K+</span>
+                </div>
             </div>
 
             <!-- Spam Score -->
             <div class="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
-                <div class="flex items-center justify-between">
+                <div class="flex items-center justify-between mb-3">
                     <div>
                         <p class="text-sm font-medium text-gray-500">Spam Score</p>
                         <p class="text-3xl font-bold {% if latest_profile.backlinks_spam_score > 30 %}text-red-600{% elif latest_profile.backlinks_spam_score > 15 %}text-yellow-600{% else %}text-green-600{% endif %}">
@@ -138,6 +235,15 @@
                         </svg>
                     </div>
                 </div>
+                <!-- Reverse progress bar for Spam Score (higher is worse) -->
+                <div class="w-full bg-gray-200 rounded-full h-2 mb-2">
+                    <div class="{% if latest_profile.backlinks_spam_score > 30 %}bg-red-500{% elif latest_profile.backlinks_spam_score > 15 %}bg-yellow-500{% else %}bg-green-500{% endif %} h-2 rounded-full transition-all duration-500 ease-in-out" style="width: {{ latest_profile.backlinks_spam_score|default:0 }}%"></div>
+                </div>
+                <div class="flex justify-between text-xs text-gray-400">
+                    <span>0 (Good)</span>
+                    <span>50</span>
+                    <span>100 (Bad)</span>
+                </div>
             </div>
         </div>
 
@@ -147,21 +253,37 @@
             <div class="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
                 <h3 class="text-lg font-semibold text-gray-900 mb-4">Referring Domains</h3>
                 <div class="space-y-3">
-                    <div class="flex items-center justify-between">
+                    <div class="flex items-center justify-between mb-1">
                         <span class="text-sm text-gray-600">Total Domains</span>
                         <span class="font-medium">{{ latest_profile.referring_domains|floatformat:0 }}</span>
                     </div>
-                    <div class="flex items-center justify-between">
+                    <div class="w-full bg-gray-100 rounded-full h-1.5">
+                        {% widthratio latest_profile.referring_domains 5000 100 as total_domains_pct %}
+                        <div class="bg-blue-400 h-1.5 rounded-full" style="width: {% if total_domains_pct > 100 %}100{% else %}{{ total_domains_pct }}{% endif %}%"></div>
+                    </div>
+                    <div class="flex items-center justify-between mb-1">
                         <span class="text-sm text-gray-600">NoFollow Domains</span>
                         <span class="font-medium">{{ latest_profile.referring_domains_nofollow|floatformat:0 }}</span>
                     </div>
-                    <div class="flex items-center justify-between">
+                    <div class="w-full bg-gray-100 rounded-full h-1.5">
+                        {% widthratio latest_profile.referring_domains_nofollow latest_profile.referring_domains 100 as nofollow_domains_pct %}
+                        <div class="bg-orange-400 h-1.5 rounded-full" style="width: {{ nofollow_domains_pct|default:0 }}%"></div>
+                    </div>
+                    <div class="flex items-center justify-between mb-1">
                         <span class="text-sm text-gray-600">Main Domains</span>
                         <span class="font-medium">{{ latest_profile.referring_main_domains|floatformat:0 }}</span>
                     </div>
-                    <div class="flex items-center justify-between">
+                    <div class="w-full bg-gray-100 rounded-full h-1.5">
+                        {% widthratio latest_profile.referring_main_domains latest_profile.referring_domains 100 as main_domains_pct %}
+                        <div class="bg-green-400 h-1.5 rounded-full" style="width: {{ main_domains_pct|default:0 }}%"></div>
+                    </div>
+                    <div class="flex items-center justify-between mb-1">
                         <span class="text-sm text-gray-600">Main NoFollow</span>
                         <span class="font-medium">{{ latest_profile.referring_main_domains_nofollow|floatformat:0 }}</span>
+                    </div>
+                    <div class="w-full bg-gray-100 rounded-full h-1.5">
+                        {% widthratio latest_profile.referring_main_domains_nofollow latest_profile.referring_main_domains 100 as main_nofollow_pct %}
+                        <div class="bg-red-400 h-1.5 rounded-full" style="width: {{ main_nofollow_pct|default:0 }}%"></div>
                     </div>
                 </div>
             </div>
@@ -170,21 +292,40 @@
             <div class="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
                 <h3 class="text-lg font-semibold text-gray-900 mb-4">Network & Infrastructure</h3>
                 <div class="space-y-3">
-                    <div class="flex items-center justify-between">
+                    <div class="flex items-center justify-between mb-1">
                         <span class="text-sm text-gray-600">Referring IPs</span>
                         <span class="font-medium">{{ latest_profile.referring_ips|floatformat:0 }}</span>
                     </div>
-                    <div class="flex items-center justify-between">
+                    <div class="w-full bg-gray-100 rounded-full h-1.5 mb-3">
+                        {% widthratio latest_profile.referring_ips 1000 100 as ips_pct %}
+                        <div class="bg-cyan-400 h-1.5 rounded-full" style="width: {% if ips_pct > 100 %}100{% else %}{{ ips_pct }}{% endif %}%"></div>
+                    </div>
+
+                    <div class="flex items-center justify-between mb-1">
                         <span class="text-sm text-gray-600">Referring Subnets</span>
                         <span class="font-medium">{{ latest_profile.referring_subnets|floatformat:0 }}</span>
                     </div>
-                    <div class="flex items-center justify-between">
+                    <div class="w-full bg-gray-100 rounded-full h-1.5 mb-3">
+                        {% widthratio latest_profile.referring_subnets 500 100 as subnets_pct %}
+                        <div class="bg-indigo-400 h-1.5 rounded-full" style="width: {% if subnets_pct > 100 %}100{% else %}{{ subnets_pct }}{% endif %}%"></div>
+                    </div>
+
+                    <div class="flex items-center justify-between mb-1">
                         <span class="text-sm text-gray-600">Referring Pages</span>
                         <span class="font-medium">{{ latest_profile.referring_pages|floatformat:0 }}</span>
                     </div>
-                    <div class="flex items-center justify-between">
+                    <div class="w-full bg-gray-100 rounded-full h-1.5 mb-3">
+                        {% widthratio latest_profile.referring_pages 10000 100 as pages_pct %}
+                        <div class="bg-pink-400 h-1.5 rounded-full" style="width: {% if pages_pct > 100 %}100{% else %}{{ pages_pct }}{% endif %}%"></div>
+                    </div>
+
+                    <div class="flex items-center justify-between mb-1">
                         <span class="text-sm text-gray-600">Pages NoFollow</span>
                         <span class="font-medium">{{ latest_profile.referring_pages_nofollow|floatformat:0 }}</span>
+                    </div>
+                    <div class="w-full bg-gray-100 rounded-full h-1.5">
+                        {% widthratio latest_profile.referring_pages_nofollow latest_profile.referring_pages 100 as pages_nofollow_pct %}
+                        <div class="bg-orange-400 h-1.5 rounded-full" style="width: {{ pages_nofollow_pct|default:0 }}%"></div>
                     </div>
                 </div>
             </div>
@@ -193,25 +334,44 @@
             <div class="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
                 <h3 class="text-lg font-semibold text-gray-900 mb-4">Link Analysis</h3>
                 <div class="space-y-3">
-                    <div class="flex items-center justify-between">
+                    <div class="flex items-center justify-between mb-1">
                         <span class="text-sm text-gray-600">External Links</span>
                         <span class="font-medium">{{ latest_profile.external_links_count|floatformat:0 }}</span>
                     </div>
-                    <div class="flex items-center justify-between">
+                    <div class="w-full bg-gray-100 rounded-full h-1.5 mb-3">
+                        {% widthratio latest_profile.external_links_count 50000 100 as external_links_pct %}
+                        <div class="bg-emerald-400 h-1.5 rounded-full" style="width: {% if external_links_pct > 100 %}100{% else %}{{ external_links_pct }}{% endif %}%"></div>
+                    </div>
+
+                    <div class="flex items-center justify-between mb-1">
                         <span class="text-sm text-gray-600">Internal Links</span>
                         <span class="font-medium">{{ latest_profile.internal_links_count|floatformat:0 }}</span>
                     </div>
-                    <div class="flex items-center justify-between">
+                    <div class="w-full bg-gray-100 rounded-full h-1.5 mb-3">
+                        {% widthratio latest_profile.internal_links_count 100000 100 as internal_links_pct %}
+                        <div class="bg-blue-400 h-1.5 rounded-full" style="width: {% if internal_links_pct > 100 %}100{% else %}{{ internal_links_pct }}{% endif %}%"></div>
+                    </div>
+
+                    <div class="flex items-center justify-between mb-1">
                         <span class="text-sm text-gray-600">Broken Backlinks</span>
                         <span class="font-medium {% if latest_profile.broken_backlinks > 0 %}text-red-600{% endif %}">
                             {{ latest_profile.broken_backlinks|floatformat:0 }}
                         </span>
                     </div>
-                    <div class="flex items-center justify-between">
+                    <div class="w-full bg-gray-100 rounded-full h-1.5 mb-3">
+                        {% widthratio latest_profile.broken_backlinks 1000 100 as broken_backlinks_pct %}
+                        <div class="bg-red-500 h-1.5 rounded-full" style="width: {% if broken_backlinks_pct > 100 %}100{% else %}{{ broken_backlinks_pct }}{% endif %}%"></div>
+                    </div>
+
+                    <div class="flex items-center justify-between mb-1">
                         <span class="text-sm text-gray-600">Broken Pages</span>
                         <span class="font-medium {% if latest_profile.broken_pages > 0 %}text-red-600{% endif %}">
                             {{ latest_profile.broken_pages|floatformat:0 }}
                         </span>
+                    </div>
+                    <div class="w-full bg-gray-100 rounded-full h-1.5">
+                        {% widthratio latest_profile.broken_pages 100 100 as broken_pages_pct %}
+                        <div class="bg-red-500 h-1.5 rounded-full" style="width: {% if broken_pages_pct > 100 %}100{% else %}{{ broken_pages_pct }}{% endif %}%"></div>
                     </div>
                 </div>
             </div>
@@ -224,12 +384,26 @@
                 <h3 class="text-lg font-semibold text-gray-900 mb-4">Top-Level Domains</h3>
                 {% if latest_profile.referring_links_tld %}
                     <div class="space-y-3">
+                        {% with total_tld_links=latest_profile.backlinks %}
                         {% for tld, count in latest_profile.referring_links_tld.items|slice:":5" %}
-                        <div class="flex items-center justify-between">
-                            <span class="text-sm text-gray-600 font-mono">.{{ tld }}</span>
-                            <span class="font-medium">{{ count|floatformat:0 }}</span>
+                        <div class="flex items-center">
+                            <span class="text-sm text-gray-600 font-mono w-16">.{{ tld }}</span>
+                            <div class="flex-1 mx-3">
+                                <div class="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
+                                    {% if total_tld_links %}
+                                        {% widthratio count total_tld_links 100 as tld_percentage %}
+                                    {% else %}
+                                        {% widthratio 0 1 100 as tld_percentage %}
+                                    {% endif %}
+                                    <div class="bg-gradient-to-r from-blue-400 to-blue-600 h-2 rounded-full transition-all duration-500" style="width: {{ tld_percentage|default:0 }}%"></div>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <span class="text-lg font-bold text-gray-800">{{ count|floatformat:0 }}</span>
+                            </div>
                         </div>
                         {% endfor %}
+                        {% endwith %}
                     </div>
                 {% else %}
                     <p class="text-gray-500 text-sm">No TLD data available</p>
@@ -241,12 +415,26 @@
                 <h3 class="text-lg font-semibold text-gray-900 mb-4">Countries</h3>
                 {% if latest_profile.referring_links_countries %}
                     <div class="space-y-3">
+                        {% with total_country_links=latest_profile.backlinks %}
                         {% for country, count in latest_profile.referring_links_countries.items|slice:":5" %}
-                        <div class="flex items-center justify-between">
-                            <span class="text-sm text-gray-600">{{ country|upper }}</span>
-                            <span class="font-medium">{{ count|floatformat:0 }}</span>
+                        <div class="flex items-center">
+                            <span class="text-sm text-gray-600 font-medium w-16">{{ country|upper }}</span>
+                            <div class="flex-1 mx-3">
+                                <div class="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
+                                    {% if total_country_links %}
+                                        {% widthratio count total_country_links 100 as country_percentage %}
+                                    {% else %}
+                                        {% widthratio 0 1 100 as country_percentage %}
+                                    {% endif %}
+                                    <div class="bg-gradient-to-r from-green-400 to-green-600 h-2 rounded-full transition-all duration-500" style="width: {{ country_percentage|default:0 }}%"></div>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <span class="text-lg font-bold text-gray-800">{{ count|floatformat:0 }}</span>
+                            </div>
                         </div>
                         {% endfor %}
+                        {% endwith %}
                     </div>
                 {% else %}
                     <p class="text-gray-500 text-sm">No country data available</p>
@@ -261,12 +449,26 @@
                 <h3 class="text-lg font-semibold text-gray-900 mb-4">Link Types</h3>
                 {% if latest_profile.referring_links_types %}
                     <div class="space-y-3">
+                        {% with total_type_links=latest_profile.backlinks %}
                         {% for link_type, count in latest_profile.referring_links_types.items|slice:":5" %}
-                        <div class="flex items-center justify-between">
-                            <span class="text-sm text-gray-600 capitalize">{{ link_type|title }}</span>
-                            <span class="font-medium">{{ count|floatformat:0 }}</span>
+                        <div class="flex items-center">
+                            <span class="text-sm text-gray-600 capitalize w-24">{{ link_type|title }}</span>
+                            <div class="flex-1 mx-3">
+                                <div class="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
+                                    {% if total_type_links %}
+                                        {% widthratio count total_type_links 100 as type_percentage %}
+                                    {% else %}
+                                        {% widthratio 0 1 100 as type_percentage %}
+                                    {% endif %}
+                                    <div class="bg-gradient-to-r from-orange-400 to-orange-600 h-2 rounded-full transition-all duration-500" style="width: {{ type_percentage|default:0 }}%"></div>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <span class="text-lg font-bold text-gray-800">{{ count|floatformat:0 }}</span>
+                            </div>
                         </div>
                         {% endfor %}
+                        {% endwith %}
                     </div>
                 {% else %}
                     <p class="text-gray-500 text-sm">No link type data available</p>
@@ -278,12 +480,26 @@
                 <h3 class="text-lg font-semibold text-gray-900 mb-4">Platform Types</h3>
                 {% if latest_profile.referring_links_platform_types %}
                     <div class="space-y-3">
+                        {% with total_platform_links=latest_profile.backlinks %}
                         {% for platform, count in latest_profile.referring_links_platform_types.items|slice:":5" %}
-                        <div class="flex items-center justify-between">
-                            <span class="text-sm text-gray-600 capitalize">{{ platform|title }}</span>
-                            <span class="font-medium">{{ count|floatformat:0 }}</span>
+                        <div class="flex items-center">
+                            <span class="text-sm text-gray-600 capitalize w-28">{{ platform|title }}</span>
+                            <div class="flex-1 mx-3">
+                                <div class="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
+                                    {% if total_platform_links %}
+                                        {% widthratio count total_platform_links 100 as platform_percentage %}
+                                    {% else %}
+                                        {% widthratio 0 1 100 as platform_percentage %}
+                                    {% endif %}
+                                    <div class="bg-gradient-to-r from-purple-400 to-purple-600 h-2 rounded-full transition-all duration-500" style="width: {{ platform_percentage|default:0 }}%"></div>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <span class="text-lg font-bold text-gray-800">{{ count|floatformat:0 }}</span>
+                            </div>
                         </div>
                         {% endfor %}
+                        {% endwith %}
                     </div>
                 {% else %}
                     <p class="text-gray-500 text-sm">No platform data available</p>
@@ -297,12 +513,6 @@
             <div class="flex items-center justify-between">
                 <div>
                     <h3 class="text-lg font-semibold text-blue-900">Detailed Backlink Data Available</h3>
-                    <p class="text-blue-700 mt-1">
-                        {{ latest_profile.backlinks_count_collected|floatformat:0 }} detailed backlinks collected
-                        {% if latest_profile.backlinks_collected_at %}
-                            on {{ latest_profile.backlinks_collected_at|date:"M d, Y \a\t H:i" }}
-                        {% endif %}
-                    </p>
                 </div>
                 <button 
                     onclick="downloadBacklinksFile()" 

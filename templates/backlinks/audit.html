@@ -1,0 +1,1183 @@
+{% extends "dashboard_base.html" %}
+{% load static %}
+
+{% block title %}Backlink Audit - LimeClicks{% endblock %}
+{% block page_title %}Backlink Audit{% endblock %}
+
+{% block extra_head %}
+<script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+<script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
+<script src="https://unpkg.com/pako@2.1.0/dist/pako.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<script>
+    // Pass Django context to JavaScript
+    window.projectsData = {{ projects_json|safe }};
+</script>
+<div class="mx-auto max-w-7xl" x-data="backlinkAudit()">
+    <!-- Header Section -->
+    <div class="mb-8">
+        <div class="flex items-center justify-between">
+            <div>
+                <h1 class="text-3xl font-bold text-gray-900">Backlink Audit</h1>
+                <p class="text-gray-600 mt-1">Review and analyze your backlinks with advanced filtering</p>
+            </div>
+            <div class="flex items-center space-x-4">
+                <!-- Project Selector -->
+                <select 
+                    x-model="selectedProjectId"
+                    @change="updateURLAndLoad()"
+                    class="select select-bordered select-sm w-64"
+                >
+                    <option value="">Select a project...</option>
+                    {% for project in projects %}
+                    <option value="{{ project.profile_id }}" 
+                            data-domain="{{ project.domain }}"
+                            data-count="{{ project.backlinks_count }}">
+                        {{ project.domain }}
+                    </option>
+                    {% endfor %}
+                </select>
+                
+                <!-- Export Button -->
+                <button 
+                    @click="exportToCSV()"
+                    x-show="backlinks.length > 0"
+                    class="btn btn-outline btn-sm"
+                >
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                    </svg>
+                    <span x-text="hasActiveFilters() ? `Export Filtered (${filteredBacklinks.length})` : 'Export'"></span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading State -->
+    <div x-show="loading" class="text-center py-12">
+        <div class="inline-flex items-center">
+            <svg class="animate-spin -ml-1 mr-3 h-8 w-8 text-blue-600" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <span class="text-lg">Loading backlinks...</span>
+        </div>
+    </div>
+
+    <!-- Filters Section -->
+    <div x-show="!loading && backlinks.length > 0" class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+        <h3 class="text-lg font-semibold mb-4">Advanced Filters</h3>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <!-- Spam Score Filter -->
+            <div>
+                <label class="text-sm font-medium text-gray-700 mb-1 block">Spam Score</label>
+                <div class="flex items-center space-x-2">
+                    <input 
+                        type="number" 
+                        x-model="filters.spamScoreMin" 
+                        @input="applyFilters()"
+                        placeholder="Min" 
+                        class="input input-bordered input-sm w-20"
+                        min="0" max="100"
+                    >
+                    <span class="text-gray-500">to</span>
+                    <input 
+                        type="number" 
+                        x-model="filters.spamScoreMax" 
+                        @input="applyFilters()"
+                        placeholder="Max" 
+                        class="input input-bordered input-sm w-20"
+                        min="0" max="100"
+                    >
+                </div>
+            </div>
+
+            <!-- Domain Rating Filter -->
+            <div>
+                <label class="text-sm font-medium text-gray-700 mb-1 block">Domain Rating</label>
+                <div class="flex items-center space-x-2">
+                    <input 
+                        type="number" 
+                        x-model="filters.domainRatingMin" 
+                        @input="applyFilters()"
+                        placeholder="Min" 
+                        class="input input-bordered input-sm w-20"
+                        min="0" max="100"
+                    >
+                    <span class="text-gray-500">to</span>
+                    <input 
+                        type="number" 
+                        x-model="filters.domainRatingMax" 
+                        @input="applyFilters()"
+                        placeholder="Max" 
+                        class="input input-bordered input-sm w-20"
+                        min="0" max="100"
+                    >
+                </div>
+            </div>
+
+            <!-- Link Type Filter -->
+            <div>
+                <label class="text-sm font-medium text-gray-700 mb-1 block">Link Type</label>
+                <select 
+                    x-model="filters.linkType" 
+                    @change="applyFilters()"
+                    class="select select-bordered select-sm w-full"
+                >
+                    <option value="">All Types</option>
+                    <option value="anchor">Anchor</option>
+                    <option value="redirect">Redirect</option>
+                    <option value="image">Image</option>
+                    <option value="form">Form</option>
+                    <option value="canonical">Canonical</option>
+                </select>
+            </div>
+
+            <!-- DoFollow/NoFollow Filter -->
+            <div>
+                <label class="text-sm font-medium text-gray-700 mb-1 block">Follow Type</label>
+                <select 
+                    x-model="filters.followType" 
+                    @change="applyFilters()"
+                    class="select select-bordered select-sm w-full"
+                >
+                    <option value="">All</option>
+                    <option value="dofollow">DoFollow</option>
+                    <option value="nofollow">NoFollow</option>
+                    <option value="ugc">UGC</option>
+                    <option value="sponsored">Sponsored</option>
+                </select>
+            </div>
+
+            <!-- Platform Type Filter -->
+            <div>
+                <label class="text-sm font-medium text-gray-700 mb-1 block">Platform Type</label>
+                <select 
+                    x-model="filters.platformType" 
+                    @change="applyFilters()"
+                    class="select select-bordered select-sm w-full"
+                >
+                    <option value="">All Platforms</option>
+                    <option value="cms">CMS</option>
+                    <option value="blogs">Blogs</option>
+                    <option value="news">News</option>
+                    <option value="ecommerce">E-commerce</option>
+                    <option value="organization">Organization</option>
+                    <option value="message-boards">Forums</option>
+                </select>
+            </div>
+
+            <!-- TLD Filter -->
+            <div>
+                <label class="text-sm font-medium text-gray-700 mb-1 block">Top-Level Domain</label>
+                <select 
+                    x-model="filters.tld" 
+                    @change="applyFilters()"
+                    class="select select-bordered select-sm w-full"
+                >
+                    <option value="">All TLDs</option>
+                    <template x-for="tld in uniqueTLDs" :key="tld">
+                        <option :value="tld" x-text="'.' + tld"></option>
+                    </template>
+                </select>
+            </div>
+
+            <!-- Language Filter -->
+            <div>
+                <label class="text-sm font-medium text-gray-700 mb-1 block">Language</label>
+                <select 
+                    x-model="filters.language" 
+                    @change="applyFilters()"
+                    class="select select-bordered select-sm w-full"
+                >
+                    <option value="">All Languages</option>
+                    <template x-for="lang in uniqueLanguages" :key="lang">
+                        <option :value="lang" x-text="lang"></option>
+                    </template>
+                </select>
+            </div>
+
+            <!-- Search Filter -->
+            <div>
+                <label class="text-sm font-medium text-gray-700 mb-1 block">Search</label>
+                <input 
+                    type="text" 
+                    x-model="filters.search" 
+                    @input="applyFilters()"
+                    placeholder="URL, anchor text..." 
+                    class="input input-bordered input-sm w-full"
+                >
+            </div>
+        </div>
+
+        <!-- Filter Actions -->
+        <div class="flex items-center justify-end mt-4 pt-4 border-t">
+            <button 
+                @click="resetFilters()"
+                class="btn btn-ghost btn-sm"
+            >
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                </svg>
+                Reset Filters
+            </button>
+        </div>
+    </div>
+
+    <!-- Statistics Cards -->
+    <div x-show="!loading && backlinks.length > 0" class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+            <div class="text-sm text-gray-500">Avg Spam Score</div>
+            <div class="text-2xl font-bold" :class="avgSpamScore > 30 ? 'text-red-600' : avgSpamScore > 15 ? 'text-yellow-600' : 'text-green-600'" x-text="avgSpamScore.toFixed(1)"></div>
+        </div>
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+            <div class="text-sm text-gray-500">Avg Domain Rating</div>
+            <div class="text-2xl font-bold text-blue-600" x-text="avgDomainRating.toFixed(1)"></div>
+        </div>
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+            <div class="text-sm text-gray-500">DoFollow Links</div>
+            <div class="text-2xl font-bold text-green-600" x-text="doFollowPercentage.toFixed(1) + '%'"></div>
+        </div>
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+            <div class="text-sm text-gray-500">Unique Domains</div>
+            <div class="text-2xl font-bold text-purple-600" x-text="uniqueDomains"></div>
+        </div>
+    </div>
+
+    <!-- Backlinks Table -->
+    <div x-show="!loading && filteredBacklinks.length > 0" class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="table table-sm w-full">
+                <thead>
+                    <tr class="bg-gray-50">
+                        <th class="sticky left-0 bg-gray-50 z-10">
+                            <input type="checkbox" @change="toggleSelectAll($event)" class="checkbox checkbox-sm">
+                        </th>
+                        <th @click="sortBy('url_from')" class="cursor-pointer hover:bg-gray-100">
+                            Source URL
+                            <span x-show="sortField === 'url_from'">
+                                <span x-show="sortDirection === 'asc'">↑</span>
+                                <span x-show="sortDirection === 'desc'">↓</span>
+                            </span>
+                        </th>
+                        <th @click="sortBy('anchor')" class="cursor-pointer hover:bg-gray-100">
+                            Anchor Text
+                            <span x-show="sortField === 'anchor'">
+                                <span x-show="sortDirection === 'asc'">↑</span>
+                                <span x-show="sortDirection === 'desc'">↓</span>
+                            </span>
+                        </th>
+                        <th @click="sortBy('domain_from_rating')" class="cursor-pointer hover:bg-gray-100">
+                            DR
+                            <span x-show="sortField === 'domain_from_rating'">
+                                <span x-show="sortDirection === 'asc'">↑</span>
+                                <span x-show="sortDirection === 'desc'">↓</span>
+                            </span>
+                        </th>
+                        <th @click="sortBy('spam_score')" class="cursor-pointer hover:bg-gray-100">
+                            Spam
+                            <span x-show="sortField === 'spam_score'">
+                                <span x-show="sortDirection === 'asc'">↑</span>
+                                <span x-show="sortDirection === 'desc'">↓</span>
+                            </span>
+                        </th>
+                        <th>Type</th>
+                        <th>Follow</th>
+                        <th>Platform</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <template x-for="(backlink, index) in paginatedBacklinks" :key="index">
+                        <tr class="hover:bg-gray-50">
+                            <td>
+                                <input type="checkbox" :value="index" x-model="selectedBacklinks" class="checkbox checkbox-sm">
+                            </td>
+                            <td class="max-w-xs truncate">
+                                <a :href="backlink.url_from" target="_blank" class="text-blue-600 hover:underline text-xs" x-text="backlink.url_from"></a>
+                            </td>
+                            <td class="max-w-xs truncate">
+                                <span class="text-xs" x-text="backlink.anchor || '-'"></span>
+                            </td>
+                            <td>
+                                <span class="badge badge-sm" :class="backlink.domain_from_rating >= 70 ? 'badge-success' : backlink.domain_from_rating >= 40 ? 'badge-warning' : 'badge-error'" x-text="backlink.domain_from_rating || 0"></span>
+                            </td>
+                            <td>
+                                <span class="badge badge-sm" :class="backlink.spam_score > 30 ? 'badge-error' : backlink.spam_score > 15 ? 'badge-warning' : 'badge-success'" x-text="backlink.spam_score || 0"></span>
+                            </td>
+                            <td>
+                                <span class="text-xs capitalize" x-text="backlink.type || 'anchor'"></span>
+                            </td>
+                            <td>
+                                <span class="badge badge-sm" :class="backlink.dofollow ? 'badge-success' : 'badge-ghost'" x-text="backlink.dofollow ? 'DoFollow' : 'NoFollow'"></span>
+                            </td>
+                            <td>
+                                <span class="text-xs capitalize" x-text="backlink.platform_type || '-'"></span>
+                            </td>
+                            <td>
+                                <div class="flex space-x-1">
+                                    <button @click="reviewBacklink(backlink)" class="btn btn-ghost btn-xs">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination -->
+        <div class="flex items-center justify-between p-4 border-t">
+            <select x-model.number="perPage" @change="updatePagination()" class="select select-bordered select-sm">
+                <option value="25">25 per page</option>
+                <option value="50">50 per page</option>
+                <option value="100">100 per page</option>
+                <option value="250">250 per page</option>
+            </select>
+            
+            <div class="join" x-show="totalPages > 1">
+                <!-- First Page -->
+                <button 
+                    @click="goToPage(1)" 
+                    :disabled="currentPage === 1" 
+                    class="join-item btn btn-sm"
+                    x-show="currentPage > 3"
+                >
+                    1
+                </button>
+                <button 
+                    class="join-item btn btn-sm btn-disabled" 
+                    x-show="currentPage > 4"
+                >
+                    ...
+                </button>
+                
+                <!-- Previous Pages -->
+                <template x-for="page in getPaginationRange()" :key="page">
+                    <button 
+                        @click="goToPage(page)" 
+                        :class="page === currentPage ? 'join-item btn btn-sm btn-active' : 'join-item btn btn-sm'"
+                        x-text="page"
+                    ></button>
+                </template>
+                
+                <!-- Last Pages -->
+                <button 
+                    class="join-item btn btn-sm btn-disabled" 
+                    x-show="currentPage < totalPages - 3"
+                >
+                    ...
+                </button>
+                <button 
+                    @click="goToPage(totalPages)" 
+                    :disabled="currentPage === totalPages" 
+                    class="join-item btn btn-sm"
+                    x-show="currentPage < totalPages - 2"
+                    x-text="totalPages"
+                ></button>
+            </div>
+            
+            <div class="flex items-center space-x-2">
+                <button 
+                    @click="previousPage()" 
+                    :disabled="currentPage === 1" 
+                    class="btn btn-sm"
+                >
+                    Previous
+                </button>
+                <button 
+                    @click="nextPage()" 
+                    :disabled="currentPage === totalPages" 
+                    class="btn btn-sm"
+                >
+                    Next
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- No Data State -->
+    <div x-show="!loading && backlinks.length === 0 && selectedProjectId" class="text-center py-12">
+        <svg class="mx-auto h-16 w-16 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V7a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+        </svg>
+        <h3 class="mt-4 text-xl font-medium text-gray-900">No Backlink Data</h3>
+        <p class="mt-2 text-gray-500">This project doesn't have detailed backlink data yet.</p>
+    </div>
+
+    <!-- Select Project Prompt -->
+    <div x-show="!selectedProjectId && !loading" class="text-center py-12">
+        <svg class="mx-auto h-16 w-16 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
+        </svg>
+        <h3 class="mt-4 text-xl font-medium text-gray-900">Select a Project</h3>
+        <p class="mt-2 text-gray-500">Choose a project from the dropdown to start auditing backlinks.</p>
+    </div>
+</div>
+
+<script>
+function backlinkAudit() {
+    return {
+        selectedProjectId: '',
+        loading: false,
+        backlinks: [],
+        filteredBacklinks: [],
+        paginatedBacklinks: [],
+        selectedBacklinks: [],
+        currentPage: 1,
+        perPage: 50,
+        totalPages: 1,
+        sortField: 'spam_score',
+        sortDirection: 'desc',
+        
+        init() {
+            // Check URL parameters for project ID
+            const urlParams = new URLSearchParams(window.location.search);
+            const projectId = urlParams.get('project');
+            
+            if (projectId) {
+                this.selectedProjectId = projectId;
+                // Auto-load backlinks if project is in URL
+                this.$nextTick(() => {
+                    this.loadBacklinks();
+                });
+            }
+            
+            // Watch for changes that should update pagination
+            this.$watch('filteredBacklinks', () => {
+                console.log('filteredBacklinks changed, length:', this.filteredBacklinks.length);
+            });
+            
+            this.$watch('totalPages', (value) => {
+                console.log('totalPages changed to:', value);
+            });
+        },
+        
+        // Filter values
+        filters: {
+            spamScoreMin: '',
+            spamScoreMax: '',
+            domainRatingMin: '',
+            domainRatingMax: '',
+            linkType: '',
+            followType: '',
+            platformType: '',
+            tld: '',
+            language: '',
+            search: ''
+        },
+        
+        // Unique values for filters
+        uniqueTLDs: [],
+        uniqueLanguages: [],
+        
+        // Statistics
+        avgSpamScore: 0,
+        avgDomainRating: 0,
+        doFollowPercentage: 0,
+        uniqueDomains: 0,
+        
+        updateURLAndLoad() {
+            // Update URL with selected project
+            if (this.selectedProjectId) {
+                const url = new URL(window.location);
+                url.searchParams.set('project', this.selectedProjectId);
+                window.history.pushState({}, '', url);
+                this.loadBacklinks();
+            } else {
+                // Remove project parameter if no project selected
+                const url = new URL(window.location);
+                url.searchParams.delete('project');
+                window.history.pushState({}, '', url);
+            }
+        },
+        
+        async loadBacklinks() {
+            if (!this.selectedProjectId) return;
+            
+            this.loading = true;
+            this.backlinks = [];
+            this.filteredBacklinks = [];
+            
+            try {
+                console.log('Loading backlinks for profile:', this.selectedProjectId);
+                
+                // Get presigned URL from backend
+                const response = await fetch(`/backlinks/audit/presigned-url/${this.selectedProjectId}/`);
+                const data = await response.json();
+                
+                console.log('Presigned URL response:', data);
+                
+                if (data.success) {
+                    // Fetch CSV directly from R2
+                    console.log('Fetching CSV from:', data.url);
+                    const csvResponse = await fetch(data.url, {
+                        mode: 'cors',
+                        credentials: 'omit'
+                    });
+                    
+                    if (!csvResponse.ok) {
+                        throw new Error(`HTTP error! status: ${csvResponse.status}`);
+                    }
+                    
+                    // Get the response as array buffer to check if it's gzipped
+                    const arrayBuffer = await csvResponse.arrayBuffer();
+                    const uint8Array = new Uint8Array(arrayBuffer);
+                    
+                    let responseText;
+                    
+                    // Check if the file is gzipped (starts with 1f 8b)
+                    if (uint8Array[0] === 0x1f && uint8Array[1] === 0x8b) {
+                        console.log('Detected gzipped file, decompressing...');
+                        try {
+                            // Decompress using pako
+                            const decompressed = pako.ungzip(uint8Array, { to: 'string' });
+                            responseText = decompressed;
+                            console.log('Successfully decompressed file');
+                            console.log('Decompressed size:', responseText.length, 'characters');
+                        } catch (err) {
+                            console.error('Error decompressing:', err);
+                            // Try to read as text anyway
+                            responseText = new TextDecoder().decode(uint8Array);
+                        }
+                    } else {
+                        // Not gzipped, decode as regular text
+                        responseText = new TextDecoder().decode(uint8Array);
+                        console.log('File was not gzipped, read directly as text');
+                    }
+                    
+                    console.log('Response text length:', responseText.length);
+                    console.log('First 1000 chars of decompressed data:', responseText.substring(0, 1000));
+                    console.log('Last 500 chars of decompressed data:', responseText.substring(responseText.length - 500));
+                    
+                    // Check if it's JSON or CSV
+                    let parsedData = [];
+                    
+                    // First check if response is empty
+                    if (!responseText || responseText.trim().length === 0) {
+                        console.error('Empty response after decompression');
+                        this.loading = false;
+                        alert('The backlinks file appears to be empty');
+                        return;
+                    }
+                    
+                    // Check for JSON format
+                    if (responseText.trim().startsWith('[') || responseText.trim().startsWith('{')) {
+                        // It's JSON
+                        console.log('Detected JSON format');
+                        try {
+                            parsedData = JSON.parse(responseText);
+                            console.log('JSON parse successful, type:', typeof parsedData);
+                            
+                            // Log the structure more carefully
+                            if (typeof parsedData === 'object') {
+                                if (Array.isArray(parsedData)) {
+                                    console.log('Parsed data is an array with', parsedData.length, 'items');
+                                } else {
+                                    console.log('Parsed data is an object with keys:', Object.keys(parsedData));
+                                    // Log the type and length of each property
+                                    for (const key of Object.keys(parsedData)) {
+                                        const value = parsedData[key];
+                                        if (Array.isArray(value)) {
+                                            console.log(`  ${key}: Array with ${value.length} items`);
+                                        } else if (typeof value === 'object' && value !== null) {
+                                            console.log(`  ${key}: Object`);
+                                        } else {
+                                            console.log(`  ${key}: ${typeof value}`);
+                                        }
+                                    }
+                                }
+                            }
+                            
+                            if (!Array.isArray(parsedData)) {
+                                console.log('Data is not an array, checking for nested structure...');
+                                
+                                // Check all properties that might contain the array
+                                // 'backlinks' should be first since that's what our task stores
+                                const possibleArrayKeys = ['backlinks', 'data', 'items', 'result', 'results', 'links', 'records'];
+                                
+                                let dataExtracted = false;
+                                for (const key of possibleArrayKeys) {
+                                    if (parsedData[key] && Array.isArray(parsedData[key])) {
+                                        console.log(`✅ Found array in .${key} property with ${parsedData[key].length} items`);
+                                        
+                                        // Log metadata if this is our expected structure
+                                        if (key === 'backlinks' && parsedData.collected_count) {
+                                            console.log('Metadata from file:');
+                                            console.log(`  Domain: ${parsedData.domain}`);
+                                            console.log(`  Collected count: ${parsedData.collected_count}`);
+                                            console.log(`  Total available: ${parsedData.total_available}`);
+                                            console.log(`  Collected at: ${parsedData.collected_at}`);
+                                            
+                                            // Check if backlinks array contains result objects instead of items
+                                            if (parsedData[key].length > 0 && typeof parsedData[key][0] === 'object' && parsedData[key][0].items) {
+                                                console.log('⚠️ Backlinks array contains result objects, extracting items...');
+                                                const allItems = [];
+                                                for (const resultObj of parsedData[key]) {
+                                                    if (resultObj.items && Array.isArray(resultObj.items)) {
+                                                        console.log(`  Extracting ${resultObj.items.length} items from result object`);
+                                                        allItems.push(...resultObj.items);
+                                                    }
+                                                }
+                                                console.log(`✅ Extracted total of ${allItems.length} backlink items from ${parsedData[key].length} result objects`);
+                                                parsedData = allItems;
+                                                dataExtracted = true;
+                                                break;
+                                            }
+                                        }
+                                        
+                                        if (!dataExtracted) {
+                                            parsedData = parsedData[key];
+                                        }
+                                        break;
+                                    }
+                                }
+                                
+                                // If still not an array, check if it's a DataForSEO response format
+                                if (!Array.isArray(parsedData)) {
+                                    // Check for nested task results structure (common in DataForSEO)
+                                    if (parsedData.tasks && Array.isArray(parsedData.tasks)) {
+                                        console.log('Found DataForSEO tasks structure');
+                                        for (const task of parsedData.tasks) {
+                                            if (task.result && Array.isArray(task.result)) {
+                                                for (const result of task.result) {
+                                                    if (result.items && Array.isArray(result.items)) {
+                                                        console.log(`Found items in task result with ${result.items.length} items`);
+                                                        parsedData = result.items;
+                                                        break;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                    
+                                    // Also check if parsedData is directly the result array (old format)
+                                    // This happens if the task was storing result directly instead of items
+                                    if (!Array.isArray(parsedData) && parsedData.length === undefined) {
+                                        // Check if we have an array of objects that look like backlinks
+                                        const firstKey = Object.keys(parsedData)[0];
+                                        if (firstKey && typeof parsedData[firstKey] === 'object' && 
+                                            parsedData[firstKey].items && Array.isArray(parsedData[firstKey].items)) {
+                                            console.log('Found items in nested structure');
+                                            parsedData = parsedData[firstKey].items;
+                                        }
+                                    }
+                                }
+                                
+                                // If still not an array, wrap it
+                                if (!Array.isArray(parsedData)) {
+                                    console.log('No array property found, wrapping single object in array');
+                                    parsedData = [parsedData];
+                                }
+                            } else {
+                                console.log('Data is already an array');
+                            }
+                            
+                            console.log('🎯 Final JSON item count:', parsedData.length);
+                            
+                            // Only show sample items if we have a reasonable number
+                            if (parsedData.length <= 10) {
+                                console.log('Showing all items for inspection:');
+                                parsedData.forEach((item, i) => {
+                                    console.log(`Item ${i + 1}:`, item);
+                                });
+                            } else {
+                                console.log('Showing first 3 items for inspection (out of', parsedData.length, 'total):');
+                                for (let i = 0; i < Math.min(3, parsedData.length); i++) {
+                                    console.log(`Item ${i + 1}:`, parsedData[i]);
+                                }
+                                console.log(`... and ${parsedData.length - 3} more items`);
+                            }
+                            
+                            if (parsedData.length > 0) {
+                                this.processBacklinksData(parsedData);
+                            } else {
+                                console.error('No items in JSON array');
+                                this.loading = false;
+                                alert('No backlinks found in the JSON file');
+                            }
+                        } catch (jsonError) {
+                            console.error('JSON parse error:', jsonError);
+                            console.log('Error details:', jsonError.message);
+                            console.log('Attempting CSV parse instead...');
+                            // Fall through to CSV parsing
+                        }
+                    } 
+                    
+                    // If not JSON or JSON parsing failed, try CSV
+                    if (parsedData.length === 0) {
+                        // It's CSV - Parse using PapaParse
+                        console.log('Attempting CSV format parse');
+                        console.log('Sample of data to parse (first 1000 chars):', responseText.substring(0, 1000));
+                        
+                        Papa.parse(responseText, {
+                            header: true,
+                            skipEmptyLines: true,
+                            delimiter: ',', // Explicitly set delimiter
+                            complete: (results) => {
+                                console.log('CSV Parse complete');
+                                console.log('Row count:', results.data.length);
+                                console.log('Parse errors:', results.errors);
+                                console.log('Headers found:', results.meta.fields);
+                                
+                                if (results.data.length > 0) {
+                                    console.log('First 3 rows:', results.data.slice(0, 3));
+                                    this.processBacklinksData(results.data);
+                                } else {
+                                    console.error('No data rows found in CSV');
+                                    this.loading = false;
+                                    alert('No backlinks found in the file');
+                                }
+                            },
+                            error: (error) => {
+                                console.error('Papa Parse error:', error);
+                                this.loading = false;
+                                alert('Error parsing CSV file: ' + error.message);
+                            }
+                        });
+                    }
+                } else {
+                    console.error('Failed to get presigned URL:', data);
+                    this.loading = false;
+                    alert('Failed to get file URL: ' + (data.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Error loading backlinks:', error);
+                this.loading = false;
+                alert('Failed to load backlinks. Please try again.');
+            }
+        },
+        
+        processBacklinksData(data) {
+            console.log('Processing backlinks data, count:', data.length);
+            
+            // Log the first item's complete structure to understand field names
+            if (data.length > 0) {
+                console.log('First item complete structure:');
+                console.log(JSON.stringify(data[0], null, 2));
+                console.log('Available fields:', Object.keys(data[0]));
+                
+                // Detect field mapping dynamically
+                this.detectFieldMapping(data[0]);
+            }
+            
+            // Map the JSON data to our expected format
+            this.backlinks = data.map((row, index) => {
+                // Log the first few rows to understand the structure
+                if (index < 3) {
+                    console.log(`Row ${index + 1} data:`, row);
+                }
+                
+                // Based on actual DataForSEO structure, map the fields directly
+                return {
+                    ...row,
+                    // Use actual field names from DataForSEO
+                    spam_score: parseFloat(row.backlink_spam_score || row.url_to_spam_score || 0) || 0,
+                    
+                    // Domain rating from domain_from_rank
+                    domain_from_rating: parseFloat(row.domain_from_rank || row.page_from_rank || 0) || 0,
+                    
+                    // Dofollow is already a boolean in the data
+                    dofollow: row.dofollow === true || row.dofollow === 'true',
+                    
+                    // URL and domain fields are already correctly named
+                    url_from: row.url_from || '',
+                    domain_from: row.domain_from || this.extractDomain(row.url_from || ''),
+                    
+                    // Anchor text
+                    anchor: row.anchor || '',
+                    
+                    // Link type (item_type in DataForSEO)
+                    type: row.item_type || row.type || 'anchor',
+                    
+                    // Platform type is an array in DataForSEO
+                    platform_type: Array.isArray(row.domain_from_platform_type) 
+                        ? row.domain_from_platform_type.join(', ')
+                        : (row.domain_from_platform_type || '-'),
+                    
+                    // Language from page_from_language
+                    language: row.page_from_language || row.language || '-',
+                    
+                    // Additional attributes
+                    is_ugc: row.is_ugc || row.ugc || false,
+                    is_sponsored: row.is_sponsored || row.sponsored || false
+                };
+            });
+            
+            console.log('Processed backlinks count:', this.backlinks.length);
+            console.log('First processed backlink:', this.backlinks[0]);
+            console.log('Sample of processed backlinks:', this.backlinks.slice(0, 5));
+            
+            this.extractUniqueValues();
+            this.applyFilters();
+            this.calculateStatistics();
+            this.loading = false;
+        },
+        
+        extractDomain(url) {
+            try {
+                const urlObj = new URL(url);
+                return urlObj.hostname;
+            } catch {
+                return url;
+            }
+        },
+        
+        extractUniqueValues() {
+            const tlds = new Set();
+            const languages = new Set();
+            
+            this.backlinks.forEach(backlink => {
+                // Extract TLD
+                const domain = backlink.domain_from;
+                if (domain) {
+                    const parts = domain.split('.');
+                    if (parts.length > 1) {
+                        tlds.add(parts[parts.length - 1]);
+                    }
+                }
+                
+                // Extract language
+                if (backlink.language) {
+                    languages.add(backlink.language);
+                }
+            });
+            
+            this.uniqueTLDs = Array.from(tlds).sort();
+            this.uniqueLanguages = Array.from(languages).sort();
+        },
+        
+        detectFieldMapping(sampleItem) {
+            // This method helps detect which fields are available in the JSON
+            console.log('Detecting field mapping from sample item...');
+            
+            // Based on actual DataForSEO structure
+            const detectedFields = {
+                url: 'url_from',
+                domain: 'domain_from',
+                anchor: 'anchor',
+                spam: 'backlink_spam_score',
+                dr: 'domain_from_rank',
+                follow: 'dofollow',
+                type: 'item_type',
+                platform: 'domain_from_platform_type',
+                language: 'page_from_language',
+                country: 'domain_from_country',
+                first_seen: 'first_seen',
+                last_seen: 'last_seen'
+            };
+            
+            // Verify which fields are actually present
+            console.log('Verifying DataForSEO fields:');
+            for (const [category, field] of Object.entries(detectedFields)) {
+                if (sampleItem[field] !== undefined) {
+                    console.log(`✓ ${category}: ${field} = ${JSON.stringify(sampleItem[field]).substring(0, 50)}`);
+                } else {
+                    console.log(`✗ ${category}: ${field} not found`);
+                }
+            }
+            
+            return detectedFields;
+        },
+        
+        applyFilters() {
+            this.filteredBacklinks = this.backlinks.filter(backlink => {
+                // Spam score filter
+                if (this.filters.spamScoreMin && backlink.spam_score < parseFloat(this.filters.spamScoreMin)) return false;
+                if (this.filters.spamScoreMax && backlink.spam_score > parseFloat(this.filters.spamScoreMax)) return false;
+                
+                // Domain rating filter
+                if (this.filters.domainRatingMin && backlink.domain_from_rating < parseFloat(this.filters.domainRatingMin)) return false;
+                if (this.filters.domainRatingMax && backlink.domain_from_rating > parseFloat(this.filters.domainRatingMax)) return false;
+                
+                // Link type filter
+                if (this.filters.linkType && backlink.type !== this.filters.linkType) return false;
+                
+                // Follow type filter
+                if (this.filters.followType) {
+                    if (this.filters.followType === 'dofollow' && !backlink.dofollow) return false;
+                    if (this.filters.followType === 'nofollow' && backlink.dofollow) return false;
+                    if (this.filters.followType === 'ugc' && !backlink.is_ugc) return false;
+                    if (this.filters.followType === 'sponsored' && !backlink.is_sponsored) return false;
+                }
+                
+                // Platform type filter
+                if (this.filters.platformType && backlink.platform_type !== this.filters.platformType) return false;
+                
+                // TLD filter
+                if (this.filters.tld) {
+                    const domain = backlink.domain_from;
+                    if (!domain || !domain.endsWith('.' + this.filters.tld)) return false;
+                }
+                
+                // Language filter
+                if (this.filters.language && backlink.language !== this.filters.language) return false;
+                
+                // Search filter
+                if (this.filters.search) {
+                    const searchLower = this.filters.search.toLowerCase();
+                    const urlMatch = backlink.url_from && backlink.url_from.toLowerCase().includes(searchLower);
+                    const anchorMatch = backlink.anchor && backlink.anchor.toLowerCase().includes(searchLower);
+                    if (!urlMatch && !anchorMatch) return false;
+                }
+                
+                return true;
+            });
+            
+            this.sortBacklinks();
+            this.updatePagination();
+            this.calculateStatistics();
+        },
+        
+        sortBacklinks() {
+            this.filteredBacklinks.sort((a, b) => {
+                let aVal = a[this.sortField];
+                let bVal = b[this.sortField];
+                
+                if (typeof aVal === 'string') {
+                    aVal = aVal.toLowerCase();
+                    bVal = bVal.toLowerCase();
+                }
+                
+                if (this.sortDirection === 'asc') {
+                    return aVal > bVal ? 1 : -1;
+                } else {
+                    return aVal < bVal ? 1 : -1;
+                }
+            });
+        },
+        
+        sortBy(field) {
+            if (this.sortField === field) {
+                this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';
+            } else {
+                this.sortField = field;
+                this.sortDirection = 'desc';
+            }
+            this.sortBacklinks();
+            this.updatePagination();
+        },
+        
+        calculateStatistics() {
+            if (this.filteredBacklinks.length === 0) {
+                this.avgSpamScore = 0;
+                this.avgDomainRating = 0;
+                this.doFollowPercentage = 0;
+                this.uniqueDomains = 0;
+                return;
+            }
+            
+            // Calculate averages
+            const totalSpam = this.filteredBacklinks.reduce((sum, b) => sum + b.spam_score, 0);
+            const totalDR = this.filteredBacklinks.reduce((sum, b) => sum + b.domain_from_rating, 0);
+            const doFollowCount = this.filteredBacklinks.filter(b => b.dofollow).length;
+            
+            this.avgSpamScore = totalSpam / this.filteredBacklinks.length;
+            this.avgDomainRating = totalDR / this.filteredBacklinks.length;
+            this.doFollowPercentage = (doFollowCount / this.filteredBacklinks.length) * 100;
+            
+            // Count unique domains
+            const domains = new Set(this.filteredBacklinks.map(b => b.domain_from));
+            this.uniqueDomains = domains.size;
+        },
+        
+        updatePagination() {
+            const totalItems = this.filteredBacklinks.length;
+            const itemsPerPage = parseInt(this.perPage);
+            this.totalPages = Math.ceil(totalItems / itemsPerPage);
+            this.currentPage = 1;
+            
+            console.log('Pagination update:');
+            console.log(`  Total items: ${totalItems}`);
+            console.log(`  Items per page: ${itemsPerPage}`);
+            console.log(`  Total pages: ${this.totalPages}`);
+            console.log(`  Current page: ${this.currentPage}`);
+            
+            this.paginateBacklinks();
+        },
+        
+        paginateBacklinks() {
+            const itemsPerPage = parseInt(this.perPage);
+            const start = (this.currentPage - 1) * itemsPerPage;
+            const end = start + itemsPerPage;
+            this.paginatedBacklinks = this.filteredBacklinks.slice(start, end);
+            
+            console.log(`Paginating: showing items ${start} to ${end} of ${this.filteredBacklinks.length}`);
+            console.log(`Paginated items count: ${this.paginatedBacklinks.length}`);
+        },
+        
+        nextPage() {
+            if (this.currentPage < this.totalPages) {
+                this.currentPage++;
+                this.paginateBacklinks();
+            }
+        },
+        
+        previousPage() {
+            if (this.currentPage > 1) {
+                this.currentPage--;
+                this.paginateBacklinks();
+            }
+        },
+        
+        goToPage(page) {
+            if (page >= 1 && page <= this.totalPages && page !== this.currentPage) {
+                this.currentPage = page;
+                this.paginateBacklinks();
+            }
+        },
+        
+        getPaginationRange() {
+            const range = [];
+            const maxVisible = 5; // Maximum number of page buttons to show
+            let start = Math.max(1, this.currentPage - 2);
+            let end = Math.min(this.totalPages, this.currentPage + 2);
+            
+            // Adjust range if at the beginning or end
+            if (this.currentPage <= 3) {
+                start = 1;
+                end = Math.min(maxVisible, this.totalPages);
+            } else if (this.currentPage >= this.totalPages - 2) {
+                start = Math.max(1, this.totalPages - maxVisible + 1);
+                end = this.totalPages;
+            }
+            
+            for (let i = start; i <= end; i++) {
+                range.push(i);
+            }
+            
+            return range;
+        },
+        
+        resetFilters() {
+            this.filters = {
+                spamScoreMin: '',
+                spamScoreMax: '',
+                domainRatingMin: '',
+                domainRatingMax: '',
+                linkType: '',
+                followType: '',
+                platformType: '',
+                tld: '',
+                language: '',
+                search: ''
+            };
+            this.applyFilters();
+        },
+        
+        hasActiveFilters() {
+            return this.filters.spamScoreMin || this.filters.spamScoreMax ||
+                   this.filters.domainRatingMin || this.filters.domainRatingMax ||
+                   this.filters.linkType || this.filters.followType ||
+                   this.filters.platformType || this.filters.tld ||
+                   this.filters.language || this.filters.search;
+        },
+        
+        exportToCSV() {
+            // Use filtered backlinks if filters are active, otherwise use all
+            const dataToExport = this.hasActiveFilters() ? this.filteredBacklinks : this.backlinks;
+            
+            if (dataToExport.length === 0) {
+                alert('No data to export');
+                return;
+            }
+            
+            // Define CSV headers
+            const headers = [
+                'Source URL', 'Domain', 'Anchor Text', 'Domain Rating', 'Spam Score',
+                'Type', 'Follow', 'Platform', 'Language', 'Country', 'First Seen', 'Last Seen'
+            ];
+            
+            // Convert backlinks to CSV rows
+            const csvRows = dataToExport.map(backlink => {
+                return [
+                    backlink.url_from || '',
+                    backlink.domain_from || '',
+                    backlink.anchor || '',
+                    backlink.domain_from_rating || 0,
+                    backlink.spam_score || 0,
+                    backlink.type || backlink.item_type || '',
+                    backlink.dofollow ? 'DoFollow' : 'NoFollow',
+                    backlink.platform_type || '',
+                    backlink.language || backlink.page_from_language || '',
+                    backlink.domain_from_country || '',
+                    backlink.first_seen || '',
+                    backlink.last_seen || ''
+                ].map(field => {
+                    // Escape quotes and wrap in quotes if contains comma, newline, or quotes
+                    const str = String(field);
+                    if (str.includes(',') || str.includes('\n') || str.includes('"')) {
+                        return `"${str.replace(/"/g, '""')}"`;
+                    }
+                    return str;
+                }).join(',');
+            });
+            
+            // Combine headers and rows
+            const csvContent = [
+                headers.join(','),
+                ...csvRows
+            ].join('\n');
+            
+            // Create blob and download
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+            // Get domain from projects array
+            const selectedProj = window.projectsData.find(p => p.profile_id == this.selectedProjectId);
+            const domain = selectedProj ? `_${selectedProj.domain}` : '_backlinks';
+            const filterText = this.hasActiveFilters() ? '_filtered' : '';
+            
+            link.setAttribute('href', url);
+            link.setAttribute('download', `backlinks${domain}${filterText}_${timestamp}.csv`);
+            link.style.display = 'none';
+            
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            URL.revokeObjectURL(url);
+            
+            // Show success message
+            const count = dataToExport.length;
+            const message = this.hasActiveFilters() 
+                ? `Exported ${count} filtered backlinks to CSV`
+                : `Exported ${count} backlinks to CSV`;
+            console.log(message);
+        },
+        
+        toggleSelectAll(event) {
+            if (event.target.checked) {
+                this.selectedBacklinks = this.paginatedBacklinks.map((_, index) => index);
+            } else {
+                this.selectedBacklinks = [];
+            }
+        },
+        
+        reviewBacklink(backlink) {
+            window.open(backlink.url_from, '_blank');
+        },
+        
+        
+        exportFiltered() {
+            const csv = Papa.unparse(this.filteredBacklinks);
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `backlinks_filtered_${new Date().toISOString().split('T')[0]}.csv`;
+            a.click();
+            window.URL.revokeObjectURL(url);
+        }
+    }
+}
+</script>
+{% endblock %}

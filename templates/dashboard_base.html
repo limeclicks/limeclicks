@@ -479,9 +479,15 @@
                         <span class="text-xs uppercase font-semibold text-base-content/60">Link Building</span>
                     </li>
                     <li>
-                        <a href="{% url 'backlinks:list' %}" class="flex items-center gap-3 {% if request.resolver_match.app_name == 'backlinks' %}active{% endif %}">
+                        <a href="{% url 'backlinks:list' %}" class="flex items-center gap-3 {% if request.resolver_match.app_name == 'backlinks' and request.resolver_match.url_name != 'audit' %}active{% endif %}">
                             <i class="fas fa-link w-4"></i>
                             <span>Backlink Analytics</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="{% url 'backlinks:audit' %}" class="flex items-center gap-3 {% if request.resolver_match.url_name == 'audit' %}active{% endif %}">
+                            <i class="fas fa-search-plus w-4"></i>
+                            <span>Backlink Audit</span>
                         </a>
                     </li>
                     <!-- On Page & Tech SEO -->

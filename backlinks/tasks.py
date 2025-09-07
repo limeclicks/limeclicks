@@ -323,9 +323,12 @@ def fetch_detailed_backlinks_from_dataforseo(self, backlink_profile_id, max_link
                 
             # Extract and merge results from this batch
             if task.get("result") and task["result"]:
-                batch_backlinks = task["result"]
-                all_backlinks.extend(batch_backlinks)
-                logger.info(f"Collected {len(batch_backlinks)} backlinks in this batch (total: {len(all_backlinks)})")
+                # DataForSEO returns result as array with items inside
+                for result in task["result"]:
+                    if result.get("items"):
+                        batch_backlinks = result["items"]
+                        all_backlinks.extend(batch_backlinks)
+                        logger.info(f"Collected {len(batch_backlinks)} backlinks in this batch (total: {len(all_backlinks)})")
             else:
                 logger.info(f"No more backlinks returned at offset {offset}")
                 break

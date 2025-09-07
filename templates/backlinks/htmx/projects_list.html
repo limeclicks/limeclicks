@@ -67,19 +67,7 @@
                     </div>
                     <div class="text-xs text-gray-500 font-medium">Total Links</div>
                 </div>
-
-                <!-- Lost Links -->
-                <div class="text-center">
-                    <div class="text-2xl font-bold {% if item.loss_links > 0 %}text-red-600{% else %}text-green-600{% endif %}">
-                        {% if item.loss_links > 0 %}
-                            -{{ item.loss_links }}
-                        {% else %}
-                            -
-                        {% endif %}
-                    </div>
-                    <div class="text-xs text-gray-500 font-medium">Lost Links</div>
-                </div>
-
+                
                 <!-- Spam Score -->
                 <div class="text-center">
                     <div class="text-2xl font-bold {% if item.profile.backlinks_spam_score > 30 %}text-red-600{% elif item.profile.backlinks_spam_score > 15 %}text-yellow-600{% else %}text-green-600{% endif %}">
@@ -108,19 +96,45 @@
                                     </a>
                                 </li>
                                 <li>
-                                    <button 
-                                        hx-post="{% url 'backlinks:fetch' item.project.id %}"
-                                        hx-confirm="Fetch fresh backlink data for {{ item.project.domain }}? This will use API credits."
-                                        class="w-full text-left"
-                                    >
-                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-                                        </svg>
-                                        Refresh Data
-                                    </button>
+                                    {% if item.can_fetch %}
+                                        <button 
+                                            hx-post="{% url 'backlinks:fetch' item.project.id %}"
+                                            hx-confirm="Fetch fresh backlink data for {{ item.project.domain }}? This will use API credits."
+                                            class="w-full text-left"
+                                        >
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                                            </svg>
+                                            Refresh Data
+                                        </button>
+                                    {% else %}
+                                        <button 
+                                            disabled
+                                            class="w-full text-left opacity-50 cursor-not-allowed"
+                                            title="Available in {{ item.days_until_next_fetch }} days"
+                                        >
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                            </svg>
+                                            Available in {{ item.days_until_next_fetch }} days
+                                        </button>
+                                    {% endif %}
                                 </li>
                                 {% if item.profile.backlinks > 0 %}
                                 <li>
+                                    {% if item.profile.backlinks_file_path %}
+                                    <!-- If detailed backlinks already exist, go to audit page -->
+                                    <a 
+                                        href="{% url 'backlinks:audit' %}?project={{ item.profile.id }}"
+                                        class="w-full text-left block px-4 py-2 text-sm hover:bg-gray-100"
+                                    >
+                                        <svg class="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path>
+                                        </svg>
+                                        View Detailed List
+                                    </a>
+                                    {% else %}
+                                    <!-- If no detailed backlinks yet, fetch them -->
                                     <button 
                                         hx-post="{% url 'backlinks:fetch_detailed' item.project.id %}"
                                         hx-confirm="Collect detailed backlink data for {{ item.project.domain }}? This may take several minutes."
@@ -131,21 +145,34 @@
                                         </svg>
                                         Get Detailed List
                                     </button>
+                                    {% endif %}
                                 </li>
                                 {% endif %}
                             </ul>
                         </div>
                     {% else %}
-                        <button 
-                            class="btn btn-primary btn-sm"
-                            hx-post="{% url 'backlinks:fetch' item.project.id %}"
-                            hx-confirm="Fetch backlink data for {{ item.project.domain }}?"
-                        >
-                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
-                            </svg>
-                            Fetch Data
-                        </button>
+                        {% if item.can_fetch %}
+                            <button 
+                                class="btn btn-primary btn-sm"
+                                hx-post="{% url 'backlinks:fetch' item.project.id %}"
+                                hx-confirm="Fetch backlink data for {{ item.project.domain }}?"
+                            >
+                                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
+                                </svg>
+                                Fetch Data
+                            </button>
+                        {% else %}
+                            <button 
+                                class="btn btn-sm btn-disabled"
+                                title="Available in {{ item.days_until_next_fetch }} days"
+                            >
+                                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                                {{ item.days_until_next_fetch }} days
+                            </button>
+                        {% endif %}
                     {% endif %}
                 </div>
             </div>
