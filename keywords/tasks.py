@@ -420,34 +420,47 @@ def _process_ranking_if_needed(keyword: Keyword, html_content: str, date_str: st
 def enqueue_keyword_scrapes_batch():
     """
     Celery Beat task to enqueue eligible keywords for scraping.
-    Runs every minute and enqueues up to 500 keywords that haven't been scraped in 24+ hours.
+    Runs every 15 minutes and enqueues up to 500 keywords that haven't been scraped in 24+ hours.
     Prevents duplicate queuing using the processing flag.
     """
+    from django.db import connection
     
-    now = timezone.now()
-    min_interval = timedelta(hours=settings.FETCH_MIN_INTERVAL_HOURS)
-    cutoff_time = now - min_interval
-    
-    # Maximum keywords to process per run
-    BATCH_SIZE = 500
-    
-    # Find eligible keywords that aren't already processing
-    eligible_keywords = Keyword.objects.filter(
-        models.Q(scraped_at__isnull=True) |  # Never scraped
-        models.Q(scraped_at__lte=cutoff_time)  # Scraped > 24h ago
-    ).filter(
-        archive=False,  # Not archived
-        project__active=True,  # Active project
-        processing=False  # Not already in queue
-    ).values_list('id', 'scraped_at')[:BATCH_SIZE]
-    
-    if not eligible_keywords:
-        logger.info("No keywords eligible for scraping")
-        return {'total': 0, 'high_priority': 0, 'default_priority': 0}
-    
-    # Mark keywords as processing to prevent duplicate queuing
-    keyword_ids = [kid for kid, _ in eligible_keywords]
-    Keyword.objects.filter(id__in=keyword_ids).update(processing=True)
+    try:
+        now = timezone.now()
+        min_interval = timedelta(hours=settings.FETCH_MIN_INTERVAL_HOURS)
+        cutoff_time = now - min_interval
+        
+        # Maximum keywords to process per run
+        BATCH_SIZE = 500
+        
+        # Reset stuck keywords (processing for more than 10 minutes)
+        stuck_cutoff = now - timedelta(minutes=10)
+        stuck_count = Keyword.objects.filter(
+            processing=True,
+            scraped_at__lt=stuck_cutoff
+        ).update(processing=False)
+        
+        if stuck_count > 0:
+            logger.info(f"Reset {stuck_count} stuck keywords")
+        
+        # Find eligible keywords that aren't already processing
+        # Use select_for_update to prevent race conditions
+        eligible_keywords = list(Keyword.objects.select_for_update(skip_locked=True).filter(
+            models.Q(scraped_at__isnull=True) |  # Never scraped
+            models.Q(scraped_at__lte=cutoff_time)  # Scraped > 24h ago
+        ).filter(
+            archive=False,  # Not archived
+            project__active=True,  # Active project
+            processing=False  # Not already in queue
+        ).values_list('id', 'scraped_at')[:BATCH_SIZE])
+        
+        if not eligible_keywords:
+            logger.info("No keywords eligible for scraping")
+            return {'total': 0, 'high_priority': 0, 'default_priority': 0}
+        
+        # Mark keywords as processing to prevent duplicate queuing
+        keyword_ids = [kid for kid, _ in eligible_keywords]
+        Keyword.objects.filter(id__in=keyword_ids).update(processing=True)
     
     enqueued_high = 0
     enqueued_default = 0
@@ -470,15 +483,21 @@ def enqueue_keyword_scrapes_batch():
             priority=priority
         )
     
-    logger.info(
-        f"Enqueued batch of {len(eligible_keywords)} keywords. "
-        f"High priority (never scraped): {enqueued_high}, "
-        f"Default priority: {enqueued_default}"
-    )
-    
-    return {
-        'total': len(eligible_keywords),
-        'high_priority': enqueued_high,
-        'default_priority': enqueued_default,
-        'batch_size': BATCH_SIZE
-    }
+        logger.info(
+            f"Enqueued batch of {len(eligible_keywords)} keywords. "
+            f"High priority (never scraped): {enqueued_high}, "
+            f"Default priority: {enqueued_default}"
+        )
+        
+        return {
+            'total': len(eligible_keywords),
+            'high_priority': enqueued_high,
+            'default_priority': enqueued_default,
+            'batch_size': BATCH_SIZE
+        }
+    except Exception as e:
+        logger.error(f"Error in enqueue_keyword_scrapes_batch: {e}", exc_info=True)
+        return {'total': 0, 'high_priority': 0, 'default_priority': 0, 'error': str(e)}
+    finally:
+        # Ensure database connection is closed to prevent connection leaks
+        connection.close()

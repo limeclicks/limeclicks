@@ -390,10 +390,10 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'accounts.tasks.cleanup_expired_tokens',
         'schedule': 3600.0,  # Every hour
     },
-    # Enqueue keywords for SERP scraping every minute
+    # Enqueue keywords for SERP scraping every 15 minutes
     'enqueue-keyword-scrapes': {
         'task': 'keywords.tasks.enqueue_keyword_scrapes_batch',
-        'schedule': 60.0,  # Every minute (60 seconds)
+        'schedule': 900.0,  # Every 15 minutes (900 seconds)
     },
 }
 
