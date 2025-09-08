@@ -19,6 +19,7 @@ erDiagram
     Project ||--o{ Target : tracks
     Project ||--o{ KeywordReport : generates
     Project ||--o{ ReportSchedule : has
+    Project ||--o{ BacklinkProfile : analyzes
     
     ProjectMember }o--|| User : "member"
     ProjectMember }o--|| Project : "belongs_to"
@@ -60,6 +61,8 @@ erDiagram
     ReportSchedule }o--o| User : created_by
     ReportSchedule }o--o| KeywordReport : last_report
     ReportSchedule }o--o{ Keyword : includes
+    
+    BacklinkProfile }o--|| Project : for_project
 
     User {
         int id PK
@@ -84,6 +87,10 @@ erDiagram
         string domain
         string title
         boolean active
+        string dataforseo_keywords_path
+        datetime dataforseo_keywords_updated_at
+        string dataforseo_task_id
+        datetime backlinks_no_data_until
         datetime created_at
         datetime updated_at
     }
@@ -312,6 +319,39 @@ erDiagram
         datetime created_at
         datetime updated_at
     }
+    
+    BacklinkProfile {
+        int id PK
+        int project_id FK
+        string target
+        int rank
+        int backlinks
+        int backlinks_spam_score
+        int internal_links_count
+        int external_links_count
+        int broken_backlinks
+        int broken_pages
+        int referring_domains
+        int referring_domains_nofollow
+        int referring_main_domains
+        int referring_main_domains_nofollow
+        int referring_ips
+        int referring_subnets
+        int referring_pages
+        int referring_pages_nofollow
+        json referring_links_tld
+        json referring_links_types
+        json referring_links_attributes
+        json referring_links_platform_types
+        json referring_links_semantic_locations
+        json referring_links_countries
+        json previous_summary
+        string backlinks_file_path
+        datetime backlinks_collected_at
+        int backlinks_count_collected
+        datetime created_at
+        datetime updated_at
+    }
 ```
 
 ## Simplified Core Relationships View
@@ -330,6 +370,7 @@ graph TB
         Project --> |has| Keyword
         Project --> |has| SiteAudit
         Project --> |tracks| Target
+        Project --> |analyzes| BacklinkProfile
         ProjectMember --> |belongs to| Project
     end
     
@@ -350,6 +391,11 @@ graph TB
         Target[Target/Competitor]
         Target --> |has rankings| TargetKeywordRank
         TargetKeywordRank --> |for| Keyword
+    end
+    
+    subgraph "Backlink Analysis"
+        BacklinkProfile[BacklinkProfile]
+        BacklinkProfile --> |analyzes domain| Project
     end
     
     subgraph "Reporting"
@@ -404,6 +450,16 @@ graph LR
     K --> TKR3[Rank: mysite.com #5]
 ```
 
+### 5. Backlink Analysis
+```mermaid
+graph TD
+    P[Project: example.com] --> BP[BacklinkProfile]
+    BP --> |stores| BF[Backlinks File in R2]
+    BP --> |tracks| RD[Referring Domains: 150]
+    BP --> |tracks| BL[Total Backlinks: 3500]
+    BP --> |tracks| SS[Spam Score: 12]
+```
+
 ## Database Constraints & Rules
 
 ### Unique Constraints
@@ -423,10 +479,11 @@ graph LR
 5. **Invitation expiry**: 14 days
 6. **Verification token expiry**: 24 hours
 7. **Password reset token expiry**: 1 hour
+8. **Backlinks lockdown**: 30 days when no data found
 
 ### Cascade Rules
 - Delete User → Delete owned Projects
-- Delete Project → Delete all Keywords, SiteAudits, Targets
+- Delete Project → Delete all Keywords, SiteAudits, Targets, BacklinkProfiles
 - Delete Keyword → Delete all Ranks, KeywordTags
 - Delete SiteAudit → Delete all SiteIssues, AuditFiles
 - Delete Target → Delete all TargetKeywordRanks
@@ -480,6 +537,23 @@ Schedule/Manual Trigger → KeywordReport
     Send Email Notification
 ```
 
+### 4. Backlink Profile Update
+```
+User/Schedule → Fetch Backlinks → Project
+         ↓
+    Check Lockdown Status
+         ↓
+    DataForSEO API Call
+         ↓
+    Parse Summary Data → Update BacklinkProfile
+         ↓
+    Fetch Detailed Backlinks (if available)
+         ↓
+    Upload to R2 Storage
+         ↓
+    Update BacklinkProfile with file path
+```
+
 ## Performance Indexes
 
 ### Primary Indexes
@@ -502,6 +576,12 @@ CREATE INDEX idx_issue_audit_severity ON site_audit_siteissue(site_audit_id, sev
 
 -- Reports
 CREATE INDEX idx_report_project_created ON keyword_reports(project_id, created_at DESC);
+
+-- Backlinks
+CREATE INDEX idx_backlink_project_target ON backlinks_profile(project_id, target);
+CREATE INDEX idx_backlink_project_rank ON backlinks_profile(project_id, rank);
+CREATE INDEX idx_backlink_project_backlinks ON backlinks_profile(project_id, backlinks);
+CREATE INDEX idx_backlink_created ON backlinks_profile(created_at);
 ```
 
 This visual ERD provides a complete overview of the database structure, relationships, and data flow patterns in the LimeClicks application.

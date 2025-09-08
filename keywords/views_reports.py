@@ -165,9 +165,10 @@ def create_report_view(request, project_id, project=None):
                 archive=False
             )
             
-            # Apply country filter
-            if selected_countries:
-                keywords = keywords.filter(country__in=selected_countries)
+            # Don't apply country filter - include all countries in reports
+            # Country information will be included with each keyword in the report
+            # if selected_countries:
+            #     keywords = keywords.filter(country__in=selected_countries)
             
             # Apply tag filter
             if selected_tags:
@@ -176,9 +177,9 @@ def create_report_view(request, project_id, project=None):
             # Store filter information in report (for reference)
             if selected_tags:
                 report.include_tags = list(map(int, selected_tags))
-            if selected_countries:
-                # Store countries in exclude_tags field temporarily (or add a new field)
-                report.exclude_tags = selected_countries
+            # Don't store country filter since we're including all countries
+            # if selected_countries:
+            #     report.exclude_tags = selected_countries
             if selected_tags or selected_countries:
                 report.save(update_fields=['include_tags', 'exclude_tags'])
             

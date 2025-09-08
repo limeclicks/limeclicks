@@ -121,22 +121,8 @@
                     <span>Leave filters empty to include all project keywords in reports.</span>
                 </div>
                 
-                <!-- Country Filter -->
-                {% if countries %}
-                <div class="form-control">
-                    <label class="label">
-                        <span class="label-text">Filter by Country</span>
-                    </label>
-                    <div class="grid grid-cols-2 md:grid-cols-3 gap-2">
-                        {% for country, country_code in countries %}
-                        <label class="label cursor-pointer justify-start gap-2">
-                            <input type="checkbox" name="countries" value="{{ country }}" class="checkbox checkbox-sm">
-                            <span class="label-text">{{ country_code }} ({{ country }})</span>
-                        </label>
-                        {% endfor %}
-                    </div>
-                </div>
-                {% endif %}
+                <!-- Country Filter Removed - All countries are included with their respective keywords -->
+                <!-- Each keyword will show its associated country in the report -->
                 
                 <!-- Tags Filter -->
                 {% if tags %}

@@ -309,7 +309,7 @@ class KeywordReportGenerator:
                         impact = "down"
             
             row = [
-                f"GOOGLE, {kw_data['country_code']}",
+                f"GOOGLE, {kw_data['country']}",  # Use full country name instead of country_code
                 kw_data['keyword'],
                 kw_data.get('rank_url', ''),
                 kw_data['created_at'].strftime('%Y-%m-%d') if kw_data['created_at'] else '',
@@ -694,7 +694,7 @@ class KeywordReportGenerator:
                     page_data[clean_url]['keywords'].append({
                         'keyword': keyword.keyword,
                         'rank': keyword.rank,
-                        'country': keyword.country
+                        'country': keyword.country  # Include country information
                     })
                     page_data[clean_url]['total_count'] += 1
                     
@@ -727,14 +727,14 @@ class KeywordReportGenerator:
                     'Top 3',
                     'Top 10',
                     'Top 30',
-                    'Keywords (Top 10)'
+                    'Keywords with Country (Top 10)'
                 ])
                 
                 # Write data
                 for url, data in sorted_pages:
-                    # Get top 10 keywords for this page
+                    # Get top 10 keywords for this page with country information
                     top_keywords = sorted(data['keywords'], key=lambda x: x['rank'])[:10]
-                    keywords_str = '; '.join([f"{k['keyword']} (#{k['rank']})" for k in top_keywords])
+                    keywords_str = '; '.join([f"{k['keyword']} - {k['country']} (#{k['rank']})" for k in top_keywords])
                     
                     csv_writer.writerow([
                         url,
@@ -1005,20 +1005,29 @@ class KeywordReportGenerator:
             keyword_competitors = defaultdict(list)
             
             for ck in comp_keywords:
-                keyword_competitors[ck.keyword.keyword].append({
+                # Create a key that includes both keyword and country
+                keyword_key = f"{ck.keyword.keyword}|{ck.keyword.country}"
+                keyword_competitors[keyword_key].append({
                     'competitor': ck.target.domain,
                     'rank': ck.rank if ck.rank > 0 else 101,
-                    'url': ck.rank_url
+                    'url': ck.rank_url,
+                    'country': ck.keyword.country
                 })
             
             # Sort keywords by number of competitors targeting them
             keyword_data = []
-            for keyword, competitors in keyword_competitors.items():
+            for keyword_key, competitors in keyword_competitors.items():
+                # Split the key to get keyword and country
+                keyword_parts = keyword_key.split('|')
+                keyword = keyword_parts[0]
+                country = keyword_parts[1] if len(keyword_parts) > 1 else 'US'
+                
                 # Sort competitors by rank
                 competitors.sort(key=lambda x: x['rank'])
                 
                 keyword_data.append({
                     'keyword': keyword,
+                    'country': country,
                     'competitor_count': len(competitors),
                     'top_competitor': competitors[0]['competitor'] if competitors else None,
                     'top_rank': competitors[0]['rank'] if competitors else 0,
@@ -1036,6 +1045,7 @@ class KeywordReportGenerator:
                 # Write headers
                 csv_writer.writerow([
                     'Keyword',
+                    'Country',
                     'Competitors Count',
                     'Top Competitor',
                     'Top Rank',
@@ -1051,6 +1061,7 @@ class KeywordReportGenerator:
                     
                     csv_writer.writerow([
                         kw_data['keyword'],
+                        kw_data['country'],
                         kw_data['competitor_count'],
                         kw_data['top_competitor'],
                         kw_data['top_rank'] if kw_data['top_rank'] <= 100 else 'NR',
@@ -1082,7 +1093,7 @@ class KeywordReportGenerator:
                 story.append(Spacer(1, 0.5*inch))
                 
                 # Keywords table
-                table_data = [['Keyword', 'Competitors', 'Top Competitor', 'Top Rank']]
+                table_data = [['Keyword', 'Country', 'Competitors', 'Top Competitor', 'Top Rank']]
                 
                 for kw_data in keyword_data[:50]:  # Top 50 keywords
                     keyword_display = kw_data['keyword'][:30] + '...' if len(kw_data['keyword']) > 30 else kw_data['keyword']
@@ -1090,12 +1101,13 @@ class KeywordReportGenerator:
                     
                     table_data.append([
                         keyword_display,
+                        kw_data['country'],
                         str(kw_data['competitor_count']),
                         comp_display or 'N/A',
                         str(kw_data['top_rank']) if kw_data['top_rank'] <= 100 else 'NR'
                     ])
                 
-                kw_table = Table(table_data, colWidths=[3*inch, 1.2*inch, 2.5*inch, 0.8*inch])
+                kw_table = Table(table_data, colWidths=[2.5*inch, 0.8*inch, 1*inch, 2.2*inch, 0.8*inch])
                 kw_table.setStyle(TableStyle([
                     ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
                     ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
