@@ -254,68 +254,92 @@ def audit_status_stream(request):
     """Server-sent events stream for real-time audit status updates"""
     def event_stream():
         """Generate server-sent events"""
+        from django.db import connection
         # Track previous states and scores to detect changes
         audit_states = {}
         is_initial_load = True
+        iteration_count = 0
+        max_iterations = 1200  # 1 hour maximum (3 seconds * 1200 = 3600 seconds)
         
-        while True:
-            # Get all audits for the user's projects
-            user_projects = Project.objects.filter(user=request.user).values_list('id', flat=True)
-            audits = SiteAudit.objects.filter(
-                project_id__in=user_projects
-            ).select_related('project')
-            
-            # Check for status or score changes
-            for audit in audits:
-                audit_key = f"audit_{audit.id}"
+        while iteration_count < max_iterations:
+            try:
+                # Get all audits for the user's projects
+                user_projects = Project.objects.filter(user=request.user).values_list('id', flat=True)
+                audits = SiteAudit.objects.filter(
+                    project_id__in=user_projects
+                ).select_related('project')
                 
-                # Create a state tuple to track all changes
-                current_state = (
-                    audit.status,
-                    audit.overall_site_health_score,
-                    audit.performance_score_mobile,
-                    audit.performance_score_desktop,
-                    audit.total_pages_crawled
-                )
+                # Check for status or score changes
+                for audit in audits:
+                    audit_key = f"audit_{audit.id}"
+                    
+                    # Create a state tuple to track all changes
+                    current_state = (
+                        audit.status,
+                        audit.overall_site_health_score,
+                        audit.performance_score_mobile,
+                        audit.performance_score_desktop,
+                        audit.total_pages_crawled
+                    )
+                    
+                    previous_state = audit_states.get(audit_key)
+                    
+                    # Detect any change (status, scores, or pages)
+                    if previous_state != current_state:
+                        # On initial load, just populate the state without sending updates
+                        # This prevents notifications for already completed audits
+                        if is_initial_load:
+                            audit_states[audit_key] = current_state
+                        else:
+                            # Send update for any change
+                            data = {
+                                'project_id': audit.project.id,
+                                'audit_id': audit.id,
+                                'status': audit.status,
+                                'previous_status': previous_state[0] if previous_state else None,
+                                'health_score': audit.overall_site_health_score,
+                                'pages_crawled': audit.total_pages_crawled,
+                                'issues_count': audit.get_total_issues_count(),
+                                'performance_mobile': audit.performance_score_mobile,
+                                'performance_desktop': audit.performance_score_desktop,
+                                'update_type': 'score_update' if previous_state and previous_state[0] == audit.status else 'status_update',
+                                'is_new_completion': previous_state and previous_state[0] != 'completed' and audit.status == 'completed'
+                            }
+                            
+                            # Send as named event for HTMX SSE
+                            yield f"event: audit_update\ndata: {json.dumps(data)}\n\n"
+                            
+                            # Update tracked state
+                            audit_states[audit_key] = current_state
                 
-                previous_state = audit_states.get(audit_key)
+                # After first iteration, mark as no longer initial load
+                is_initial_load = False
                 
-                # Detect any change (status, scores, or pages)
-                if previous_state != current_state:
-                    # On initial load, just populate the state without sending updates
-                    # This prevents notifications for already completed audits
-                    if is_initial_load:
-                        audit_states[audit_key] = current_state
-                    else:
-                        # Send update for any change
-                        data = {
-                            'project_id': audit.project.id,
-                            'audit_id': audit.id,
-                            'status': audit.status,
-                            'previous_status': previous_state[0] if previous_state else None,
-                            'health_score': audit.overall_site_health_score,
-                            'pages_crawled': audit.total_pages_crawled,
-                            'issues_count': audit.get_total_issues_count(),
-                            'performance_mobile': audit.performance_score_mobile,
-                            'performance_desktop': audit.performance_score_desktop,
-                            'update_type': 'score_update' if previous_state and previous_state[0] == audit.status else 'status_update',
-                            'is_new_completion': previous_state and previous_state[0] != 'completed' and audit.status == 'completed'
-                        }
-                        
-                        # Send as named event for HTMX SSE
-                        yield f"event: audit_update\ndata: {json.dumps(data)}\n\n"
-                        
-                        # Update tracked state
-                        audit_states[audit_key] = current_state
-            
-            # After first iteration, mark as no longer initial load
-            is_initial_load = False
-            
-            # Also send heartbeat to keep connection alive
-            yield f": heartbeat\n\n"
-            
-            # Wait before next check
-            time.sleep(3)  # Check every 3 seconds for faster updates
+                # Close database connection after each iteration to prevent connection accumulation
+                connection.close()
+                
+                # Increment iteration counter
+                iteration_count += 1
+                
+                # Send heartbeat every 10 iterations (30 seconds)
+                if iteration_count % 10 == 0:
+                    yield f": heartbeat\n\n"
+                
+                # Wait before next check
+                time.sleep(3)  # Check every 3 seconds for faster updates
+                
+            except Exception as e:
+                # Log error and close connection
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"Error in audit SSE stream: {e}")
+                connection.close()
+                yield f"event: error\ndata: {json.dumps({'error': 'Stream error, reconnecting...'})}\n\n"
+                break
+        
+        # Stream timeout - ask client to reconnect
+        yield f"event: timeout\ndata: {json.dumps({'message': 'Stream timeout, please reconnect'})}\n\n"
+        connection.close()
     
     response = StreamingHttpResponse(
         event_stream(),

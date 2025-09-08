@@ -28,6 +28,7 @@ def fetch_backlink_summary_from_dataforseo(self, project_id, target_domain=None,
     Returns:
         Dict with task status and created BacklinkProfile ID
     """
+    from django.db import connection
     
     try:
         # Get the project
@@ -198,8 +199,16 @@ def fetch_backlink_summary_from_dataforseo(self, project_id, target_domain=None,
         
     except Exception as e:
         logger.error(f"Error fetching backlinks for project {project_id}: {str(e)}")
+        # Close connection before retry
+        connection.close()
         # Retry the task with exponential backoff
         raise self.retry(exc=e, countdown=60 * (self.request.retries + 1))
+    finally:
+        # Always close database connection to prevent leaks
+        try:
+            connection.close()
+        except:
+            pass
 
 
 @shared_task(bind=True, max_retries=3)
@@ -214,6 +223,7 @@ def fetch_backlinks_for_all_projects(self, force=False):
     Returns:
         Dict with processing summary
     """
+    from django.db import connection
     
     try:
         logger.info("Starting backlink summary fetch for all active projects")
@@ -256,7 +266,14 @@ def fetch_backlinks_for_all_projects(self, force=False):
         
     except Exception as e:
         logger.error(f"Error in bulk backlink fetch task: {str(e)}")
+        connection.close()
         raise self.retry(exc=e, countdown=60 * (self.request.retries + 1))
+    finally:
+        # Always close database connection
+        try:
+            connection.close()
+        except:
+            pass
 
 
 @shared_task(bind=True, max_retries=3)
@@ -432,4 +449,13 @@ def fetch_detailed_backlinks_from_dataforseo(self, backlink_profile_id, max_link
         
     except Exception as e:
         logger.error(f"Error collecting detailed backlinks for profile {backlink_profile_id}: {str(e)}")
+        from django.db import connection
+        connection.close()
         raise self.retry(exc=e, countdown=60 * (self.request.retries + 1))
+    finally:
+        # Always close database connection
+        from django.db import connection
+        try:
+            connection.close()
+        except:
+            pass

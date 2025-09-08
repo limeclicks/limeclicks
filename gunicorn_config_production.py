@@ -5,15 +5,15 @@ import os
 bind = "127.0.0.1:7650"
 backlog = 2048
 
-# Worker Processes - GEVENT CONFIGURATION for production
-workers = min(multiprocessing.cpu_count() * 2 + 1, 9)  # Cap at 9 workers for better resource management
-worker_class = "gevent"  # Using gevent workers for better concurrency
-worker_connections = 1000  # Max simultaneous clients per worker
-keepalive = 5
+# Worker Processes - SYNC CONFIGURATION for better database connection management
+workers = min(multiprocessing.cpu_count() * 2, 6)  # Reduced workers to control connections
+worker_class = "sync"  # Changed from gevent to sync to prevent connection multiplication
+# Note: sync workers handle one request at a time, preventing connection accumulation
+keepalive = 2  # Reduced keepalive
 
-# Gevent specific settings
+# Worker management settings
 worker_tmp_dir = "/dev/shm"  # Use RAM for worker heartbeat
-max_requests = 1000  # Restart workers after this many requests to prevent memory leaks
+max_requests = 500  # Restart workers more frequently to release resources
 max_requests_jitter = 50  # Randomize worker restart
 
 # Timeouts

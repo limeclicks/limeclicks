@@ -972,49 +972,77 @@ def keyword_updates_sse(request, project_id):
     
     def event_stream():
         """Generate SSE events for keyword updates"""
+        from django.db import connection
         last_check = timezone.now()
+        iteration_count = 0
+        max_iterations = 1800  # 1 hour maximum (2 seconds * 1800 = 3600 seconds)
         
-        while True:
-            # Check for updated keywords
-            updated_keywords = Keyword.objects.filter(
-                project=project,
-                updated_at__gt=last_check,
-                archive=False
-            ).prefetch_related('keyword_tags__tag')
-            
-            for keyword in updated_keywords:
-                # Send update event
-                data = {
-                    'id': keyword.id,
-                    'keyword': keyword.keyword,
-                    'rank': keyword.rank,
-                    'rank_status': keyword.rank_status,
-                    'rank_diff': keyword.rank_diff_from_last_time,
-                    'rank_url': keyword.rank_url,
-                    'processing': keyword.processing,
-                    'scraped_at': keyword.scraped_at.isoformat() if keyword.scraped_at else None,
-                    'country': keyword.country,
-                }
+        while iteration_count < max_iterations:
+            try:
+                # Check for updated keywords
+                updated_keywords = Keyword.objects.filter(
+                    project=project,
+                    updated_at__gt=last_check,
+                    archive=False
+                ).prefetch_related('keyword_tags__tag')
                 
-                yield f"data: {json.dumps(data)}\n\n"
-            
-            # Also check for processing status changes
-            processing_keywords = Keyword.objects.filter(
-                project=project,
-                processing=True,
-                archive=False
-            )
-            
-            for keyword in processing_keywords:
-                data = {
-                    'id': keyword.id,
-                    'processing': True,
-                    'status': 'checking'
-                }
-                yield f"data: {json.dumps(data)}\n\n"
-            
-            last_check = timezone.now()
-            time.sleep(2)  # Check every 2 seconds
+                for keyword in updated_keywords:
+                    # Send update event
+                    data = {
+                        'id': keyword.id,
+                        'keyword': keyword.keyword,
+                        'rank': keyword.rank,
+                        'rank_status': keyword.rank_status,
+                        'rank_diff': keyword.rank_diff_from_last_time,
+                        'rank_url': keyword.rank_url,
+                        'processing': keyword.processing,
+                        'scraped_at': keyword.scraped_at.isoformat() if keyword.scraped_at else None,
+                        'country': keyword.country,
+                    }
+                    
+                    yield f"data: {json.dumps(data)}\n\n"
+                
+                # Also check for processing status changes
+                processing_keywords = Keyword.objects.filter(
+                    project=project,
+                    processing=True,
+                    archive=False
+                )
+                
+                for keyword in processing_keywords:
+                    data = {
+                        'id': keyword.id,
+                        'processing': True,
+                        'status': 'checking'
+                    }
+                    yield f"data: {json.dumps(data)}\n\n"
+                
+                last_check = timezone.now()
+                
+                # Close database connection after each iteration to prevent connection accumulation
+                connection.close()
+                
+                # Increment iteration counter
+                iteration_count += 1
+                
+                # Send keepalive every 10 iterations (20 seconds)
+                if iteration_count % 10 == 0:
+                    yield f": keepalive\n\n"
+                
+                time.sleep(2)  # Check every 2 seconds
+                
+            except Exception as e:
+                # Log error and close connection
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"Error in SSE event stream: {e}")
+                connection.close()
+                yield f"event: error\ndata: {json.dumps({'error': 'Stream error, reconnecting...'})}\n\n"
+                break
+        
+        # Stream timeout - ask client to reconnect
+        yield f"event: timeout\ndata: {json.dumps({'message': 'Stream timeout, please reconnect'})}\n\n"
+        connection.close()
     
     response = StreamingHttpResponse(event_stream(), content_type='text/event-stream')
     response['Cache-Control'] = 'no-cache'

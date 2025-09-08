@@ -114,9 +114,13 @@ WSGI_APPLICATION = 'limeclicks.wsgi.application'
 DATABASES = {
     "default": dj_database_url.parse(
         os.getenv("DATABASE_URL"),
-        conn_max_age=600,
+        conn_max_age=0,  # Close connections immediately to prevent accumulation
     )
 }
+
+# Add connection health checks for Django 4.1+
+if hasattr(dj_database_url, 'CONN_HEALTH_CHECKS'):
+    DATABASES['default']['CONN_HEALTH_CHECKS'] = True
 
 # Password validation
 # https://docs.djangoproject.com/en/5.1/ref/settings/#auth-password-validators
