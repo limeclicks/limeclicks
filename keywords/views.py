@@ -97,7 +97,7 @@ def keywords_list(request):
     
     # Handle HTMX requests for partial updates
     if request.headers.get('HX-Request'):
-        return render(request, 'keywords/partials/keyword_list_items.html', context)
+        return render(request, 'keywords/partials/keyword_list_content.html', context)
     
     return render(request, 'keywords/list.html', context)
 

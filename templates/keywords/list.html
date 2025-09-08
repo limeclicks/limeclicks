@@ -284,23 +284,99 @@
             {% endif %}
         </div>
         
-        {% if has_next %}
-        <!-- Load More Button -->
-        <div class="text-center mt-8" id="load-more-container">
-            <button 
-                class="btn btn-primary btn-outline"
-                hx-get="{% url 'keywords:list' %}?page={{ next_page }}"
-                hx-trigger="click"
-                hx-target="#keyword-cards-container"
-                hx-select=".keyword-card"
-                hx-swap="beforeend"
-                hx-indicator="#load-more-spinner"
-            >
-                <span id="load-more-text">Load More</span>
-                <span id="load-more-spinner" class="htmx-indicator">
-                    <i class="fas fa-spinner loading-spinner ml-2"></i>
-                </span>
-            </button>
+        {% if page_obj.paginator.num_pages > 1 %}
+        <!-- Pagination Controls -->
+        <div class="card bg-base-100 shadow-sm border border-base-300 mt-8">
+            <div class="card-body p-4">
+                <div class="flex flex-col sm:flex-row justify-between items-center gap-4">
+                    <!-- Page Info -->
+                    <div class="text-sm text-base-content/60">
+                        Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+                    </div>
+                    
+                    <!-- Pagination Controls -->
+                    <div class="join">
+                        {% if page_obj.has_previous %}
+                        <a 
+                            class="join-item btn btn-sm"
+                            href="?page=1{% if search_query %}&search={{ search_query }}{% endif %}"
+                            hx-get="{% url 'keywords:list' %}?page=1{% if search_query %}&search={{ search_query }}{% endif %}"
+                            hx-target="#keyword-list"
+                            hx-swap="innerHTML"
+                            hx-push-url="true"
+                        >
+                            «
+                        </a>
+                        <a 
+                            class="join-item btn btn-sm"
+                            href="?page={{ page_obj.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}"
+                            hx-get="{% url 'keywords:list' %}?page={{ page_obj.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}"
+                            hx-target="#keyword-list"
+                            hx-swap="innerHTML"
+                            hx-push-url="true"
+                        >
+                            ‹
+                        </a>
+                        {% else %}
+                        <button class="join-item btn btn-sm btn-disabled" disabled>«</button>
+                        <button class="join-item btn btn-sm btn-disabled" disabled>‹</button>
+                        {% endif %}
+                        
+                        <!-- Page Numbers -->
+                        {% for num in page_obj.paginator.page_range %}
+                            {% if num > page_obj.number|add:"-3" and num < page_obj.number|add:"3" %}
+                            {% if page_obj.number == num %}
+                            <button class="join-item btn btn-sm btn-active" disabled>
+                                {{ num }}
+                            </button>
+                            {% else %}
+                            <a 
+                                class="join-item btn btn-sm"
+                                href="?page={{ num }}{% if search_query %}&search={{ search_query }}{% endif %}"
+                                hx-get="{% url 'keywords:list' %}?page={{ num }}{% if search_query %}&search={{ search_query }}{% endif %}"
+                                hx-target="#keyword-list"
+                                hx-swap="innerHTML"
+                                hx-push-url="true"
+                            >
+                                {{ num }}
+                            </a>
+                            {% endif %}
+                            {% endif %}
+                        {% endfor %}
+                        
+                        {% if page_obj.has_next %}
+                        <a 
+                            class="join-item btn btn-sm"
+                            href="?page={{ page_obj.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}"
+                            hx-get="{% url 'keywords:list' %}?page={{ page_obj.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}"
+                            hx-target="#keyword-list"
+                            hx-swap="innerHTML"
+                            hx-push-url="true"
+                        >
+                            ›
+                        </a>
+                        <a 
+                            class="join-item btn btn-sm"
+                            href="?page={{ page_obj.paginator.num_pages }}{% if search_query %}&search={{ search_query }}{% endif %}"
+                            hx-get="{% url 'keywords:list' %}?page={{ page_obj.paginator.num_pages }}{% if search_query %}&search={{ search_query }}{% endif %}"
+                            hx-target="#keyword-list"
+                            hx-swap="innerHTML"
+                            hx-push-url="true"
+                        >
+                            »
+                        </a>
+                        {% else %}
+                        <button class="join-item btn btn-sm btn-disabled" disabled>›</button>
+                        <button class="join-item btn btn-sm btn-disabled" disabled>»</button>
+                        {% endif %}
+                    </div>
+                    
+                    <!-- Results Info -->
+                    <div class="text-sm text-base-content/60">
+                        Showing {{ page_obj.start_index }} to {{ page_obj.end_index }} of {{ page_obj.paginator.count }} projects
+                    </div>
+                </div>
+            </div>
         </div>
         {% endif %}
     </div>
