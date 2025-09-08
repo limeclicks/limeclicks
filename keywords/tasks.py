@@ -444,23 +444,27 @@ def enqueue_keyword_scrapes_batch():
             logger.info(f"Reset {stuck_count} stuck keywords")
         
         # Find eligible keywords that aren't already processing
-        # Use select_for_update to prevent race conditions
-        eligible_keywords = list(Keyword.objects.select_for_update(skip_locked=True).filter(
-            models.Q(scraped_at__isnull=True) |  # Never scraped
-            models.Q(scraped_at__lte=cutoff_time)  # Scraped > 24h ago
-        ).filter(
-            archive=False,  # Not archived
-            project__active=True,  # Active project
-            processing=False  # Not already in queue
-        ).values_list('id', 'scraped_at')[:BATCH_SIZE])
+        # Wrap in transaction for select_for_update
+        from django.db import transaction
+        
+        with transaction.atomic():
+            eligible_keywords = list(Keyword.objects.select_for_update(skip_locked=True).filter(
+                models.Q(scraped_at__isnull=True) |  # Never scraped
+                models.Q(scraped_at__lte=cutoff_time)  # Scraped > 24h ago
+            ).filter(
+                archive=False,  # Not archived
+                project__active=True,  # Active project
+                processing=False  # Not already in queue
+            ).values_list('id', 'scraped_at')[:BATCH_SIZE])
+            
+            # Mark keywords as processing inside the same transaction
+            if eligible_keywords:
+                keyword_ids = [kid for kid, _ in eligible_keywords]
+                Keyword.objects.filter(id__in=keyword_ids).update(processing=True)
         
         if not eligible_keywords:
             logger.info("No keywords eligible for scraping")
             return {'total': 0, 'high_priority': 0, 'default_priority': 0}
-        
-        # Mark keywords as processing to prevent duplicate queuing
-        keyword_ids = [kid for kid, _ in eligible_keywords]
-        Keyword.objects.filter(id__in=keyword_ids).update(processing=True)
         
         enqueued_high = 0
         enqueued_default = 0
