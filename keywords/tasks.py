@@ -461,27 +461,27 @@ def enqueue_keyword_scrapes_batch():
         # Mark keywords as processing to prevent duplicate queuing
         keyword_ids = [kid for kid, _ in eligible_keywords]
         Keyword.objects.filter(id__in=keyword_ids).update(processing=True)
-    
-    enqueued_high = 0
-    enqueued_default = 0
-    
-    for keyword_id, scraped_at in eligible_keywords:
-        # Only use serp_high for keywords that have never been scraped
-        if scraped_at is None:
-            queue_name = 'serp_high'
-            priority = 10
-            enqueued_high += 1
-        else:
-            queue_name = 'serp_default'
-            priority = 5
-            enqueued_default += 1
         
-        # Enqueue the task
-        fetch_keyword_serp_html.apply_async(
-            args=[keyword_id],
-            queue=queue_name,
-            priority=priority
-        )
+        enqueued_high = 0
+        enqueued_default = 0
+        
+        for keyword_id, scraped_at in eligible_keywords:
+            # Only use serp_high for keywords that have never been scraped
+            if scraped_at is None:
+                queue_name = 'serp_high'
+                priority = 10
+                enqueued_high += 1
+            else:
+                queue_name = 'serp_default'
+                priority = 5
+                enqueued_default += 1
+            
+            # Enqueue the task
+            fetch_keyword_serp_html.apply_async(
+                args=[keyword_id],
+                queue=queue_name,
+                priority=priority
+            )
     
         logger.info(
             f"Enqueued batch of {len(eligible_keywords)} keywords. "
