@@ -120,13 +120,13 @@ class AccountsTestCase(TestCase):
         
         # Should redirect after successful login with status 302
         self.assertEqual(response.status_code, 302)
-        # Check redirect URL is the dashboard
-        self.assertEqual(response.url, reverse('accounts:dashboard'))
+        # Check redirect URL is the projects list
+        self.assertEqual(response.url, reverse('project:project_list'))
         
-        # Now follow the redirect and verify we reach the dashboard
+        # Now follow the redirect and verify we reach the projects page
         response = self.client.get(response.url)
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'Dashboard')
+        self.assertContains(response, 'Projects')
     
     def test_login_with_nonexistent_user(self, mock_recaptcha):
         """Test login fails with non-existent username"""

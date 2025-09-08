@@ -132,7 +132,7 @@ def login_view(request):
                 if next_url and next_url.startswith('/'):
                     redirect_to = next_url
                 else:
-                    redirect_to = reverse("accounts:dashboard")
+                    redirect_to = reverse("project:project_list")
                 
                 # Use hard redirect
                 return HttpResponseRedirect(redirect_to)
@@ -167,7 +167,7 @@ def login_view(request):
                                 if next_url and next_url.startswith('/'):
                                     redirect_to = next_url
                                 else:
-                                    redirect_to = reverse("accounts:dashboard")
+                                    redirect_to = reverse("project:project_list")
                                 
                                 # Use hard redirect
                                 return HttpResponseRedirect(redirect_to)
