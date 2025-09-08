@@ -420,7 +420,7 @@ def _process_ranking_if_needed(keyword: Keyword, html_content: str, date_str: st
 def enqueue_keyword_scrapes_batch():
     """
     Celery Beat task to enqueue eligible keywords for scraping.
-    Runs every 15 minutes and enqueues up to 500 keywords that haven't been scraped in 24+ hours.
+    Runs every 5 minutes and enqueues up to 500 keywords that haven't been scraped in 24+ hours.
     Prevents duplicate queuing using the processing flag.
     """
     from django.db import connection

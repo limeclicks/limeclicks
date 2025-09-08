@@ -376,6 +376,13 @@ CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = TIME_ZONE
 
+# Celery worker pool settings to prevent database connection issues
+CELERY_WORKER_POOL = 'prefork'  # Use prefork pool for better connection management
+CELERY_WORKER_MAX_TASKS_PER_CHILD = 100  # Restart worker after 100 tasks to release connections
+CELERY_WORKER_PREFETCH_MULTIPLIER = 1  # Prevent workers from prefetching too many tasks
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
+CELERY_BROKER_POOL_LIMIT = 10  # Limit Redis connection pool
+
 # Celery task routing
 CELERY_TASK_ROUTES = {
     'accounts.tasks.*': {'queue': 'accounts'},
@@ -390,10 +397,10 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'accounts.tasks.cleanup_expired_tokens',
         'schedule': 3600.0,  # Every hour
     },
-    # Enqueue keywords for SERP scraping every 15 minutes
+    # Enqueue keywords for SERP scraping every 5 minutes
     'enqueue-keyword-scrapes': {
         'task': 'keywords.tasks.enqueue_keyword_scrapes_batch',
-        'schedule': 900.0,  # Every 15 minutes (900 seconds)
+        'schedule': 300.0,  # Every 5 minutes (300 seconds)
     },
 }
 
