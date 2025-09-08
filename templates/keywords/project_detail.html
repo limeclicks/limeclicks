@@ -230,7 +230,7 @@
                                 value="{{ search_query }}"
                                 hx-get="{% url 'keywords:project_keywords' project.id %}"
                                 hx-trigger="keyup changed delay:500ms, search"
-                                hx-target="#keywords-table-body"
+                                hx-target="#keywords-container"
                                 hx-include="#search-form"
                             >
                             <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-base-content/40 text-sm"></i>
@@ -242,7 +242,7 @@
                             class="btn btn-primary btn-sm"
                             hx-get="{% url 'keywords:project_keywords' project.id %}"
                             hx-trigger="click"
-                            hx-target="#keywords-table-body"
+                            hx-target="#keywords-container"
                             hx-include="#search-form"
                         >
                             Search
@@ -264,7 +264,7 @@
                         <select name="country" id="country-filter" class="select select-bordered select-sm"
                                 hx-get="{% url 'keywords:project_keywords' project.id %}"
                                 hx-trigger="change"
-                                hx-target="#keywords-table-body"
+                                hx-target="#keywords-container"
                                 hx-include="#search-form">
                             <option value="">All Countries</option>
                             <option value="US" {% if request.GET.country == 'US' %}selected{% endif %}>United States</option>
@@ -280,7 +280,7 @@
                         <select name="tag" id="tag-filter" class="select select-bordered select-sm"
                                 hx-get="{% url 'keywords:project_keywords' project.id %}"
                                 hx-trigger="change"
-                                hx-target="#keywords-table-body"
+                                hx-target="#keywords-container"
                                 hx-include="#search-form">
                             <option value="">All Tags</option>
                             {% for tag in available_tags %}
@@ -294,7 +294,7 @@
                         <select name="rank_compare" id="rank-compare" class="select select-bordered select-sm"
                                 hx-get="{% url 'keywords:project_keywords' project.id %}"
                                 hx-trigger="change"
-                                hx-target="#keywords-table-body"
+                                hx-target="#keywords-container"
                                 hx-include="#search-form">
                             <option value="">All Ranks</option>
                             <option value="eq" {% if request.GET.rank_compare == 'eq' %}selected{% endif %}>Rank Equal To</option>
@@ -316,7 +316,7 @@
                                 value="{{ request.GET.rank_value }}"
                                 hx-get="{% url 'keywords:project_keywords' project.id %}"
                                 hx-trigger="change delay:500ms"
-                                hx-target="#keywords-table-body"
+                                hx-target="#keywords-container"
                                 hx-include="#search-form"
                             >
                             <input 
@@ -330,7 +330,7 @@
                                 value="{{ request.GET.rank_value2 }}"
                                 hx-get="{% url 'keywords:project_keywords' project.id %}"
                                 hx-trigger="change delay:500ms"
-                                hx-target="#keywords-table-body"
+                                hx-target="#keywords-container"
                                 hx-include="#search-form"
                             >
                         </div>
@@ -472,7 +472,8 @@
         </div>
     </div>
     
-    <!-- Keywords Table -->
+    <!-- Keywords Container -->
+    <div id="keywords-container">
     <div class="card bg-base-100 shadow-sm border border-base-300">
         <div class="card-body p-0">
             {% if keywords %}
@@ -700,8 +701,9 @@
             {% endif %}
         </div>
     </div>
+    </div>
     
-    {% if keywords %}
+    {% if page_obj.paginator.num_pages > 1 %}
     <!-- Pagination Card (Separate from table) -->
     <div class="card bg-base-100 shadow-sm border border-base-300 mt-4">
         <div class="card-body p-4">
@@ -726,13 +728,21 @@
                     {% if page_obj.has_previous %}
                     <button 
                         class="join-item btn btn-sm"
-                        onclick="goToPage(1)"
+                        hx-get="{% url 'keywords:project_keywords' project.id %}?page=1"
+                        hx-trigger="click"
+                        hx-target="#keywords-container"
+                        hx-swap="innerHTML"
+                        hx-include="#search-form"
                     >
                         «
                     </button>
                     <button 
                         class="join-item btn btn-sm"
-                        onclick="goToPage({{ page_obj.previous_page_number }})"
+                        hx-get="{% url 'keywords:project_keywords' project.id %}?page={{ page_obj.previous_page_number }}"
+                        hx-trigger="click"
+                        hx-target="#keywords-container"
+                        hx-swap="innerHTML"
+                        hx-include="#search-form"
                     >
                         ‹
                     </button>
@@ -746,7 +756,11 @@
                         {% if num > page_obj.number|add:"-3" and num < page_obj.number|add:"3" %}
                         <button 
                             class="join-item btn btn-sm {% if page_obj.number == num %}btn-active{% endif %}"
-                            onclick="goToPage({{ num }})"
+                            hx-get="{% url 'keywords:project_keywords' project.id %}?page={{ num }}"
+                            hx-trigger="click"
+                            hx-target="#keywords-container"
+                            hx-swap="innerHTML"
+                            hx-include="#search-form"
                         >
                             {{ num }}
                         </button>
@@ -756,13 +770,21 @@
                     {% if page_obj.has_next %}
                     <button 
                         class="join-item btn btn-sm"
-                        onclick="goToPage({{ page_obj.next_page_number }})"
+                        hx-get="{% url 'keywords:project_keywords' project.id %}?page={{ page_obj.next_page_number }}"
+                        hx-trigger="click"
+                        hx-target="#keywords-container"
+                        hx-swap="innerHTML"
+                        hx-include="#search-form"
                     >
                         ›
                     </button>
                     <button 
                         class="join-item btn btn-sm"
-                        onclick="goToPage({{ page_obj.paginator.num_pages }})"
+                        hx-get="{% url 'keywords:project_keywords' project.id %}?page={{ page_obj.paginator.num_pages }}"
+                        hx-trigger="click"
+                        hx-target="#keywords-container"
+                        hx-swap="innerHTML"
+                        hx-include="#search-form"
                     >
                         »
                     </button>
