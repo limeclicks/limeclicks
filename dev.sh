@@ -24,6 +24,11 @@ cleanup() {
 
 trap cleanup EXIT INT TERM
 
+# Set correct Python environment
+echo -e "${BLUE}Setting Python environment...${NC}"
+pyenv local limeclicks
+eval "$(pyenv init -)"
+
 # Start Redis if not running
 if ! redis-cli ping > /dev/null 2>&1; then
     echo -e "${BLUE}Starting Redis...${NC}"
@@ -36,6 +41,7 @@ npx tailwindcss -i ./static/src/input.css -o ./static/dist/tailwind.css
 
 # Set environment
 export PYTHONUNBUFFERED=1
+export DJANGO_SETTINGS_MODULE=limeclicks.settings
 
 # Start all services
 echo -e "\n${GREEN}Starting Development Services${NC}"
