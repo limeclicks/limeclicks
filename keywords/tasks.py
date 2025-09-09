@@ -419,11 +419,12 @@ def _process_ranking_if_needed(keyword: Keyword, html_content: str, date_str: st
 @shared_task
 def enqueue_keyword_scrapes_batch():
     """
-    Celery Beat task to enqueue eligible keywords for scraping.
+    Enhanced Celery Beat task with auto-recovery mechanisms.
     Runs every 5 minutes and enqueues up to 500 keywords that haven't been scraped in 24+ hours.
-    Prevents duplicate queuing using the processing flag.
+    Includes self-healing features to prevent stuck keywords.
     """
     from django.db import connection
+    from project.models import Project
     
     try:
         now = timezone.now()
@@ -433,15 +434,61 @@ def enqueue_keyword_scrapes_batch():
         # Maximum keywords to process per run
         BATCH_SIZE = 500
         
-        # Reset stuck keywords (processing for more than 10 minutes)
+        # === AUTO-RECOVERY MECHANISM 1: Reset stuck keywords ===
+        # Reset keywords that have been processing for more than 10 minutes
         stuck_cutoff = now - timedelta(minutes=10)
-        stuck_count = Keyword.objects.filter(
-            processing=True,
-            scraped_at__lt=stuck_cutoff
-        ).update(processing=False)
+        stuck_keywords = Keyword.objects.filter(
+            processing=True
+        ).filter(
+            models.Q(scraped_at__isnull=True) |  # Never scraped but stuck
+            models.Q(scraped_at__lt=stuck_cutoff)  # Or scraped long ago
+        )
+        stuck_count = stuck_keywords.update(processing=False)
         
         if stuck_count > 0:
-            logger.info(f"Reset {stuck_count} stuck keywords")
+            logger.info(f"[AUTO-RECOVERY] Reset {stuck_count} stuck keywords")
+        
+        # === AUTO-RECOVERY MECHANISM 2: Auto-activate projects with overdue keywords ===
+        # Find projects that are inactive but have overdue keywords
+        inactive_projects_with_overdue = Project.objects.filter(
+            active=False,
+            keyword__scraped_at__lt=cutoff_time,
+            keyword__archive=False
+        ).distinct()
+        
+        if inactive_projects_with_overdue.exists():
+            activated_count = inactive_projects_with_overdue.update(active=True)
+            logger.warning(
+                f"[AUTO-RECOVERY] Activated {activated_count} inactive projects with overdue keywords: "
+                f"{', '.join([p.domain for p in inactive_projects_with_overdue[:5]])}"
+            )
+        
+        # === AUTO-RECOVERY MECHANISM 3: Reset orphaned processing flags ===
+        # Reset keywords where processing=True but no task is running for them
+        # This handles cases where tasks failed without cleanup
+        orphaned_reset_count = 0
+        processing_keywords = Keyword.objects.filter(processing=True)
+        if processing_keywords.count() > 100:  # Only check if there are many stuck
+            # Get list of keyword IDs currently being processed by Celery
+            from celery import current_app
+            i = current_app.control.inspect()
+            active_tasks = i.active()
+            
+            active_keyword_ids = set()
+            if active_tasks:
+                for worker, tasks in active_tasks.items():
+                    for task in tasks:
+                        if 'fetch_keyword_serp_html' in task.get('name', ''):
+                            args = task.get('args', [])
+                            if args and isinstance(args[0], int):
+                                active_keyword_ids.add(args[0])
+            
+            # Reset keywords that claim to be processing but aren't in active tasks
+            orphaned_keywords = processing_keywords.exclude(id__in=active_keyword_ids)
+            orphaned_reset_count = orphaned_keywords.update(processing=False)
+            
+            if orphaned_reset_count > 0:
+                logger.info(f"[AUTO-RECOVERY] Reset {orphaned_reset_count} orphaned processing flags")
         
         # Find eligible keywords that aren't already processing
         # Wrap in transaction for select_for_update
@@ -505,3 +552,193 @@ def enqueue_keyword_scrapes_batch():
     finally:
         # Ensure database connection is closed to prevent connection leaks
         connection.close()
+
+
+@shared_task
+def cleanup_stuck_keywords():
+    """
+    Dedicated cleanup task that runs every 15 minutes to ensure system health.
+    Performs comprehensive cleanup and recovery operations.
+    """
+    from project.models import Project
+    from celery import current_app
+    
+    cleanup_stats = {
+        'stuck_reset': 0,
+        'orphaned_reset': 0,
+        'projects_activated': 0,
+        'overdue_queued': 0,
+        'errors_cleared': 0
+    }
+    
+    try:
+        now = timezone.now()
+        
+        # 1. Reset keywords stuck in processing for >15 minutes
+        stuck_cutoff = now - timedelta(minutes=15)
+        stuck_keywords = Keyword.objects.filter(
+            processing=True,
+            updated_at__lt=stuck_cutoff  # Use updated_at to catch truly stuck ones
+        )
+        cleanup_stats['stuck_reset'] = stuck_keywords.update(
+            processing=False,
+            last_error_message="Auto-reset: stuck in processing"
+        )
+        
+        # 2. Clear processing flag for keywords with no active Celery tasks
+        i = current_app.control.inspect()
+        active_tasks = i.active()
+        
+        active_keyword_ids = set()
+        if active_tasks:
+            for worker, tasks in active_tasks.items():
+                for task in tasks:
+                    if 'fetch_keyword_serp_html' in task.get('name', ''):
+                        args = task.get('args', [])
+                        if args and isinstance(args[0], int):
+                            active_keyword_ids.add(args[0])
+        
+        # Find keywords claiming to be processing but not in active tasks
+        orphaned = Keyword.objects.filter(
+            processing=True
+        ).exclude(id__in=active_keyword_ids)
+        cleanup_stats['orphaned_reset'] = orphaned.update(processing=False)
+        
+        # 3. Auto-activate projects with overdue keywords
+        min_interval = timedelta(hours=settings.FETCH_MIN_INTERVAL_HOURS)
+        cutoff_time = now - min_interval
+        
+        inactive_projects = Project.objects.filter(
+            active=False,
+            keyword__scraped_at__lt=cutoff_time,
+            keyword__archive=False
+        ).distinct()
+        
+        if inactive_projects.exists():
+            cleanup_stats['projects_activated'] = inactive_projects.update(active=True)
+            project_names = ', '.join([p.domain for p in inactive_projects[:3]])
+            logger.warning(f"[CLEANUP] Activated {cleanup_stats['projects_activated']} projects: {project_names}...")
+        
+        # 4. Queue severely overdue keywords (>48 hours)
+        severe_cutoff = now - timedelta(hours=48)
+        severely_overdue = Keyword.objects.filter(
+            scraped_at__lt=severe_cutoff,
+            archive=False,
+            project__active=True,
+            processing=False
+        )[:50]  # Limit to 50 to avoid overload
+        
+        for keyword in severely_overdue:
+            fetch_keyword_serp_html.apply_async(
+                args=[keyword.id],
+                queue='serp_high',
+                priority=9
+            )
+            cleanup_stats['overdue_queued'] += 1
+        
+        # 5. Clear old error messages for successfully scraped keywords
+        recent_success = Keyword.objects.filter(
+            scraped_at__gt=now - timedelta(hours=25),
+            last_error_message__isnull=False
+        )
+        cleanup_stats['errors_cleared'] = recent_success.update(last_error_message=None)
+        
+        # Log cleanup results
+        if any(cleanup_stats.values()):
+            logger.info(
+                f"[CLEANUP] Completed - "
+                f"Stuck reset: {cleanup_stats['stuck_reset']}, "
+                f"Orphaned reset: {cleanup_stats['orphaned_reset']}, "
+                f"Projects activated: {cleanup_stats['projects_activated']}, "
+                f"Overdue queued: {cleanup_stats['overdue_queued']}, "
+                f"Errors cleared: {cleanup_stats['errors_cleared']}"
+            )
+        
+        return cleanup_stats
+        
+    except Exception as e:
+        logger.error(f"Error in cleanup_stuck_keywords: {e}", exc_info=True)
+        return {'error': str(e)}
+
+
+@shared_task
+def worker_health_check():
+    """
+    Monitor Celery worker health and take corrective actions if needed.
+    Runs every 5 minutes.
+    """
+    from celery import current_app
+    import subprocess
+    
+    health_status = {
+        'workers_online': 0,
+        'active_tasks': 0,
+        'reserved_tasks': 0,
+        'actions_taken': []
+    }
+    
+    try:
+        # Check worker status
+        i = current_app.control.inspect()
+        stats = i.stats()
+        
+        if not stats:
+            # No workers responding - this is critical
+            logger.critical("[HEALTH] No Celery workers responding!")
+            health_status['actions_taken'].append('No workers found - restart may be needed')
+            
+            # Try to restart the worker service (requires sudo permissions configured)
+            try:
+                result = subprocess.run(
+                    ['sudo', 'systemctl', 'restart', 'limeclicks-celery'],
+                    capture_output=True,
+                    text=True,
+                    timeout=30
+                )
+                if result.returncode == 0:
+                    health_status['actions_taken'].append('Successfully restarted Celery worker service')
+                    logger.info("[HEALTH] Restarted Celery worker service")
+            except Exception as restart_error:
+                logger.error(f"[HEALTH] Failed to restart worker: {restart_error}")
+        else:
+            health_status['workers_online'] = len(stats)
+            
+            # Check active tasks
+            active = i.active()
+            if active:
+                for worker, tasks in active.items():
+                    health_status['active_tasks'] += len(tasks)
+            
+            # Check reserved tasks
+            reserved = i.reserved()
+            if reserved:
+                for worker, tasks in reserved.items():
+                    health_status['reserved_tasks'] += len(tasks)
+            
+            # Check for task backlog
+            if health_status['reserved_tasks'] > 100:
+                logger.warning(f"[HEALTH] High task backlog: {health_status['reserved_tasks']} tasks waiting")
+                health_status['actions_taken'].append(f"High backlog detected: {health_status['reserved_tasks']} tasks")
+            
+            # Check for stuck workers (active tasks but no reserved)
+            if health_status['active_tasks'] > 10 and health_status['reserved_tasks'] == 0:
+                stuck_count = Keyword.objects.filter(processing=True).count()
+                if stuck_count > 20:
+                    logger.warning(f"[HEALTH] Possible stuck workers: {stuck_count} keywords processing")
+                    # Reset stuck keywords
+                    reset_count = Keyword.objects.filter(
+                        processing=True,
+                        updated_at__lt=timezone.now() - timedelta(minutes=20)
+                    ).update(processing=False)
+                    if reset_count > 0:
+                        health_status['actions_taken'].append(f"Reset {reset_count} stuck keywords")
+        
+        # Log health status if issues found
+        if health_status['actions_taken']:
+            logger.info(f"[HEALTH] Status: {health_status}")
+        
+        return health_status
+        
+    except Exception as e:
+        logger.error(f"Error in worker_health_check: {e}", exc_info=True)
+        return {'error': str(e)}

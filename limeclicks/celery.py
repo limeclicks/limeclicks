@@ -67,20 +67,29 @@ app.autodiscover_tasks()
 from celery.schedules import crontab
 
 app.conf.beat_schedule = {
-    # Keyword crawl scheduling
-    'schedule-keyword-crawls': {
-        'task': 'keywords.schedule_keyword_crawls',
+    # Keyword crawl scheduling - PRIMARY TASK
+    'enqueue-keyword-scrapes': {
+        'task': 'keywords.tasks.enqueue_keyword_scrapes_batch',
         'schedule': crontab(minute='*/5'),  # Run every 5 minutes
-        'kwargs': {'batch_size': 50}
+        'options': {'queue': 'celery', 'priority': 10}
     },
+    
+    # Auto-recovery and cleanup tasks
+    'cleanup-stuck-keywords': {
+        'task': 'keywords.tasks.cleanup_stuck_keywords',
+        'schedule': crontab(minute='*/15'),  # Run every 15 minutes
+        'options': {'queue': 'celery', 'priority': 9}
+    },
+    'worker-health-check': {
+        'task': 'keywords.tasks.worker_health_check',
+        'schedule': crontab(minute='*/5'),  # Run every 5 minutes
+        'options': {'queue': 'celery', 'priority': 9}
+    },
+    
+    # Legacy tasks (if they exist)
     'update-keyword-priorities': {
         'task': 'keywords.update_keyword_priorities',
         'schedule': crontab(hour=1, minute=0),  # Run daily at 1 AM
-    },
-    'reset-stuck-keywords': {
-        'task': 'keywords.reset_stuck_keywords',
-        'schedule': crontab(minute='*/30'),  # Run every 30 minutes
-        'kwargs': {'stuck_hours': 2}
     },
     # Site audit tasks - Check for 30-day scheduled audits
     'check-scheduled-site-audits': {
