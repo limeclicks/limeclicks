@@ -30,7 +30,7 @@ def keywords_list(request):
     if search_query:
         user_projects = user_projects.filter(
             Q(domain__icontains=search_query) |
-            Q(name__icontains=search_query)
+            Q(title__icontains=search_query)
         )
     
     # Get projects with keywords for display

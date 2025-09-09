@@ -4,33 +4,20 @@
         <div class="flex items-start justify-between mb-4">
             <div class="flex-1">
                 <h3 class="text-lg font-bold text-base-content">
-                    {{ item.project.name|default:item.project.domain }}
+                    {{ item.project.title|default:item.project.domain }}
                 </h3>
                 <p class="text-sm text-base-content/60 mt-1">{{ item.project.domain }}</p>
             </div>
             
-            <!-- Health Status Badge -->
-            {% if item.health_status == 'healthy' %}
-                <div class="badge badge-success gap-1">
-                    <i class="fas fa-check-circle text-xs"></i>
-                    Healthy
-                </div>
-            {% elif item.health_status == 'attention' %}
-                <div class="badge badge-warning gap-1">
-                    <i class="fas fa-exclamation-triangle text-xs"></i>
-                    Needs Attention
-                </div>
-            {% elif item.health_status == 'critical' %}
-                <div class="badge badge-error gap-1">
-                    <i class="fas fa-times-circle text-xs"></i>
-                    Critical
-                </div>
-            {% else %}
-                <div class="badge badge-ghost gap-1">
-                    <i class="fas fa-plus-circle text-xs"></i>
-                    New
-                </div>
-            {% endif %}
+            <!-- View Keywords Button -->
+            <a 
+                href="{% url 'keywords:project_keywords' item.project.id %}"
+                class="btn btn-primary btn-sm"
+                onclick="event.stopPropagation()"
+            >
+                View Keywords
+                <i class="fas fa-arrow-right ml-1"></i>
+            </a>
         </div>
         
         <!-- Statistics Grid -->
@@ -71,16 +58,5 @@
             </div>
         </div>
         {% endif %}
-        
-        <!-- Action Buttons -->
-        <div class="card-actions justify-end mt-4 pt-4 border-t border-base-200">
-            <a 
-                href="{% url 'keywords:project_keywords' item.project.id %}"
-                class="btn btn-primary btn-sm"
-            >
-                View Keywords
-                <i class="fas fa-arrow-right ml-1"></i>
-            </a>
-        </div>
     </div>
 </div>
