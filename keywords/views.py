@@ -264,8 +264,8 @@ def project_keywords(request, project_id):
     
     # Handle HTMX requests for partial updates
     if request.headers.get('HX-Request'):
-        # Return the full list with pagination for HTMX requests
-        return render(request, 'keywords/partials/keywords_list.html', context)
+        # Return the table with pagination for HTMX requests
+        return render(request, 'keywords/partials/keywords_table_with_pagination.html', context)
     
     return render(request, 'keywords/project_detail.html', context)
 

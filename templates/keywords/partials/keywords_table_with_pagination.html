@@ -1,0 +1,225 @@
+<!-- Keywords Table Content Only -->
+<div class="card bg-base-100 shadow-sm border border-base-300">
+    <div class="card-body p-0">
+        {% if keywords %}
+        <div id="keywords-table" class="overflow-x-auto">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th class="w-12">
+                            <input type="checkbox" 
+                                   id="select-all-keywords" 
+                                   class="checkbox checkbox-sm"
+                                   onchange="toggleAllKeywords(this)">
+                        </th>
+                        <th>
+                            <button class="flex items-center gap-1 font-semibold hover:text-primary cursor-pointer"
+                                    onclick="sortTable('keyword')"
+                                    data-sort="keyword">
+                                Keyword
+                                <span class="sort-indicator">
+                                    {% if sort_by == 'keyword' %}
+                                        {% if sort_order == 'asc' %}
+                                            <i class="fas fa-sort-up text-primary"></i>
+                                        {% else %}
+                                            <i class="fas fa-sort-down text-primary"></i>
+                                        {% endif %}
+                                    {% else %}
+                                        <i class="fas fa-sort text-base-content/30"></i>
+                                    {% endif %}
+                                </span>
+                            </button>
+                        </th>
+                        <th class="text-center">
+                            <button class="flex items-center justify-center gap-1 font-semibold hover:text-primary cursor-pointer w-full"
+                                    onclick="sortTable('rank')"
+                                    data-sort="rank">
+                                Current Rank
+                                <span class="sort-indicator">
+                                    {% if sort_by == 'rank' %}
+                                        {% if sort_order == 'asc' %}
+                                            <i class="fas fa-sort-up text-primary"></i>
+                                        {% else %}
+                                            <i class="fas fa-sort-down text-primary"></i>
+                                        {% endif %}
+                                    {% else %}
+                                        <i class="fas fa-sort text-base-content/30"></i>
+                                    {% endif %}
+                                </span>
+                            </button>
+                        </th>
+                        <th class="text-center">
+                            <button class="flex items-center justify-center gap-1 font-semibold hover:text-primary cursor-pointer w-full"
+                                    onclick="sortTable('change')"
+                                    data-sort="change">
+                                Change
+                                <span class="sort-indicator">
+                                    {% if sort_by == 'change' %}
+                                        {% if sort_order == 'asc' %}
+                                            <i class="fas fa-sort-up text-primary"></i>
+                                        {% else %}
+                                            <i class="fas fa-sort-down text-primary"></i>
+                                        {% endif %}
+                                    {% else %}
+                                        <i class="fas fa-sort text-base-content/30"></i>
+                                    {% endif %}
+                                </span>
+                            </button>
+                        </th>
+                        <th>Country</th>
+                        <th>
+                            <button class="flex items-center gap-1 font-semibold hover:text-primary cursor-pointer"
+                                    onclick="sortTable('last_checked')"
+                                    data-sort="last_checked">
+                                Last Checked
+                                <span class="sort-indicator">
+                                    {% if sort_by == 'last_checked' %}
+                                        {% if sort_order == 'asc' %}
+                                            <i class="fas fa-sort-up text-primary"></i>
+                                        {% else %}
+                                            <i class="fas fa-sort-down text-primary"></i>
+                                        {% endif %}
+                                    {% else %}
+                                        <i class="fas fa-sort text-base-content/30"></i>
+                                    {% endif %}
+                                </span>
+                            </button>
+                        </th>
+                        <th class="text-right">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="keywords-table-body" data-sort-by="{{ sort_by }}" data-sort-order="{{ sort_order }}">
+                    {% include 'keywords/partials/keywords_list.html' %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <!-- Empty State -->
+        <div class="p-12 text-center">
+            <div class="w-20 h-20 bg-base-200 rounded-full flex items-center justify-center mx-auto mb-4">
+                <i class="fas fa-key text-2xl text-base-content/40"></i>
+            </div>
+            <h3 class="text-lg font-semibold mb-2">No Keywords Yet</h3>
+            <p class="text-base-content/60 mb-6">Add keywords to start tracking rankings for this project.</p>
+            <button 
+                hx-get="{% url 'keywords:add_keyword_modal' %}?project_id={{ project.id }}"
+                hx-trigger="click"
+                hx-target="#modal-container"
+                hx-swap="innerHTML"
+                class="btn btn-primary"
+            >
+                <i class="fas fa-plus mr-2"></i>
+                Add Your First Keywords
+            </button>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Pagination Section -->
+<div id="pagination-container">
+{% if page_obj.paginator.num_pages > 1 %}
+<div class="card bg-base-100 shadow-sm border border-base-300 mt-4">
+    <div class="card-body p-4">
+        <div class="flex items-center justify-between">
+            <!-- Per Page Selector (Left) -->
+            <div class="flex items-center gap-2">
+                <span class="text-sm text-base-content/60">Show</span>
+                <select 
+                    id="per-page-bottom"
+                    class="select select-bordered select-sm"
+                    onchange="changePerPage(this.value)"
+                >
+                    <option value="50" {% if per_page == 50 %}selected{% endif %}>50</option>
+                    <option value="100" {% if per_page == 100 %}selected{% endif %}>100</option>
+                    <option value="250" {% if per_page == 250 %}selected{% endif %}>250</option>
+                </select>
+                <span class="text-sm text-base-content/60">per page</span>
+            </div>
+            
+            <!-- Pagination Controls (Center) -->
+            <div class="join">
+                {% if page_obj.has_previous %}
+                <button 
+                    class="join-item btn btn-sm"
+                    hx-get="{% url 'keywords:project_keywords' project.id %}?page=1"
+                    hx-trigger="click"
+                    hx-target="#keywords-container"
+                    hx-swap="innerHTML"
+                    hx-include="#search-form"
+                >
+                    «
+                </button>
+                <button 
+                    class="join-item btn btn-sm"
+                    hx-get="{% url 'keywords:project_keywords' project.id %}?page={{ page_obj.previous_page_number }}"
+                    hx-trigger="click"
+                    hx-target="#keywords-container"
+                    hx-swap="innerHTML"
+                    hx-include="#search-form"
+                >
+                    ‹
+                </button>
+                {% else %}
+                <button class="join-item btn btn-sm btn-disabled">«</button>
+                <button class="join-item btn btn-sm btn-disabled">‹</button>
+                {% endif %}
+                
+                <!-- Page Numbers -->
+                {% for num in page_obj.paginator.page_range %}
+                    {% if num > page_obj.number|add:"-3" and num < page_obj.number|add:"3" %}
+                    {% if page_obj.number == num %}
+                    <button class="join-item btn btn-sm btn-active">
+                        {{ num }}
+                    </button>
+                    {% else %}
+                    <button 
+                        class="join-item btn btn-sm"
+                        hx-get="{% url 'keywords:project_keywords' project.id %}?page={{ num }}"
+                        hx-trigger="click"
+                        hx-target="#keywords-container"
+                        hx-swap="innerHTML"
+                        hx-include="#search-form"
+                    >
+                        {{ num }}
+                    </button>
+                    {% endif %}
+                    {% endif %}
+                {% endfor %}
+                
+                {% if page_obj.has_next %}
+                <button 
+                    class="join-item btn btn-sm"
+                    hx-get="{% url 'keywords:project_keywords' project.id %}?page={{ page_obj.next_page_number }}"
+                    hx-trigger="click"
+                    hx-target="#keywords-container"
+                    hx-swap="innerHTML"
+                    hx-include="#search-form"
+                >
+                    ›
+                </button>
+                <button 
+                    class="join-item btn btn-sm"
+                    hx-get="{% url 'keywords:project_keywords' project.id %}?page={{ page_obj.paginator.num_pages }}"
+                    hx-trigger="click"
+                    hx-target="#keywords-container"
+                    hx-swap="innerHTML"
+                    hx-include="#search-form"
+                >
+                    »
+                </button>
+                {% else %}
+                <button class="join-item btn btn-sm btn-disabled">›</button>
+                <button class="join-item btn btn-sm btn-disabled">»</button>
+                {% endif %}
+            </div>
+            
+            <!-- Results Info (Right) -->
+            <div class="text-sm text-base-content/60">
+                Showing {{ page_obj.start_index }} to {{ page_obj.end_index }} of {{ page_obj.paginator.count }} results
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+</div>
