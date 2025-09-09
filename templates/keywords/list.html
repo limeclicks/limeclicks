@@ -70,124 +70,24 @@
         <div class="card bg-base-100 shadow-sm border border-base-300">
             <div class="card-body p-4">
                 <!-- Search Bar -->
-                <div class="relative mb-4">
+                <div class="relative">
                     <input 
                         type="text" 
                         id="search-input"
                         name="search"
-                        placeholder="Search keywords, domains, or projects..." 
+                        placeholder="Search projects by domain or name..." 
                         class="input input-bordered w-full pl-12 pr-4 h-12"
                         value="{{ search_query }}"
                         hx-get="{% url 'keywords:list' %}"
                         hx-trigger="keyup changed delay:500ms"
                         hx-target="#keyword-list"
                         hx-swap="innerHTML"
-                        hx-vals='{"filter": "{{ filter_status|default:"all" }}"}'
                         hx-indicator="#search-spinner"
                     >
                     <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-base-content/40"></i>
                     <span id="search-spinner" class="htmx-indicator absolute right-4 top-1/2 -translate-y-1/2">
                         <i class="fas fa-spinner loading-spinner text-primary"></i>
                     </span>
-                </div>
-                
-                <!-- Filter Buttons -->
-                <div class="flex items-center gap-2 flex-wrap">
-                    <span class="text-sm text-base-content/60 mr-2">Filter:</span>
-                    
-                    <!-- All Filter (default) -->
-                    <button 
-                        type="button"
-                        name="filter"
-                        value="all"
-                        class="btn btn-sm {% if filter_status == 'all' or not filter_status %}btn-primary{% else %}btn-outline{% endif %}"
-                        hx-get="{% url 'keywords:list' %}"
-                        hx-trigger="click"
-                        hx-target="#keyword-list"
-                        hx-swap="innerHTML"
-                        hx-include="#search-input"
-                        hx-vals='{"filter": "all"}'
-                        onclick="updateFilterButtons(this)"
-                    >
-                        All
-                        <span class="badge badge-sm ml-1">{{ total_keywords }}</span>
-                    </button>
-                    
-                    <!-- Top 10 Filter -->
-                    <button 
-                        type="button"
-                        name="filter"
-                        value="top10"
-                        class="btn btn-sm {% if filter_status == 'top10' %}btn-success{% else %}btn-outline btn-success{% endif %}"
-                        hx-get="{% url 'keywords:list' %}"
-                        hx-trigger="click"
-                        hx-target="#keyword-list"
-                        hx-swap="innerHTML"
-                        hx-include="#search-input"
-                        hx-vals='{"filter": "top10"}'
-                        onclick="updateFilterButtons(this)"
-                    >
-                        <i class="fas fa-trophy mr-1"></i>
-                        Top 10
-                        <span class="badge badge-sm ml-1">{{ top10_count }}</span>
-                    </button>
-                    
-                    <!-- Improved Filter -->
-                    <button 
-                        type="button"
-                        name="filter"
-                        value="improved"
-                        class="btn btn-sm {% if filter_status == 'improved' %}btn-info{% else %}btn-outline btn-info{% endif %}"
-                        hx-get="{% url 'keywords:list' %}"
-                        hx-trigger="click"
-                        hx-target="#keyword-list"
-                        hx-swap="innerHTML"
-                        hx-include="#search-input"
-                        hx-vals='{"filter": "improved"}'
-                        onclick="updateFilterButtons(this)"
-                    >
-                        <i class="fas fa-arrow-up mr-1"></i>
-                        Improved
-                        <span class="badge badge-sm ml-1">{{ improved_count }}</span>
-                    </button>
-                    
-                    <!-- Declined Filter -->
-                    <button 
-                        type="button"
-                        name="filter"
-                        value="declined"
-                        class="btn btn-sm {% if filter_status == 'declined' %}btn-warning{% else %}btn-outline btn-warning{% endif %}"
-                        hx-get="{% url 'keywords:list' %}"
-                        hx-trigger="click"
-                        hx-target="#keyword-list"
-                        hx-swap="innerHTML"
-                        hx-include="#search-input"
-                        hx-vals='{"filter": "declined"}'
-                        onclick="updateFilterButtons(this)"
-                    >
-                        <i class="fas fa-arrow-down mr-1"></i>
-                        Declined
-                        <span class="badge badge-sm ml-1">{{ declined_count }}</span>
-                    </button>
-                    
-                    <!-- Not Ranking Filter -->
-                    <button 
-                        type="button"
-                        name="filter"
-                        value="not_ranking"
-                        class="btn btn-sm {% if filter_status == 'not_ranking' %}btn-error{% else %}btn-outline btn-error{% endif %}"
-                        hx-get="{% url 'keywords:list' %}"
-                        hx-trigger="click"
-                        hx-target="#keyword-list"
-                        hx-swap="innerHTML"
-                        hx-include="#search-input"
-                        hx-vals='{"filter": "not_ranking"}'
-                        onclick="updateFilterButtons(this)"
-                    >
-                        <i class="fas fa-times-circle mr-1"></i>
-                        Not Ranking
-                        <span class="badge badge-sm ml-1">{{ not_ranking_count }}</span>
-                    </button>
                 </div>
             </div>
         </div>
@@ -387,41 +287,6 @@
 
 <!-- JavaScript for interactions -->
 <script>
-    // Function to update filter button styles
-    function updateFilterButtons(clickedBtn) {
-        // Remove filled state from all filter buttons
-        document.querySelectorAll('[name="filter"]').forEach(btn => {
-            btn.classList.remove('btn-primary', 'btn-success', 'btn-info', 'btn-warning', 'btn-error');
-            
-            // Add outline style based on button type
-            if (btn.textContent.includes('Top 10')) {
-                btn.classList.add('btn-outline', 'btn-success');
-            } else if (btn.textContent.includes('Improved')) {
-                btn.classList.add('btn-outline', 'btn-info');
-            } else if (btn.textContent.includes('Declined')) {
-                btn.classList.add('btn-outline', 'btn-warning');
-            } else if (btn.textContent.includes('Not Ranking')) {
-                btn.classList.add('btn-outline', 'btn-error');
-            } else if (btn.textContent.includes('All')) {
-                btn.classList.add('btn-outline');
-            }
-        });
-        
-        // Add filled state to clicked button
-        clickedBtn.classList.remove('btn-outline');
-        if (clickedBtn.value === 'top10') {
-            clickedBtn.classList.add('btn-success');
-        } else if (clickedBtn.value === 'improved') {
-            clickedBtn.classList.add('btn-info');
-        } else if (clickedBtn.value === 'declined') {
-            clickedBtn.classList.add('btn-warning');
-        } else if (clickedBtn.value === 'not_ranking') {
-            clickedBtn.classList.add('btn-error');
-        } else {
-            clickedBtn.classList.add('btn-primary');
-        }
-    }
-    
     // Handle search input and other initialization
     document.addEventListener('DOMContentLoaded', function() {
         // Handle search input

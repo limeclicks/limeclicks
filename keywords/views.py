@@ -62,8 +62,7 @@ def keywords_list(request):
         projects_with_keywords.append({
             'project': project,
             'stats': keyword_stats,
-            'health_status': health_status,
-            'recent_keywords': project_keywords.order_by('-created_at')[:5]
+            'health_status': health_status
         })
     
     # Calculate overall statistics across all projects (owned and shared)
