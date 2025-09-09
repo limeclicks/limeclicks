@@ -171,7 +171,7 @@
                         value="{{ search_query }}"
                         hx-get="{% url 'project:project_list' %}"
                         hx-trigger="keyup changed delay:500ms"
-                        hx-target="#project-cards-container"
+                        hx-target="#project-cards-wrapper"
                         hx-swap="outerHTML"
                         hx-indicator="#search-spinner"
                     >
@@ -188,9 +188,7 @@
     
     <!-- Projects List -->
     <div id="project-list">
-        <div class="grid grid-cols-1 gap-4" id="project-cards-container">
-            {% include "project/partials/project_cards_clean.html" %}
-        </div>
+        {% include "project/partials/project_cards_clean.html" %}
     </div>
 </div>
 

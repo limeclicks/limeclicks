@@ -1,263 +1,267 @@
-<div class="grid grid-cols-1 gap-4" id="project-cards-container">
-{% if projects_with_info %}
-{% for item in projects_with_info %}
-<div class="card bg-base-100 shadow-sm border border-base-300 hover:shadow-lg transition-all duration-300 project-card" data-project-id="{{ item.project.id }}">
-    <div class="card-body p-6">
-        <!-- Header Section -->
-        <div class="flex items-start justify-between mb-4">
-            <div class="flex items-center gap-3 flex-1">
-                <!-- Favicon -->
-                <img 
-                    src="{% url 'project:favicon_proxy' item.project.domain %}"
-                    alt="{{ item.project.domain }} favicon"
-                    class="w-8 h-8 rounded"
-                    onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\' fill=\'%236B7280\'%3E%3Cpath d=\'M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z\'/%3E%3C/svg%3E'"
-                >
-                
-                <!-- Domain Info -->
-                <div class="flex-1">
-                    <h3 class="text-lg font-semibold text-base-content">{{ item.project.domain }}</h3>
-                    {% if item.project.title %}
-                    <p class="text-sm text-base-content/60">{{ item.project.title }}</p>
+<!-- This wrapper div will be replaced entirely by HTMX -->
+<div id="project-cards-wrapper">
+    <!-- Project Cards Grid -->
+    <div class="grid grid-cols-1 gap-4" id="project-cards-container">
+    {% if projects_with_info %}
+    {% for item in projects_with_info %}
+    <div class="card bg-base-100 shadow-sm border border-base-300 hover:shadow-lg transition-all duration-300 project-card" data-project-id="{{ item.project.id }}">
+        <div class="card-body p-6">
+            <!-- Header Section -->
+            <div class="flex items-start justify-between mb-4">
+                <div class="flex items-center gap-3 flex-1">
+                    <!-- Favicon -->
+                    <img 
+                        src="{% url 'project:favicon_proxy' item.project.domain %}"
+                        alt="{{ item.project.domain }} favicon"
+                        class="w-8 h-8 rounded"
+                        onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\' fill=\'%236B7280\'%3E%3Cpath d=\'M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z\'/%3E%3C/svg%3E'"
+                    >
+                    
+                    <!-- Domain Info -->
+                    <div class="flex-1">
+                        <h3 class="text-lg font-semibold text-base-content">{{ item.project.domain }}</h3>
+                        {% if item.project.title %}
+                        <p class="text-sm text-base-content/60">{{ item.project.title }}</p>
+                        {% endif %}
+                    </div>
+                    
+                    <!-- Owner Badge -->
+                    {% if item.is_owner %}
+                    <span class="badge badge-success badge-sm">
+                        <i class="fas fa-crown text-[10px] mr-1"></i>
+                        OWNER
+                    </span>
                     {% endif %}
                 </div>
                 
-                <!-- Owner Badge -->
-                {% if item.is_owner %}
-                <span class="badge badge-success badge-sm">
-                    <i class="fas fa-crown text-[10px] mr-1"></i>
-                    OWNER
-                </span>
-                {% endif %}
+                <!-- Actions Menu -->
+                <div class="dropdown dropdown-end">
+                    <div tabindex="0" role="button" class="btn btn-ghost btn-xs btn-circle">
+                        <i class="fas fa-ellipsis-v"></i>
+                    </div>
+                    <ul tabindex="0" class="dropdown-content z-[100] menu p-2 shadow-lg bg-base-100 rounded-box w-48">
+                        <li>
+                            <a href="{% url 'project:team_management' item.project.id %}">
+                                <i class="fas fa-users"></i> Manage Team
+                            </a>
+                        </li>
+                        {% if item.can_delete %}
+                        <li>
+                            <a class="text-error" onclick="deleteProject({{ item.project.id }}, '{{ item.project.domain }}')">
+                                <i class="fas fa-trash"></i> Delete
+                            </a>
+                        </li>
+                        {% endif %}
+                    </ul>
+                </div>
             </div>
             
-            <!-- Actions Menu -->
-            <div class="dropdown dropdown-end">
-                <div tabindex="0" role="button" class="btn btn-ghost btn-xs btn-circle">
-                    <i class="fas fa-ellipsis-v"></i>
+            <!-- Metrics in Single Line -->
+            <div class="flex items-center justify-between gap-4 mb-4 py-4 border-y border-base-300">
+                <!-- Domain Rank -->
+                <div class="flex items-center gap-3">
+                    <div>
+                        <p class="text-xs text-base-content/60">Domain Rank</p>
+                        <div class="flex items-baseline gap-1 mt-1">
+                            {% if item.domain_rank %}
+                            <span class="text-2xl font-bold text-{% if item.domain_rank >= 80 %}success{% elif item.domain_rank >= 60 %}warning{% elif item.domain_rank >= 40 %}info{% else %}error{% endif %}">{{ item.domain_rank }}</span>
+                            <span class="text-xs text-base-content/60">/100</span>
+                            {% else %}
+                            <span class="text-2xl font-bold text-base-content/30">--</span>
+                            <span class="text-xs text-base-content/60">/100</span>
+                            {% endif %}
+                        </div>
+                    </div>
                 </div>
-                <ul tabindex="0" class="dropdown-content z-[100] menu p-2 shadow-lg bg-base-100 rounded-box w-48">
-                    <li>
-                        <a href="{% url 'project:team_management' item.project.id %}">
-                            <i class="fas fa-users"></i> Manage Team
-                        </a>
-                    </li>
-                    {% if item.can_delete %}
-                    <li>
-                        <a class="text-error" onclick="deleteProject({{ item.project.id }}, '{{ item.project.domain }}')">
-                            <i class="fas fa-trash"></i> Delete
-                        </a>
-                    </li>
-                    {% endif %}
-                </ul>
-            </div>
-        </div>
-        
-        <!-- Metrics in Single Line -->
-        <div class="flex items-center justify-between gap-4 mb-4 py-4 border-y border-base-300">
-            <!-- Domain Rank -->
-            <div class="flex items-center gap-3">
-                <div>
-                    <p class="text-xs text-base-content/60">Domain Rank</p>
-                    <div class="flex items-baseline gap-1 mt-1">
-                        {% if item.domain_rank %}
-                        <span class="text-2xl font-bold text-{% if item.domain_rank >= 80 %}success{% elif item.domain_rank >= 60 %}warning{% elif item.domain_rank >= 40 %}info{% else %}error{% endif %}">{{ item.domain_rank }}</span>
-                        <span class="text-xs text-base-content/60">/100</span>
+                
+                <!-- Audit Score -->
+                <div class="flex items-center gap-3">
+                    <div>
+                        <p class="text-xs text-base-content/60">Audit Score</p>
+                        {% if item.audit_score is not None %}
+                        <div class="flex items-center gap-2 mt-1">
+                            <div class="radial-progress text-{% if item.audit_score >= 90 %}success{% elif item.audit_score >= 70 %}info{% elif item.audit_score >= 50 %}warning{% else %}error{% endif %}" 
+                                 style="--value:{{ item.audit_score }}; --size:3rem; --thickness: 3px;">
+                                <span class="text-sm font-bold">{{ item.audit_score }}</span>
+                            </div>
+                            <span class="text-xs text-{% if item.audit_score >= 90 %}success{% elif item.audit_score >= 70 %}info{% elif item.audit_score >= 50 %}warning{% else %}error{% endif %}">
+                                {% if item.audit_status == 'completed' %}Completed{% else %}{{ item.audit_status|title }}{% endif %}
+                            </span>
+                        </div>
                         {% else %}
-                        <span class="text-2xl font-bold text-base-content/30">--</span>
-                        <span class="text-xs text-base-content/60">/100</span>
+                        <div class="flex items-center gap-2 mt-1">
+                            <div class="radial-progress text-base-300" style="--value:0; --size:3rem; --thickness: 3px;">
+                                <span class="text-sm font-bold">--</span>
+                            </div>
+                            <span class="text-xs text-base-content/60">No audit</span>
+                        </div>
                         {% endif %}
                     </div>
                 </div>
-            </div>
-            
-            <!-- Audit Score -->
-            <div class="flex items-center gap-3">
-                <div>
-                    <p class="text-xs text-base-content/60">Audit Score</p>
-                    {% if item.audit_score is not None %}
-                    <div class="flex items-center gap-2 mt-1">
-                        <div class="radial-progress text-{% if item.audit_score >= 90 %}success{% elif item.audit_score >= 70 %}info{% elif item.audit_score >= 50 %}warning{% else %}error{% endif %}" 
-                             style="--value:{{ item.audit_score }}; --size:3rem; --thickness: 3px;">
-                            <span class="text-sm font-bold">{{ item.audit_score }}</span>
+                
+                <!-- Total Keywords -->
+                <div class="flex items-center gap-3">
+                    <div>
+                        <p class="text-xs text-base-content/60">Total Keywords</p>
+                        <div class="flex items-baseline gap-1 mt-1">
+                            <span class="text-2xl font-bold text-base-content">{{ item.keyword_count|default:0 }}</span>
+                            <span class="text-xs text-base-content/60">Tracked</span>
                         </div>
-                        <span class="text-xs text-{% if item.audit_score >= 90 %}success{% elif item.audit_score >= 70 %}info{% elif item.audit_score >= 50 %}warning{% else %}error{% endif %}">
-                            {% if item.audit_status == 'completed' %}Completed{% else %}{{ item.audit_status|title }}{% endif %}
-                        </span>
                     </div>
-                    {% else %}
-                    <div class="flex items-center gap-2 mt-1">
-                        <div class="radial-progress text-base-300" style="--value:0; --size:3rem; --thickness: 3px;">
-                            <span class="text-sm font-bold">--</span>
+                </div>
+                
+                <!-- Top 10 -->
+                <div class="flex items-center gap-3">
+                    <div>
+                        <p class="text-xs text-base-content/60">Top 10</p>
+                        <div class="flex items-baseline gap-1 mt-1">
+                            <span class="text-2xl font-bold text-success">{{ item.keywords_in_top_10|default:0 }}</span>
+                            <span class="text-xs text-base-content/60">Keywords</span>
                         </div>
-                        <span class="text-xs text-base-content/60">No audit</span>
-                    </div>
-                    {% endif %}
-                </div>
-            </div>
-            
-            <!-- Total Keywords -->
-            <div class="flex items-center gap-3">
-                <div>
-                    <p class="text-xs text-base-content/60">Total Keywords</p>
-                    <div class="flex items-baseline gap-1 mt-1">
-                        <span class="text-2xl font-bold text-base-content">{{ item.keyword_count|default:0 }}</span>
-                        <span class="text-xs text-base-content/60">Tracked</span>
                     </div>
                 </div>
-            </div>
-            
-            <!-- Top 10 -->
-            <div class="flex items-center gap-3">
-                <div>
-                    <p class="text-xs text-base-content/60">Top 10</p>
-                    <div class="flex items-baseline gap-1 mt-1">
-                        <span class="text-2xl font-bold text-success">{{ item.keywords_in_top_10|default:0 }}</span>
-                        <span class="text-xs text-base-content/60">Keywords</span>
+                
+                <!-- Team -->
+                <div class="flex items-center gap-3">
+                    <div>
+                        <p class="text-xs text-base-content/60">Team</p>
+                        <div class="flex items-baseline gap-1 mt-1">
+                            <span class="text-2xl font-bold text-base-content">{{ item.member_count|default:0 }}</span>
+                            <span class="text-xs text-base-content/60">Members</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Created Date -->
+                <div class="flex items-center gap-3">
+                    <div>
+                        <p class="text-xs text-base-content/60">Created</p>
+                        <div class="flex items-baseline gap-1 mt-1">
+                            <span class="text-sm font-semibold text-base-content">{{ item.project.created_at|date:"M d, Y" }}</span>
+                        </div>
                     </div>
                 </div>
             </div>
             
-            <!-- Team -->
-            <div class="flex items-center gap-3">
-                <div>
-                    <p class="text-xs text-base-content/60">Team</p>
-                    <div class="flex items-baseline gap-1 mt-1">
-                        <span class="text-2xl font-bold text-base-content">{{ item.member_count|default:0 }}</span>
-                        <span class="text-xs text-base-content/60">Members</span>
-                    </div>
-                </div>
+            <!-- Action Buttons -->
+            <div class="flex gap-2">
+                {% if item.audit_id and item.audit_status == 'completed' %}
+                <a href="{% url 'site_audit:detail' item.audit_id %}" class="btn btn-sm btn-outline flex-1">
+                    <i class="fas fa-chart-line"></i>
+                    View Audit
+                </a>
+                {% elif item.audit_status == 'running' or item.audit_status == 'pending' %}
+                <button class="btn btn-sm btn-outline flex-1" disabled>
+                    <i class="fas fa-spinner fa-spin"></i>
+                    Audit Running
+                </button>
+                {% else %}
+                <button class="btn btn-sm btn-outline flex-1" disabled>
+                    <i class="fas fa-chart-line"></i>
+                    No Audit
+                </button>
+                {% endif %}
+                
+                <a href="{% url 'backlinks:detail' item.project.id %}" class="btn btn-sm btn-outline flex-1">
+                    <i class="fas fa-link"></i>
+                    Backlinks
+                </a>
+                
+                <a href="{% url 'keywords:project_keywords' item.project.id %}" class="btn btn-sm btn-outline flex-1">
+                    <i class="fas fa-key"></i>
+                    Keywords
+                </a>
+                
+                <a href="{% url 'project:team_management' item.project.id %}" class="btn btn-sm btn-primary">
+                    <i class="fas fa-users"></i>
+                    Team
+                </a>
             </div>
-            
-            <!-- Created Date -->
-            <div class="flex items-center gap-3">
-                <div>
-                    <p class="text-xs text-base-content/60">Created</p>
-                    <div class="flex items-baseline gap-1 mt-1">
-                        <span class="text-sm font-semibold text-base-content">{{ item.project.created_at|date:"M d, Y" }}</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Action Buttons -->
-        <div class="flex gap-2">
-            {% if item.audit_id and item.audit_status == 'completed' %}
-            <a href="{% url 'site_audit:detail' item.audit_id %}" class="btn btn-sm btn-outline flex-1">
-                <i class="fas fa-chart-line"></i>
-                View Audit
-            </a>
-            {% elif item.audit_status == 'running' or item.audit_status == 'pending' %}
-            <button class="btn btn-sm btn-outline flex-1" disabled>
-                <i class="fas fa-spinner fa-spin"></i>
-                Audit Running
-            </button>
-            {% else %}
-            <button class="btn btn-sm btn-outline flex-1" disabled>
-                <i class="fas fa-chart-line"></i>
-                No Audit
-            </button>
-            {% endif %}
-            
-            <a href="{% url 'backlinks:detail' item.project.id %}" class="btn btn-sm btn-outline flex-1">
-                <i class="fas fa-link"></i>
-                Backlinks
-            </a>
-            
-            <a href="{% url 'keywords:project_keywords' item.project.id %}" class="btn btn-sm btn-outline flex-1">
-                <i class="fas fa-key"></i>
-                Keywords
-            </a>
-            
-            <a href="{% url 'project:team_management' item.project.id %}" class="btn btn-sm btn-primary">
-                <i class="fas fa-users"></i>
-                Team
-            </a>
         </div>
     </div>
-</div>
-{% endfor %}
-{% else %}
-<!-- Empty State -->
-<div class="card bg-base-100 shadow-sm border border-base-300 hover:shadow-lg transition-all duration-300">
-    <div class="card-body p-12 text-center">
-        <div class="flex justify-center mb-6">
-            <div class="w-24 h-24 bg-primary/10 rounded-full flex items-center justify-center">
-                <i class="fas fa-folder-plus text-primary text-3xl"></i>
+    {% endfor %}
+    {% else %}
+    <!-- Empty State -->
+    <div class="card bg-base-100 shadow-sm border border-base-300 hover:shadow-lg transition-all duration-300">
+        <div class="card-body p-12 text-center">
+            <div class="flex justify-center mb-6">
+                <div class="w-24 h-24 bg-primary/10 rounded-full flex items-center justify-center">
+                    <i class="fas fa-folder-plus text-primary text-3xl"></i>
+                </div>
             </div>
-        </div>
-        
-        <h3 class="text-2xl font-bold text-base-content mb-2">No Projects Found</h3>
-        <p class="text-base-content/60 mb-8 max-w-md mx-auto">
-            {% if search_query %}
-                No projects match your search for "{{ search_query }}". Try a different search term.
-            {% else %}
-                Start monitoring your website's SEO performance by creating your first project.
+            
+            <h3 class="text-2xl font-bold text-base-content mb-2">No Projects Found</h3>
+            <p class="text-base-content/60 mb-8 max-w-md mx-auto">
+                {% if search_query %}
+                    No projects match your search for "{{ search_query }}". Try a different search term.
+                {% else %}
+                    Start monitoring your website's SEO performance by creating your first project.
+                {% endif %}
+            </p>
+            
+            {% if not search_query %}
+            <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                <button onclick="openCreateProjectModal()" class="btn btn-primary">
+                    <i class="fas fa-plus mr-2"></i>
+                    Create Your First Project
+                </button>
+            </div>
             {% endif %}
-        </p>
-        
-        {% if not search_query %}
-        <div class="flex flex-col sm:flex-row gap-4 justify-center">
-            <button onclick="openCreateProjectModal()" class="btn btn-primary">
-                <i class="fas fa-plus mr-2"></i>
-                Create Your First Project
-            </button>
         </div>
-        {% endif %}
     </div>
-</div>
-{% endif %}
-</div>
+    {% endif %}
+    </div>
 
-{% if page_obj and page_obj.has_other_pages %}
-<!-- Traditional Pagination -->
-<div class="flex justify-center mt-8">
-    <div class="join">
-        {% if page_obj.has_previous %}
-        <a href="?page={{ page_obj.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}" 
-           class="join-item btn"
-           hx-get="{% url 'project:project_list' %}?page={{ page_obj.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}"
-           hx-target="#project-cards-container"
-           hx-swap="outerHTML">
-            <i class="fas fa-chevron-left"></i>
-        </a>
-        {% else %}
-        <button class="join-item btn btn-disabled">
-            <i class="fas fa-chevron-left"></i>
-        </button>
-        {% endif %}
-        
-        {% for num in page_obj.paginator.page_range %}
-            {% if page_obj.number == num %}
-                <button class="join-item btn btn-active">{{ num }}</button>
-            {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
-                <a href="?page={{ num }}{% if search_query %}&search={{ search_query }}{% endif %}" 
-                   class="join-item btn"
-                   hx-get="{% url 'project:project_list' %}?page={{ num }}{% if search_query %}&search={{ search_query }}{% endif %}"
-                   hx-target="#project-cards-container"
-                   hx-swap="outerHTML">{{ num }}</a>
-            {% elif num == 1 or num == page_obj.paginator.num_pages %}
-                <a href="?page={{ num }}{% if search_query %}&search={{ search_query }}{% endif %}" 
-                   class="join-item btn"
-                   hx-get="{% url 'project:project_list' %}?page={{ num }}{% if search_query %}&search={{ search_query }}{% endif %}"
-                   hx-target="#project-cards-container"
-                   hx-swap="outerHTML">{{ num }}</a>
+    {% if page_obj and page_obj.has_other_pages %}
+    <!-- Pagination -->
+    <div class="flex justify-center mt-8">
+        <div class="join">
+            {% if page_obj.has_previous %}
+            <a href="?page={{ page_obj.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}" 
+               class="join-item btn"
+               hx-get="{% url 'project:project_list' %}?page={{ page_obj.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}"
+               hx-target="#project-cards-wrapper"
+               hx-swap="outerHTML">
+                <i class="fas fa-chevron-left"></i>
+            </a>
+            {% else %}
+            <button class="join-item btn btn-disabled">
+                <i class="fas fa-chevron-left"></i>
+            </button>
             {% endif %}
-        {% endfor %}
-        
-        {% if page_obj.has_next %}
-        <a href="?page={{ page_obj.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}" 
-           class="join-item btn"
-           hx-get="{% url 'project:project_list' %}?page={{ page_obj.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}"
-           hx-target="#project-cards-container"
-           hx-swap="outerHTML">
-            <i class="fas fa-chevron-right"></i>
-        </a>
-        {% else %}
-        <button class="join-item btn btn-disabled">
-            <i class="fas fa-chevron-right"></i>
-        </button>
-        {% endif %}
+            
+            {% for num in page_obj.paginator.page_range %}
+                {% if page_obj.number == num %}
+                    <button class="join-item btn btn-active">{{ num }}</button>
+                {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                    <a href="?page={{ num }}{% if search_query %}&search={{ search_query }}{% endif %}" 
+                       class="join-item btn"
+                       hx-get="{% url 'project:project_list' %}?page={{ num }}{% if search_query %}&search={{ search_query }}{% endif %}"
+                       hx-target="#project-cards-wrapper"
+                       hx-swap="outerHTML">{{ num }}</a>
+                {% elif num == 1 or num == page_obj.paginator.num_pages %}
+                    <a href="?page={{ num }}{% if search_query %}&search={{ search_query }}{% endif %}" 
+                       class="join-item btn"
+                       hx-get="{% url 'project:project_list' %}?page={{ num }}{% if search_query %}&search={{ search_query }}{% endif %}"
+                       hx-target="#project-cards-wrapper"
+                       hx-swap="outerHTML">{{ num }}</a>
+                {% endif %}
+            {% endfor %}
+            
+            {% if page_obj.has_next %}
+            <a href="?page={{ page_obj.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}" 
+               class="join-item btn"
+               hx-get="{% url 'project:project_list' %}?page={{ page_obj.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}"
+               hx-target="#project-cards-wrapper"
+               hx-swap="outerHTML">
+                <i class="fas fa-chevron-right"></i>
+            </a>
+            {% else %}
+            <button class="join-item btn btn-disabled">
+                <i class="fas fa-chevron-right"></i>
+            </button>
+            {% endif %}
+        </div>
     </div>
+    {% endif %}
 </div>
-{% endif %}
