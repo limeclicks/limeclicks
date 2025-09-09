@@ -103,7 +103,7 @@ def project_list(request):
     
     # Check if it's an HTMX request for partial updates
     if request.headers.get('HX-Request'):
-        template = 'project/partials/project_table_rows.html'
+        template = 'project/partials/project_cards_clean.html'
     else:
         template = 'project/project_list.html'
     

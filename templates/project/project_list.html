@@ -172,7 +172,7 @@
                         hx-get="{% url 'project:project_list' %}"
                         hx-trigger="keyup changed delay:500ms"
                         hx-target="#project-cards-container"
-                        hx-swap="innerHTML"
+                        hx-swap="outerHTML"
                         hx-indicator="#search-spinner"
                     >
                     <div class="absolute left-4 top-1/2 -translate-y-1/2">
@@ -189,76 +189,8 @@
     <!-- Projects List -->
     <div id="project-list">
         <div class="grid grid-cols-1 gap-4" id="project-cards-container">
-            {% if projects_with_info %}
-                {% include "project/partials/project_cards_clean.html" %}
-            {% else %}
-                <!-- Empty State -->
-                <div class="card bg-base-100 shadow-sm border border-base-300 hover:shadow-lg transition-all duration-300">
-                    <div class="card-body p-12 text-center">
-                        <div class="flex justify-center mb-6">
-                            <div class="w-24 h-24 bg-primary/10 rounded-full flex items-center justify-center">
-                                <i class="fas fa-folder-plus text-primary text-3xl"></i>
-                            </div>
-                        </div>
-                        
-                        <h3 class="text-2xl font-bold text-base-content mb-2">No Projects Yet</h3>
-                        <p class="text-base-content/60 mb-8 max-w-md mx-auto">
-                            Start monitoring your website's SEO performance by creating your first project.
-                        </p>
-                        
-                        <div class="flex flex-col sm:flex-row gap-4 justify-center">
-                            <button onclick="openCreateProjectModal()" class="btn btn-primary">
-                                <i class="fas fa-plus mr-2"></i>
-                                Create Your First Project
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            {% endif %}
+            {% include "project/partials/project_cards_clean.html" %}
         </div>
-        
-        {% if page_obj and page_obj.has_other_pages %}
-        <!-- Traditional Pagination -->
-        <div class="flex justify-center mt-8">
-            <div class="join">
-                {% if page_obj.has_previous %}
-                <a href="?page={{ page_obj.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}" 
-                   class="join-item btn">
-                    <i class="fas fa-chevron-left"></i>
-                </a>
-                {% else %}
-                <button class="join-item btn btn-disabled">
-                    <i class="fas fa-chevron-left"></i>
-                </button>
-                {% endif %}
-                
-                {% for num in page_obj.paginator.page_range %}
-                    {% if page_obj.number == num %}
-                        <button class="join-item btn btn-active">{{ num }}</button>
-                    {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
-                        <a href="?page={{ num }}{% if search_query %}&search={{ search_query }}{% endif %}" 
-                           class="join-item btn">{{ num }}</a>
-                    {% elif num == page_obj.number|add:'-3' or num == page_obj.number|add:'3' %}
-                        <button class="join-item btn btn-disabled">...</button>
-                    {% elif num == 1 or num == page_obj.paginator.num_pages %}
-                        <a href="?page={{ num }}{% if search_query %}&search={{ search_query }}{% endif %}" 
-                           class="join-item btn">{{ num }}</a>
-                    {% endif %}
-                {% endfor %}
-                
-                {% if page_obj.has_next %}
-                <a href="?page={{ page_obj.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}" 
-                   class="join-item btn">
-                    <i class="fas fa-chevron-right"></i>
-                </a>
-                {% else %}
-                <button class="join-item btn btn-disabled">
-                    <i class="fas fa-chevron-right"></i>
-                </button>
-                {% endif %}
-            </div>
-        </div>
-        {% endif %}
     </div>
 </div>
 
