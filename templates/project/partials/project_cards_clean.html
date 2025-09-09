@@ -213,54 +213,82 @@
     </div>
 
     {% if page_obj and page_obj.has_other_pages %}
-    <!-- Pagination -->
-    <div class="flex justify-center mt-8">
-        <div class="join">
-            {% if page_obj.has_previous %}
-            <a href="?page={{ page_obj.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}" 
-               class="join-item btn"
-               hx-get="{% url 'project:project_list' %}?page={{ page_obj.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}"
-               hx-target="#project-cards-wrapper"
-               hx-swap="outerHTML">
-                <i class="fas fa-chevron-left"></i>
-            </a>
-            {% else %}
-            <button class="join-item btn btn-disabled">
-                <i class="fas fa-chevron-left"></i>
-            </button>
-            {% endif %}
-            
-            {% for num in page_obj.paginator.page_range %}
-                {% if page_obj.number == num %}
-                    <button class="join-item btn btn-active">{{ num }}</button>
-                {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
-                    <a href="?page={{ num }}{% if search_query %}&search={{ search_query }}{% endif %}" 
-                       class="join-item btn"
-                       hx-get="{% url 'project:project_list' %}?page={{ num }}{% if search_query %}&search={{ search_query }}{% endif %}"
-                       hx-target="#project-cards-wrapper"
-                       hx-swap="outerHTML">{{ num }}</a>
-                {% elif num == 1 or num == page_obj.paginator.num_pages %}
-                    <a href="?page={{ num }}{% if search_query %}&search={{ search_query }}{% endif %}" 
-                       class="join-item btn"
-                       hx-get="{% url 'project:project_list' %}?page={{ num }}{% if search_query %}&search={{ search_query }}{% endif %}"
-                       hx-target="#project-cards-wrapper"
-                       hx-swap="outerHTML">{{ num }}</a>
-                {% endif %}
-            {% endfor %}
-            
-            {% if page_obj.has_next %}
-            <a href="?page={{ page_obj.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}" 
-               class="join-item btn"
-               hx-get="{% url 'project:project_list' %}?page={{ page_obj.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}"
-               hx-target="#project-cards-wrapper"
-               hx-swap="outerHTML">
-                <i class="fas fa-chevron-right"></i>
-            </a>
-            {% else %}
-            <button class="join-item btn btn-disabled">
-                <i class="fas fa-chevron-right"></i>
-            </button>
-            {% endif %}
+    <!-- Pagination Card -->
+    <div class="mt-8">
+        <div class="card bg-white shadow-lg border border-base-300 hover:shadow-xl transition-shadow duration-300">
+            <div class="card-body p-6">
+                <div class="flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <!-- Page Info -->
+                    <div class="flex items-center gap-4">
+                        <div class="flex items-center gap-2">
+                            <div class="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                                <i class="fas fa-folder text-primary"></i>
+                            </div>
+                            <div>
+                                <div class="text-sm font-semibold text-base-content">
+                                    {{ page_obj.paginator.count }} Projects
+                                </div>
+                                <div class="text-xs text-base-content/60">
+                                    Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Pagination Controls -->
+                    <div class="join shadow-sm">
+                        {% if page_obj.has_previous %}
+                        <a href="?page={{ page_obj.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}" 
+                           class="join-item btn btn-md bg-white hover:bg-base-200 border-base-300"
+                           hx-get="{% url 'project:project_list' %}?page={{ page_obj.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}"
+                           hx-target="#project-cards-wrapper"
+                           hx-swap="outerHTML">
+                            <i class="fas fa-chevron-left"></i>
+                        </a>
+                        {% else %}
+                        <button class="join-item btn btn-md btn-disabled bg-base-100">
+                            <i class="fas fa-chevron-left"></i>
+                        </button>
+                        {% endif %}
+                        
+                        {% for num in page_obj.paginator.page_range %}
+                            {% if page_obj.number == num %}
+                                <button class="join-item btn btn-md btn-primary shadow-sm">
+                                    {{ num }}
+                                </button>
+                            {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                                <a href="?page={{ num }}{% if search_query %}&search={{ search_query }}{% endif %}" 
+                                   class="join-item btn btn-md bg-white hover:bg-base-200 border-base-300"
+                                   hx-get="{% url 'project:project_list' %}?page={{ num }}{% if search_query %}&search={{ search_query }}{% endif %}"
+                                   hx-target="#project-cards-wrapper"
+                                   hx-swap="outerHTML">{{ num }}</a>
+                            {% elif num == page_obj.number|add:'-3' or num == page_obj.number|add:'3' %}
+                                <button class="join-item btn btn-md btn-disabled bg-base-100">...</button>
+                            {% elif num == 1 or num == page_obj.paginator.num_pages %}
+                                <a href="?page={{ num }}{% if search_query %}&search={{ search_query }}{% endif %}" 
+                                   class="join-item btn btn-md bg-white hover:bg-base-200 border-base-300"
+                                   hx-get="{% url 'project:project_list' %}?page={{ num }}{% if search_query %}&search={{ search_query }}{% endif %}"
+                                   hx-target="#project-cards-wrapper"
+                                   hx-swap="outerHTML">{{ num }}</a>
+                            {% endif %}
+                        {% endfor %}
+                        
+                        {% if page_obj.has_next %}
+                        <a href="?page={{ page_obj.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}" 
+                           class="join-item btn btn-md bg-white hover:bg-base-200 border-base-300"
+                           hx-get="{% url 'project:project_list' %}?page={{ page_obj.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}"
+                           hx-target="#project-cards-wrapper"
+                           hx-swap="outerHTML">
+                            <i class="fas fa-chevron-right"></i>
+                        </a>
+                        {% else %}
+                        <button class="join-item btn btn-md btn-disabled bg-base-100">
+                            <i class="fas fa-chevron-right"></i>
+                        </button>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
     {% endif %}
