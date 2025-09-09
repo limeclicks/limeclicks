@@ -133,20 +133,7 @@
         opacity: 1 !important;
     }
     
-    /* Table container - fix scroll issue */
-    .table-container {
-        min-height: auto;
-        height: auto;
-        max-height: unset;
-        overflow: hidden;
-    }
-    
-    /* Add horizontal scroll only when needed */
-    @media (max-width: 768px) {
-        .table-container {
-            overflow-x: auto;
-        }
-    }
+    /* Remove any scroll issues - let overflow-x-auto handle it */
     
     /* Table styles */
     .table {
@@ -230,7 +217,7 @@
                                 value="{{ search_query }}"
                                 hx-get="{% url 'keywords:project_keywords' project.id %}"
                                 hx-trigger="keyup changed delay:500ms, search"
-                                hx-target="#keywords-container"
+                                hx-target="#keywords-table-body"
                                 hx-include="#search-form"
                             >
                             <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-base-content/40 text-sm"></i>
@@ -242,7 +229,7 @@
                             class="btn btn-primary btn-sm"
                             hx-get="{% url 'keywords:project_keywords' project.id %}"
                             hx-trigger="click"
-                            hx-target="#keywords-container"
+                            hx-target="#keywords-table-body"
                             hx-include="#search-form"
                         >
                             Search
@@ -264,7 +251,7 @@
                         <select name="country" id="country-filter" class="select select-bordered select-sm"
                                 hx-get="{% url 'keywords:project_keywords' project.id %}"
                                 hx-trigger="change"
-                                hx-target="#keywords-container"
+                                hx-target="#keywords-table-body"
                                 hx-include="#search-form">
                             <option value="">All Countries</option>
                             <option value="US" {% if request.GET.country == 'US' %}selected{% endif %}>United States</option>
@@ -280,7 +267,7 @@
                         <select name="tag" id="tag-filter" class="select select-bordered select-sm"
                                 hx-get="{% url 'keywords:project_keywords' project.id %}"
                                 hx-trigger="change"
-                                hx-target="#keywords-container"
+                                hx-target="#keywords-table-body"
                                 hx-include="#search-form">
                             <option value="">All Tags</option>
                             {% for tag in available_tags %}
@@ -294,7 +281,7 @@
                         <select name="rank_compare" id="rank-compare" class="select select-bordered select-sm"
                                 hx-get="{% url 'keywords:project_keywords' project.id %}"
                                 hx-trigger="change"
-                                hx-target="#keywords-container"
+                                hx-target="#keywords-table-body"
                                 hx-include="#search-form">
                             <option value="">All Ranks</option>
                             <option value="eq" {% if request.GET.rank_compare == 'eq' %}selected{% endif %}>Rank Equal To</option>
@@ -316,7 +303,7 @@
                                 value="{{ request.GET.rank_value }}"
                                 hx-get="{% url 'keywords:project_keywords' project.id %}"
                                 hx-trigger="change delay:500ms"
-                                hx-target="#keywords-container"
+                                hx-target="#keywords-table-body"
                                 hx-include="#search-form"
                             >
                             <input 
@@ -330,7 +317,7 @@
                                 value="{{ request.GET.rank_value2 }}"
                                 hx-get="{% url 'keywords:project_keywords' project.id %}"
                                 hx-trigger="change delay:500ms"
-                                hx-target="#keywords-container"
+                                hx-target="#keywords-table-body"
                                 hx-include="#search-form"
                             >
                         </div>
@@ -477,7 +464,7 @@
     <div class="card bg-base-100 shadow-sm border border-base-300">
         <div class="card-body p-0">
             {% if keywords %}
-            <div id="keywords-table" class="table-container">
+            <div id="keywords-table" class="overflow-x-auto">
                 <table class="table">
                         <thead>
                             <tr>
@@ -730,7 +717,7 @@
                         class="join-item btn btn-sm"
                         hx-get="{% url 'keywords:project_keywords' project.id %}?page=1"
                         hx-trigger="click"
-                        hx-target="#keywords-container"
+                        hx-target="#keywords-table-body"
                         hx-swap="innerHTML"
                         hx-include="#search-form"
                     >
@@ -740,7 +727,7 @@
                         class="join-item btn btn-sm"
                         hx-get="{% url 'keywords:project_keywords' project.id %}?page={{ page_obj.previous_page_number }}"
                         hx-trigger="click"
-                        hx-target="#keywords-container"
+                        hx-target="#keywords-table-body"
                         hx-swap="innerHTML"
                         hx-include="#search-form"
                     >
@@ -758,7 +745,7 @@
                             class="join-item btn btn-sm {% if page_obj.number == num %}btn-active{% endif %}"
                             hx-get="{% url 'keywords:project_keywords' project.id %}?page={{ num }}"
                             hx-trigger="click"
-                            hx-target="#keywords-container"
+                            hx-target="#keywords-table-body"
                             hx-swap="innerHTML"
                             hx-include="#search-form"
                         >
@@ -772,7 +759,7 @@
                         class="join-item btn btn-sm"
                         hx-get="{% url 'keywords:project_keywords' project.id %}?page={{ page_obj.next_page_number }}"
                         hx-trigger="click"
-                        hx-target="#keywords-container"
+                        hx-target="#keywords-table-body"
                         hx-swap="innerHTML"
                         hx-include="#search-form"
                     >
@@ -782,7 +769,7 @@
                         class="join-item btn btn-sm"
                         hx-get="{% url 'keywords:project_keywords' project.id %}?page={{ page_obj.paginator.num_pages }}"
                         hx-trigger="click"
-                        hx-target="#keywords-container"
+                        hx-target="#keywords-table-body"
                         hx-swap="innerHTML"
                         hx-include="#search-form"
                     >
@@ -1011,7 +998,9 @@
         }
         
         // Make HTMX request
-        htmx.ajax('GET', '{% url "keywords:project_keywords" project.id %}?' + params.toString(), {
+        // Make the HTMX request
+        const url = '{% url "keywords:project_keywords" project.id %}?' + params.toString();
+        htmx.ajax('GET', url, {
             target: '#keywords-table-body',
             swap: 'innerHTML'
         });
@@ -1052,7 +1041,9 @@
         params.set('sort', sortInput ? sortInput.value : 'keyword');
         params.set('order', orderInput ? orderInput.value : 'asc');
         
-        htmx.ajax('GET', '{% url "keywords:project_keywords" project.id %}?' + params.toString(), {
+        // Make the HTMX request
+        const url = '{% url "keywords:project_keywords" project.id %}?' + params.toString();
+        htmx.ajax('GET', url, {
             target: '#keywords-table-body',
             swap: 'innerHTML'
         });
@@ -1077,7 +1068,9 @@
         params.set('order', orderInput ? orderInput.value : 'asc');
         params.set('page', 1); // Reset to first page on new search
         
-        htmx.ajax('GET', '{% url "keywords:project_keywords" project.id %}?' + params.toString(), {
+        // Make the HTMX request
+        const url = '{% url "keywords:project_keywords" project.id %}?' + params.toString();
+        htmx.ajax('GET', url, {
             target: '#keywords-table-body',
             swap: 'innerHTML'
         });
@@ -1111,7 +1104,9 @@
             params.append('filter', activeFilter.dataset.filter);
         }
         
-        htmx.ajax('GET', '{% url "keywords:project_keywords" project.id %}?' + params.toString(), {
+        // Make the HTMX request
+        const url = '{% url "keywords:project_keywords" project.id %}?' + params.toString();
+        htmx.ajax('GET', url, {
             target: '#keywords-table-body',
             swap: 'innerHTML'
         });
@@ -1125,10 +1120,8 @@
         params.set('per_page', value);
         params.set('page', 1); // Reset to first page
         
-        htmx.ajax('GET', '{% url "keywords:project_keywords" project.id %}?' + params.toString(), {
-            target: '#keywords-table-body',
-            swap: 'innerHTML'
-        });
+        // When changing per page, we need to reload the entire page to update pagination controls
+        window.location.href = '{% url "keywords:project_keywords" project.id %}?' + params.toString();
     }
     
     // Handle rank comparison change

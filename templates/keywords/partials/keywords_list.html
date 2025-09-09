@@ -1,143 +1,121 @@
-<!-- Keywords Table Card -->
-<div class="card bg-base-100 shadow-sm border border-base-300">
-    <div class="card-body p-0">
-        {% if keywords %}
-        <div class="overflow-x-auto">
-            <table class="table">
-                <thead>
-                    <tr>
-                        <th class="w-12">
-                            <input type="checkbox" class="checkbox checkbox-sm" id="select-all">
-                        </th>
-                        <th>Keyword</th>
-                        <th class="text-center">Rank</th>
-                        <th class="text-center">Change</th>
-                        <th>Country</th>
-                        <th>Last Checked</th>
-                        <th class="text-right">Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% include 'keywords/partials/keywords_table.html' %}
-                </tbody>
-            </table>
+<!-- This partial should only return the table rows, not the full structure -->
+{% for keyword in keywords %}
+<tr class="keyword-row" data-keyword-id="{{ keyword.id }}">
+    <td class="w-12">
+        <input type="checkbox" 
+               class="checkbox checkbox-sm keyword-checkbox"
+               value="{{ keyword.id }}"
+               onchange="updateBulkActions()">
+    </td>
+    <td>
+        <div class="flex items-center gap-2">
+            <a href="{% url 'keywords:keyword_detail' keyword.id %}" class="font-medium text-base-content hover:text-primary hover:underline">
+                {{ keyword.keyword }}
+            </a>
+            {% if keyword.processing %}
+            <span class="loading loading-spinner loading-xs text-primary" title="Checking rank..."></span>
+            {% endif %}
         </div>
-        {% else %}
-        <div class="text-center py-12">
-            <i class="fas fa-search text-4xl text-base-content/20 mb-4"></i>
-            <p class="text-base-content/60">No keywords found matching your criteria.</p>
+        {% if keyword.rank_url %}
+        <div class="mt-1">
+            <a href="{{ keyword.rank_url }}" target="_blank" class="text-xs text-base-content/60 hover:text-primary hover:underline block truncate max-w-xs" title="{{ keyword.rank_url }}">
+                <i class="fas fa-link text-[10px] mr-1"></i>{{ keyword.rank_url|truncatechars:50 }}
+            </a>
         </div>
         {% endif %}
-    </div>
-</div>
-
-<!-- Pagination -->
-{% if page_obj.paginator.num_pages > 1 %}
-<div class="card bg-base-100 shadow-sm border border-base-300 mt-4">
-    <div class="card-body p-4">
-        <div class="flex flex-col sm:flex-row justify-between items-center gap-4">
-            <!-- Per Page Selector -->
-            <div class="flex items-center gap-2">
-                <span class="text-sm text-base-content/60">Show</span>
-                <select 
-                    class="select select-bordered select-sm"
-                    hx-get="{% url 'keywords:project_keywords' project.id %}"
-                    hx-trigger="change"
-                    hx-target="#keywords-container"
-                    hx-swap="innerHTML"
-                    hx-include="#search-form"
-                    name="per_page"
-                >
-                    <option value="25" {% if per_page == 25 %}selected{% endif %}>25</option>
-                    <option value="50" {% if per_page == 50 %}selected{% endif %}>50</option>
-                    <option value="100" {% if per_page == 100 %}selected{% endif %}>100</option>
-                    <option value="250" {% if per_page == 250 %}selected{% endif %}>250</option>
-                </select>
-                <span class="text-sm text-base-content/60">per page</span>
-            </div>
-            
-            <!-- Pagination Controls -->
-            <div class="join">
-                {% if page_obj.has_previous %}
-                <button 
-                    class="join-item btn btn-sm"
-                    hx-get="{% url 'keywords:project_keywords' project.id %}?page=1"
-                    hx-trigger="click"
-                    hx-target="#keywords-container"
-                    hx-swap="innerHTML"
-                    hx-include="#search-form"
-                >
-                    «
-                </button>
-                <button 
-                    class="join-item btn btn-sm"
-                    hx-get="{% url 'keywords:project_keywords' project.id %}?page={{ page_obj.previous_page_number }}"
-                    hx-trigger="click"
-                    hx-target="#keywords-container"
-                    hx-swap="innerHTML"
-                    hx-include="#search-form"
-                >
-                    ‹
-                </button>
-                {% else %}
-                <button class="join-item btn btn-sm btn-disabled" disabled>«</button>
-                <button class="join-item btn btn-sm btn-disabled" disabled>‹</button>
-                {% endif %}
-                
-                <!-- Page Numbers -->
-                {% for num in page_obj.paginator.page_range %}
-                    {% if num > page_obj.number|add:"-3" and num < page_obj.number|add:"3" %}
-                    {% if page_obj.number == num %}
-                    <button class="join-item btn btn-sm btn-active" disabled>
-                        {{ num }}
-                    </button>
-                    {% else %}
-                    <button 
-                        class="join-item btn btn-sm"
-                        hx-get="{% url 'keywords:project_keywords' project.id %}?page={{ num }}"
-                        hx-trigger="click"
-                        hx-target="#keywords-container"
-                        hx-swap="innerHTML"
-                        hx-include="#search-form"
-                    >
-                        {{ num }}
-                    </button>
-                    {% endif %}
-                    {% endif %}
-                {% endfor %}
-                
-                {% if page_obj.has_next %}
-                <button 
-                    class="join-item btn btn-sm"
-                    hx-get="{% url 'keywords:project_keywords' project.id %}?page={{ page_obj.next_page_number }}"
-                    hx-trigger="click"
-                    hx-target="#keywords-container"
-                    hx-swap="innerHTML"
-                    hx-include="#search-form"
-                >
-                    ›
-                </button>
-                <button 
-                    class="join-item btn btn-sm"
-                    hx-get="{% url 'keywords:project_keywords' project.id %}?page={{ page_obj.paginator.num_pages }}"
-                    hx-trigger="click"
-                    hx-target="#keywords-container"
-                    hx-swap="innerHTML"
-                    hx-include="#search-form"
-                >
-                    »
-                </button>
-                {% else %}
-                <button class="join-item btn btn-sm btn-disabled" disabled>›</button>
-                <button class="join-item btn btn-sm btn-disabled" disabled>»</button>
-                {% endif %}
-            </div>
-            
-            <!-- Results Info -->
-            <div class="text-sm text-base-content/60">
-                Showing {{ page_obj.start_index }} to {{ page_obj.end_index }} of {{ page_obj.paginator.count }} results
-            </div>
+        {% if keyword.keyword_tags.all %}
+        <div class="flex flex-wrap gap-1 mt-1">
+            {% for keyword_tag in keyword.keyword_tags.all %}
+            <span class="badge badge-sm" style="background-color: {{ keyword_tag.tag.color }}; color: white;">
+                {{ keyword_tag.tag.name }}
+            </span>
+            {% endfor %}
         </div>
-    </div>
-</div>
-{% endif %}
+        {% endif %}
+    </td>
+    <td class="text-center rank-cell">
+        {% if keyword.processing %}
+            <span class="badge badge-ghost gap-1">
+                <span class="loading loading-spinner loading-xs"></span>
+                Checking
+            </span>
+        {% elif keyword.rank > 0 and keyword.rank <= 100 %}
+            <span class="badge rank-badge 
+                {% if keyword.rank == 1 %}rank-1{% elif keyword.rank == 2 %}rank-2{% elif keyword.rank == 3 %}rank-3{% elif keyword.rank <= 10 %}rank-top10{% elif keyword.rank <= 30 %}rank-top30{% elif keyword.rank <= 50 %}rank-top50{% else %}rank-top100{% endif %}">
+                #{{ keyword.rank }}
+            </span>
+        {% else %}
+            <span class="badge rank-badge rank-none">NR</span>
+        {% endif %}
+    </td>
+    <td class="text-center change-cell">
+        {% if keyword.processing %}
+            <span class="text-base-content/40">-</span>
+        {% elif keyword.rank_diff_from_last_time != 0 %}
+            <span class="flex items-center justify-center gap-1">
+                {% if keyword.rank_diff_from_last_time > 0 %}
+                    <i class="fas fa-arrow-up text-xs rank-change-up"></i>
+                    <span class="text-sm font-semibold rank-change-up">+{{ keyword.rank_diff_from_last_time }}</span>
+                {% else %}
+                    <i class="fas fa-arrow-down text-xs rank-change-down"></i>
+                    <span class="text-sm font-semibold rank-change-down">{{ keyword.rank_diff_from_last_time }}</span>
+                {% endif %}
+            </span>
+        {% else %}
+            <span class="text-base-content/40">-</span>
+        {% endif %}
+    </td>
+    <td>
+        {% load country_flags %}
+        <span class="badge badge-ghost" title="Search location: {{ keyword.country|google_domain }}">
+            {{ keyword.country|country_flag }} {{ keyword.country }}
+        </span>
+    </td>
+    <td>
+        {% if keyword.scraped_at %}
+            <span class="text-sm">{{ keyword.scraped_at|timesince }} ago</span>
+        {% else %}
+            <span class="text-sm text-base-content/40">Never</span>
+        {% endif %}
+    </td>
+    <td class="text-right">
+        <div class="dropdown dropdown-end">
+            <button tabindex="0" class="btn btn-ghost btn-sm">
+                <i class="fas fa-ellipsis-v"></i>
+            </button>
+            <ul tabindex="0" class="dropdown-content z-[1] menu p-2 shadow bg-base-100 rounded-box w-52 border">
+                <li>
+                    <a href="{% url 'keywords:keyword_detail' keyword.id %}">
+                        <i class="fas fa-eye"></i>
+                        View Details
+                    </a>
+                </li>
+                <li>
+                    <button 
+                        hx-post="{% url 'keywords:api_force_crawl' keyword.id %}"
+                        hx-trigger="click"
+                        hx-swap="none"
+                        hx-on::after-request="handleRecheckResponse(event)"
+                    >
+                        <i class="fas fa-sync"></i>
+                        Re-Check Rank
+                    </button>
+                </li>
+                <li>
+                    <button onclick="deleteKeyword({{ keyword.id }}, '{{ keyword.keyword|escapejs }}')" class="text-error w-full text-left">
+                        <i class="fas fa-trash"></i>
+                        Delete
+                    </button>
+                </li>
+            </ul>
+        </div>
+    </td>
+</tr>
+{% empty %}
+<tr>
+    <td colspan="7" class="text-center py-8">
+        <i class="fas fa-search text-4xl text-base-content/20 mb-4"></i>
+        <p class="text-base-content/60">No keywords found matching your criteria.</p>
+    </td>
+</tr>
+{% endfor %}
