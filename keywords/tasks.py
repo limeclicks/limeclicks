@@ -452,8 +452,8 @@ def enqueue_keyword_scrapes_batch():
         # Find projects that are inactive but have overdue keywords
         inactive_projects_with_overdue = Project.objects.filter(
             active=False,
-            keyword__scraped_at__lt=cutoff_time,
-            keyword__archive=False
+            keywords__scraped_at__lt=cutoff_time,
+            keywords__archive=False
         ).distinct()
         
         if inactive_projects_with_overdue.exists():
