@@ -67,23 +67,47 @@ app.autodiscover_tasks()
 from celery.schedules import crontab
 
 app.conf.beat_schedule = {
-    # Keyword crawl scheduling - PRIMARY TASK
-    'enqueue-keyword-scrapes': {
-        'task': 'keywords.tasks.enqueue_keyword_scrapes_batch',
-        'schedule': crontab(minute='*/5'),  # Run every 5 minutes
+    # ===================================================================
+    # NEW DAILY SCHEDULING SYSTEM - BULLETPROOF GUARANTEE APPROACH
+    # ===================================================================
+    
+    # 1. DAILY BULK QUEUE - Queue ALL keywords at start of day
+    'daily-queue-all-keywords': {
+        'task': 'keywords.tasks.daily_queue_all_keywords',
+        'schedule': crontab(hour=0, minute=1),  # 12:01 AM daily
         'options': {'queue': 'celery', 'priority': 10}
     },
     
-    # Auto-recovery and cleanup tasks - BALANCED SCHEDULE
-    'cleanup-stuck-keywords': {
-        'task': 'keywords.tasks.cleanup_stuck_keywords',
-        'schedule': crontab(minute='*/10'),  # Run every 10 minutes - balanced approach
+    # 2. GAP DETECTION & RECOVERY - Every 2 hours throughout the day
+    'detect-missed-keywords': {
+        'task': 'keywords.tasks.detect_and_recover_missed_keywords',
+        'schedule': crontab(minute=0, hour='*/2'),  # Every 2 hours at :00
+        'options': {'queue': 'celery', 'priority': 8}
+    },
+    
+    # 3. END-OF-DAY AUDIT - Final verification at 11:00 PM
+    'end-of-day-audit': {
+        'task': 'keywords.tasks.end_of_day_audit',
+        'schedule': crontab(hour=23, minute=0),  # 11:00 PM daily
         'options': {'queue': 'celery', 'priority': 9}
     },
+    
+    # ===================================================================
+    # LEGACY CLEANUP TASKS - REDUCED FREQUENCY
+    # ===================================================================
+    
+    # Cleanup stuck keywords - Now every 2 hours (was 10 minutes)
+    'cleanup-stuck-keywords': {
+        'task': 'keywords.tasks.cleanup_stuck_keywords',
+        'schedule': crontab(minute=30, hour='*/2'),  # Every 2 hours at :30 (offset from gap detection)
+        'options': {'queue': 'celery', 'priority': 7}
+    },
+    
+    # Worker health check - Less frequent
     'worker-health-check': {
         'task': 'keywords.tasks.worker_health_check',
-        'schedule': crontab(minute='*/5'),  # Run every 5 minutes
-        'options': {'queue': 'celery', 'priority': 9}
+        'schedule': crontab(minute='*/15'),  # Every 15 minutes (was 5 minutes)
+        'options': {'queue': 'celery', 'priority': 7}
     },
     
     # Legacy tasks (if they exist)

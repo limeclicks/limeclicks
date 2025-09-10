@@ -398,8 +398,8 @@ def add_keywords(request):
     total_created = 0
     created_keywords = []
     
-    # Import the task
-    from .tasks import fetch_keyword_serp_html
+    # Import the immediate queue task for new keywords
+    from .tasks import queue_new_keyword_immediately
     
     # Create keywords for each country
     for keyword_text in keywords_list:
@@ -422,8 +422,8 @@ def add_keywords(request):
                 keyword.schedule_next_crawl()
                 keyword.save()
                 
-                # Trigger immediate rank check
-                fetch_keyword_serp_html.delay(keyword.id)
+                # Trigger immediate HIGH PRIORITY rank check for new keywords
+                queue_new_keyword_immediately.delay(keyword.id)
                 
                 if keyword_text not in added:
                     added.append(keyword_text)

@@ -79,6 +79,11 @@ class Keyword(models.Model):
     processing = models.BooleanField(default=False, db_index=True)
     archive = models.BooleanField(default=False, db_index=True)
     
+    # Daily scheduling tracking fields
+    last_queue_date = models.DateField(null=True, blank=True, db_index=True, help_text='Last date keyword was queued for daily processing')
+    daily_queue_task_id = models.CharField(max_length=100, blank=True, null=True, help_text='Celery task ID for daily queue tracking')
+    expected_crawl_time = models.DateTimeField(null=True, blank=True, db_index=True, help_text='When this keyword is expected to be crawled')
+    
     # Timestamps
     created_at = models.DateTimeField(default=timezone.now, db_index=True)
     updated_at = models.DateTimeField(auto_now=True)

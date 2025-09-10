@@ -580,6 +580,284 @@ def enqueue_keyword_scrapes_batch():
         connection.close()
 
 
+# ===================================================================
+# DAILY KEYWORD SCHEDULING SYSTEM - BULLETPROOF GUARANTEE SYSTEM
+# ===================================================================
+
+@shared_task
+def daily_queue_all_keywords():
+    """
+    DAILY BULK SCHEDULER - Queue ALL keywords at start of day (12:01 AM)
+    
+    GUARANTEE MECHANISMS:
+    1. Tracks every keyword queued in database
+    2. Spreads execution evenly across 24 hours
+    3. Logs everything for verification
+    4. Returns detailed statistics
+    """
+    import random
+    from django.db import transaction
+    from datetime import datetime, timedelta
+    
+    stats = {
+        'total_keywords': 0,
+        'queued_count': 0,
+        'skipped_count': 0,
+        'error_count': 0,
+        'queue_date': timezone.now().date(),
+        'errors': []
+    }
+    
+    try:
+        logger.info("[DAILY QUEUE] Starting daily keyword scheduling...")
+        
+        # Get all active keywords
+        keywords = Keyword.objects.filter(
+            archive=False, 
+            project__active=True
+        ).select_related('project')
+        
+        stats['total_keywords'] = keywords.count()
+        logger.info(f"[DAILY QUEUE] Found {stats['total_keywords']} active keywords to queue")
+        
+        if stats['total_keywords'] == 0:
+            logger.warning("[DAILY QUEUE] No active keywords found!")
+            return stats
+        
+        # Create queue tracking entries and queue tasks
+        for keyword in keywords.iterator():
+            try:
+                # Calculate random delay to spread across 24 hours (0-86400 seconds)
+                delay_seconds = random.randint(60, 86340)  # Start after 1 minute, end before midnight
+                
+                # Queue the task with delay
+                result = fetch_keyword_serp_html.apply_async(
+                    args=[keyword.id],
+                    priority=5,  # Standard daily priority
+                    countdown=delay_seconds
+                )
+                
+                # Track this queue operation
+                with transaction.atomic():
+                    # Update keyword with queue tracking info
+                    keyword.last_queue_date = timezone.now().date()
+                    keyword.daily_queue_task_id = str(result.id)
+                    keyword.expected_crawl_time = timezone.now() + timedelta(seconds=delay_seconds)
+                    keyword.save(update_fields=['last_queue_date', 'daily_queue_task_id', 'expected_crawl_time'])
+                
+                stats['queued_count'] += 1
+                
+                if stats['queued_count'] % 100 == 0:
+                    logger.info(f"[DAILY QUEUE] Queued {stats['queued_count']}/{stats['total_keywords']} keywords...")
+                    
+            except Exception as e:
+                stats['error_count'] += 1
+                stats['errors'].append(f"Keyword {keyword.id}: {str(e)}")
+                logger.error(f"[DAILY QUEUE] Failed to queue keyword {keyword.id}: {e}")
+        
+        logger.info(f"[DAILY QUEUE] COMPLETED: {stats['queued_count']}/{stats['total_keywords']} keywords queued")
+        
+        # Schedule gap detection tasks throughout the day
+        _schedule_gap_detection_tasks()
+        
+        return stats
+        
+    except Exception as e:
+        logger.error(f"[DAILY QUEUE] CRITICAL ERROR: {e}")
+        stats['errors'].append(f"Critical error: {str(e)}")
+        return stats
+
+
+@shared_task  
+def queue_new_keyword_immediately(keyword_id):
+    """
+    IMMEDIATE NEW KEYWORD PROCESSOR - High priority for newly added keywords
+    
+    When users add new keywords, they get immediate high-priority processing
+    """
+    try:
+        keyword = Keyword.objects.get(id=keyword_id)
+        
+        # Queue immediately with high priority
+        result = fetch_keyword_serp_html.apply_async(
+            args=[keyword_id],
+            priority=10,  # HIGH PRIORITY - immediate processing
+            countdown=0
+        )
+        
+        # Track the immediate queue
+        keyword.last_queue_date = timezone.now().date()
+        keyword.daily_queue_task_id = str(result.id)
+        keyword.expected_crawl_time = timezone.now()
+        keyword.save(update_fields=['last_queue_date', 'daily_queue_task_id', 'expected_crawl_time'])
+        
+        logger.info(f"[IMMEDIATE QUEUE] Queued new keyword {keyword_id} with high priority")
+        return {'keyword_id': keyword_id, 'task_id': str(result.id), 'status': 'queued'}
+        
+    except Keyword.DoesNotExist:
+        logger.error(f"[IMMEDIATE QUEUE] Keyword {keyword_id} not found")
+        return {'error': f'Keyword {keyword_id} not found'}
+    except Exception as e:
+        logger.error(f"[IMMEDIATE QUEUE] Failed to queue keyword {keyword_id}: {e}")
+        return {'error': str(e)}
+
+
+@shared_task
+def detect_and_recover_missed_keywords():
+    """
+    GAP DETECTION & RECOVERY - Find keywords that should have been processed but weren't
+    
+    Runs every 2 hours to find and re-queue any missed keywords
+    """
+    from datetime import timedelta
+    
+    stats = {
+        'checked_count': 0,
+        'missed_count': 0,
+        'recovered_count': 0,
+        'errors': []
+    }
+    
+    try:
+        now = timezone.now()
+        today = now.date()
+        
+        # Find keywords that were queued today but haven't been processed yet
+        # and their expected crawl time has passed by more than 1 hour
+        overdue_threshold = now - timedelta(hours=1)
+        
+        missed_keywords = Keyword.objects.filter(
+            archive=False,
+            project__active=True,
+            last_queue_date=today,
+            expected_crawl_time__lt=overdue_threshold,
+            scraped_at__date__lt=today  # Not crawled today
+        ).select_related('project')
+        
+        stats['checked_count'] = Keyword.objects.filter(
+            archive=False, 
+            project__active=True,
+            last_queue_date=today
+        ).count()
+        
+        stats['missed_count'] = missed_keywords.count()
+        
+        if stats['missed_count'] > 0:
+            logger.warning(f"[GAP DETECTION] Found {stats['missed_count']} missed keywords - recovering...")
+            
+            for keyword in missed_keywords.iterator():
+                try:
+                    # Re-queue with high priority for immediate processing
+                    result = fetch_keyword_serp_html.apply_async(
+                        args=[keyword.id],
+                        priority=8,  # High priority for recovery
+                        countdown=0
+                    )
+                    
+                    # Update tracking
+                    keyword.daily_queue_task_id = str(result.id)
+                    keyword.expected_crawl_time = now
+                    keyword.save(update_fields=['daily_queue_task_id', 'expected_crawl_time'])
+                    
+                    stats['recovered_count'] += 1
+                    
+                except Exception as e:
+                    stats['errors'].append(f"Keyword {keyword.id}: {str(e)}")
+            
+            logger.info(f"[GAP DETECTION] Recovered {stats['recovered_count']}/{stats['missed_count']} missed keywords")
+        else:
+            logger.info(f"[GAP DETECTION] All {stats['checked_count']} keywords on track - no recovery needed")
+        
+        return stats
+        
+    except Exception as e:
+        logger.error(f"[GAP DETECTION] Error: {e}")
+        stats['errors'].append(str(e))
+        return stats
+
+
+@shared_task
+def end_of_day_audit():
+    """
+    END-OF-DAY AUDIT - Final verification that every keyword was processed
+    
+    Runs at 11:00 PM to ensure 100% completion rate
+    """
+    stats = {
+        'total_keywords': 0,
+        'processed_today': 0,
+        'completion_rate': 0.0,
+        'missing_keywords': [],
+        'final_recovery_count': 0
+    }
+    
+    try:
+        today = timezone.now().date()
+        
+        # Count all active keywords
+        all_keywords = Keyword.objects.filter(
+            archive=False,
+            project__active=True
+        ).select_related('project')
+        
+        stats['total_keywords'] = all_keywords.count()
+        
+        # Count keywords processed today
+        processed_today = all_keywords.filter(
+            scraped_at__date=today
+        )
+        
+        stats['processed_today'] = processed_today.count()
+        stats['completion_rate'] = (stats['processed_today'] / stats['total_keywords']) * 100 if stats['total_keywords'] > 0 else 0
+        
+        # Find missing keywords
+        missing = all_keywords.exclude(scraped_at__date=today)
+        
+        if missing.exists():
+            logger.warning(f"[END-OF-DAY AUDIT] {missing.count()} keywords not processed today - FINAL RECOVERY")
+            
+            for keyword in missing.iterator():
+                stats['missing_keywords'].append({
+                    'id': keyword.id,
+                    'keyword': keyword.keyword,
+                    'project': keyword.project.domain,
+                    'last_scraped': keyword.scraped_at.isoformat() if keyword.scraped_at else 'Never'
+                })
+                
+                # FINAL RECOVERY - Queue with highest priority
+                try:
+                    result = fetch_keyword_serp_html.apply_async(
+                        args=[keyword.id],
+                        priority=10,  # HIGHEST PRIORITY
+                        countdown=0
+                    )
+                    stats['final_recovery_count'] += 1
+                    
+                except Exception as e:
+                    logger.error(f"[END-OF-DAY AUDIT] Failed final recovery for keyword {keyword.id}: {e}")
+        
+        logger.info(f"[END-OF-DAY AUDIT] Completion Rate: {stats['completion_rate']:.1f}% ({stats['processed_today']}/{stats['total_keywords']})")
+        
+        if stats['final_recovery_count'] > 0:
+            logger.warning(f"[END-OF-DAY AUDIT] Final recovery initiated for {stats['final_recovery_count']} keywords")
+        
+        return stats
+        
+    except Exception as e:
+        logger.error(f"[END-OF-DAY AUDIT] Error: {e}")
+        return {'error': str(e)}
+
+
+def _schedule_gap_detection_tasks():
+    """Helper function to schedule gap detection tasks throughout the day"""
+    # Schedule gap detection every 2 hours starting from 2 AM
+    for hour in [2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22]:
+        detect_and_recover_missed_keywords.apply_async(
+            countdown=(hour * 3600) - (timezone.now().hour * 3600) - (timezone.now().minute * 60),
+            priority=8
+        )
+
+
 @shared_task
 def cleanup_stuck_keywords():
     """
