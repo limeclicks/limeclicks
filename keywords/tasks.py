@@ -743,9 +743,12 @@ def user_recheck_keyword_rank(keyword_id, user_id=None):
 @shared_task
 def detect_and_recover_missed_keywords():
     """
-    GAP DETECTION & RECOVERY - Find keywords that should have been processed but weren't
+    GAP DETECTION & STUCK KEYWORD RECOVERY - Find and fix processing issues
     
-    Runs every 2 hours to find and re-queue any missed keywords
+    Runs every 6 hours to:
+    1. Find keywords that should have been processed but weren't
+    2. Auto-fix stuck keywords that are blocking processing
+    3. Recover any missed daily queue entries
     """
     from datetime import timedelta
     
@@ -761,9 +764,9 @@ def detect_and_recover_missed_keywords():
         today = now.date()
         
         # Find keywords that were queued today but haven't been processed yet
-        # Since we queue immediately, give 2 hours grace period for processing
-        overdue_threshold = now - timedelta(hours=2)
+        # Focus on keywords that are genuinely stuck or missed
         
+        # 1. Find keywords queued today but not processed
         missed_keywords = Keyword.objects.filter(
             archive=False,
             project__active=True,
@@ -771,19 +774,38 @@ def detect_and_recover_missed_keywords():
             scraped_at__date__lt=today  # Not crawled today
         ).select_related('project')
         
+        # 2. Also find keywords stuck in processing for >6 hours
+        stuck_threshold = now - timedelta(hours=6)
+        stuck_keywords = Keyword.objects.filter(
+            archive=False,
+            project__active=True,
+            processing=True,
+            updated_at__lt=stuck_threshold
+        ).select_related('project')
+        
+        # Combine missed and stuck keywords
+        all_problem_keywords = missed_keywords.union(stuck_keywords)
+        
         stats['checked_count'] = Keyword.objects.filter(
             archive=False, 
             project__active=True,
             last_queue_date=today
         ).count()
         
-        stats['missed_count'] = missed_keywords.count()
+        stats['missed_count'] = all_problem_keywords.count()
         
         if stats['missed_count'] > 0:
-            logger.warning(f"[GAP DETECTION] Found {stats['missed_count']} missed keywords - recovering...")
+            logger.warning(f"[GAP DETECTION] Found {stats['missed_count']} problem keywords (missed/stuck) - recovering...")
             
-            for keyword in missed_keywords.iterator():
+            for keyword in all_problem_keywords.iterator():
                 try:
+                    # First, reset processing flag if stuck
+                    if keyword.processing:
+                        keyword.processing = False
+                        keyword.last_error_message = "Auto-reset: stuck >6hrs"
+                        keyword.save(update_fields=['processing', 'last_error_message'])
+                        logger.info(f"[GAP DETECTION] Reset stuck processing flag for keyword {keyword.id}")
+                    
                     # Re-queue with high priority for immediate processing
                     result = fetch_keyword_serp_html.apply_async(
                         args=[keyword.id],
@@ -801,9 +823,9 @@ def detect_and_recover_missed_keywords():
                 except Exception as e:
                     stats['errors'].append(f"Keyword {keyword.id}: {str(e)}")
             
-            logger.info(f"[GAP DETECTION] Recovered {stats['recovered_count']}/{stats['missed_count']} missed keywords")
+            logger.info(f"[GAP DETECTION] Recovered {stats['recovered_count']}/{stats['missed_count']} problem keywords")
         else:
-            logger.info(f"[GAP DETECTION] All {stats['checked_count']} keywords on track - no recovery needed")
+            logger.info(f"[GAP DETECTION] All {stats['checked_count']} keywords healthy - no recovery needed")
         
         return stats
         

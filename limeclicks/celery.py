@@ -78,10 +78,10 @@ app.conf.beat_schedule = {
         'options': {'queue': 'celery', 'priority': 10}
     },
     
-    # 2. GAP DETECTION & RECOVERY - Every 2 hours throughout the day
+    # 2. GAP DETECTION & RECOVERY - Every 6 hours (focus on stuck keywords)
     'detect-missed-keywords': {
         'task': 'keywords.tasks.detect_and_recover_missed_keywords',
-        'schedule': crontab(minute=0, hour='*/2'),  # Every 2 hours at :00
+        'schedule': crontab(minute=0, hour='*/6'),  # Every 6 hours at :00 (6 AM, 12 PM, 6 PM, 12 AM)
         'options': {'queue': 'celery', 'priority': 8}
     },
     
@@ -96,10 +96,10 @@ app.conf.beat_schedule = {
     # LEGACY CLEANUP TASKS - REDUCED FREQUENCY
     # ===================================================================
     
-    # Cleanup stuck keywords - Now every 2 hours (was 10 minutes)
+    # Cleanup stuck keywords - Every 6 hours (aligned with gap detection)
     'cleanup-stuck-keywords': {
         'task': 'keywords.tasks.cleanup_stuck_keywords',
-        'schedule': crontab(minute=30, hour='*/2'),  # Every 2 hours at :30 (offset from gap detection)
+        'schedule': crontab(minute=30, hour='*/6'),  # Every 6 hours at :30 (offset from gap detection)
         'options': {'queue': 'celery', 'priority': 7}
     },
     
