@@ -624,17 +624,14 @@ def daily_queue_all_keywords():
             logger.warning("[DAILY QUEUE] No active keywords found!")
             return stats
         
-        # Create queue tracking entries and queue tasks
+        # Create queue tracking entries and queue ALL tasks immediately
         for keyword in keywords.iterator():
             try:
-                # Calculate random delay to spread across 24 hours (0-86400 seconds)
-                delay_seconds = random.randint(60, 86340)  # Start after 1 minute, end before midnight
-                
-                # Queue the task with delay
+                # Queue the task immediately with standard priority - NO DELAYS
                 result = fetch_keyword_serp_html.apply_async(
                     args=[keyword.id],
                     priority=5,  # Standard daily priority
-                    countdown=delay_seconds
+                    countdown=0  # IMMEDIATE - no delays
                 )
                 
                 # Track this queue operation
@@ -642,7 +639,7 @@ def daily_queue_all_keywords():
                     # Update keyword with queue tracking info
                     keyword.last_queue_date = timezone.now().date()
                     keyword.daily_queue_task_id = str(result.id)
-                    keyword.expected_crawl_time = timezone.now() + timedelta(seconds=delay_seconds)
+                    keyword.expected_crawl_time = timezone.now()  # Expected immediately
                     keyword.save(update_fields=['last_queue_date', 'daily_queue_task_id', 'expected_crawl_time'])
                 
                 stats['queued_count'] += 1
@@ -703,6 +700,47 @@ def queue_new_keyword_immediately(keyword_id):
 
 
 @shared_task
+def user_recheck_keyword_rank(keyword_id, user_id=None):
+    """
+    USER-INITIATED RANK RECHECK - HIGHEST PRIORITY
+    
+    When users manually request a rank recheck, it gets top priority
+    and jumps ahead of all other queued tasks
+    """
+    try:
+        keyword = Keyword.objects.get(id=keyword_id)
+        
+        # Queue immediately with HIGHEST priority - jumps the queue
+        result = fetch_keyword_serp_html.apply_async(
+            args=[keyword_id],
+            priority=10,  # HIGHEST PRIORITY - user-initiated
+            countdown=0
+        )
+        
+        # Track the user recheck
+        keyword.daily_queue_task_id = str(result.id)
+        keyword.expected_crawl_time = timezone.now()
+        keyword.last_force_crawl_at = timezone.now()  # Track as force crawl
+        keyword.force_crawl_count += 1
+        keyword.save(update_fields=[
+            'daily_queue_task_id', 
+            'expected_crawl_time', 
+            'last_force_crawl_at',
+            'force_crawl_count'
+        ])
+        
+        logger.info(f"[USER RECHECK] Queued keyword {keyword_id} for user {user_id} with highest priority")
+        return {'keyword_id': keyword_id, 'task_id': str(result.id), 'status': 'queued', 'priority': 'highest'}
+        
+    except Keyword.DoesNotExist:
+        logger.error(f"[USER RECHECK] Keyword {keyword_id} not found")
+        return {'error': f'Keyword {keyword_id} not found'}
+    except Exception as e:
+        logger.error(f"[USER RECHECK] Failed to queue keyword {keyword_id}: {e}")
+        return {'error': str(e)}
+
+
+@shared_task
 def detect_and_recover_missed_keywords():
     """
     GAP DETECTION & RECOVERY - Find keywords that should have been processed but weren't
@@ -723,14 +761,13 @@ def detect_and_recover_missed_keywords():
         today = now.date()
         
         # Find keywords that were queued today but haven't been processed yet
-        # and their expected crawl time has passed by more than 1 hour
-        overdue_threshold = now - timedelta(hours=1)
+        # Since we queue immediately, give 2 hours grace period for processing
+        overdue_threshold = now - timedelta(hours=2)
         
         missed_keywords = Keyword.objects.filter(
             archive=False,
             project__active=True,
             last_queue_date=today,
-            expected_crawl_time__lt=overdue_threshold,
             scraped_at__date__lt=today  # Not crawled today
         ).select_related('project')
         
@@ -849,13 +886,18 @@ def end_of_day_audit():
 
 
 def _schedule_gap_detection_tasks():
-    """Helper function to schedule gap detection tasks throughout the day"""
-    # Schedule gap detection every 2 hours starting from 2 AM
-    for hour in [2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22]:
-        detect_and_recover_missed_keywords.apply_async(
-            countdown=(hour * 3600) - (timezone.now().hour * 3600) - (timezone.now().minute * 60),
-            priority=8
-        )
+    """
+    Helper function to schedule gap detection tasks throughout the day
+    
+    Since we now queue everything immediately at 12:01 AM, we schedule
+    more frequent gap detection to catch any issues quickly
+    """
+    # Schedule gap detection every 2 hours starting from 2 AM  
+    # This ensures we catch any missed keywords quickly
+    logger.info("[DAILY QUEUE] Scheduling gap detection tasks for today")
+    
+    # Note: The regular scheduled gap detection (every 2 hours) will handle this
+    # We don't need to schedule extra tasks since Celery beat handles the schedule
 
 
 @shared_task

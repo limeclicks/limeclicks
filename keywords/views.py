@@ -722,23 +722,27 @@ def api_force_crawl(request, keyword_id):
                 data={'minutes_remaining': int(time_until_allowed)}
             )
         
-        # Perform force crawl
-        scheduler = CrawlScheduler()
-        if scheduler.force_crawl_keyword(keyword):
+        # Perform immediate high-priority recheck using new system
+        from .tasks import user_recheck_keyword_rank
+        
+        result = user_recheck_keyword_rank.delay(keyword.id, request.user.id)
+        
+        if result and not result.get('error'):
             return create_ajax_response(
                 success=True,
-                message="Force crawl initiated successfully",
+                message="High-priority rank check initiated - results in 1-2 minutes",
                 data={
                     'keyword_id': keyword.id,
                     'keyword': keyword.keyword,
-                    'crawl_priority': keyword.crawl_priority,
+                    'task_id': result.get('task_id'),
+                    'priority': 'highest',
                     'force_crawl_count': keyword.force_crawl_count + 1
                 }
             )
         else:
             return create_ajax_response(
                 success=False,
-                message="Unable to initiate force crawl. Please try again later."
+                message=result.get('error', 'Unable to initiate rank recheck. Please try again later.')
             )
             
     except Keyword.DoesNotExist:
