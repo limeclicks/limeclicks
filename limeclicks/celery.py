@@ -74,10 +74,10 @@ app.conf.beat_schedule = {
         'options': {'queue': 'celery', 'priority': 10}
     },
     
-    # Auto-recovery and cleanup tasks
+    # Auto-recovery and cleanup tasks - BALANCED SCHEDULE
     'cleanup-stuck-keywords': {
         'task': 'keywords.tasks.cleanup_stuck_keywords',
-        'schedule': crontab(minute='*/15'),  # Run every 15 minutes
+        'schedule': crontab(minute='*/10'),  # Run every 10 minutes - balanced approach
         'options': {'queue': 'celery', 'priority': 9}
     },
     'worker-health-check': {

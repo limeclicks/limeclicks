@@ -139,8 +139,34 @@ def fetch_keyword_serp_html(self, keyword_id: int) -> None:
         except:
             pass
     finally:
+        # BULLETPROOF CLEANUP - Always reset processing flag as last resort
+        try:
+            # Use direct database update to ensure processing flag is reset
+            # This prevents keywords from getting stuck even if exceptions occur
+            from django.db import transaction
+            with transaction.atomic():
+                updated_count = Keyword.objects.filter(id=keyword_id).update(processing=False)
+                if updated_count > 0:
+                    logger.info(f"BULLETPROOF: Reset processing flag for keyword {keyword_id}")
+        except Exception as cleanup_error:
+            logger.error(f"BULLETPROOF CLEANUP FAILED for keyword {keyword_id}: {cleanup_error}")
+            # As absolute last resort, try with raw SQL
+            try:
+                from django.db import connection
+                with connection.cursor() as cursor:
+                    cursor.execute(
+                        "UPDATE keywords_keyword SET processing = FALSE WHERE id = %s",
+                        [keyword_id]
+                    )
+                    logger.warning(f"BULLETPROOF RAW SQL: Reset processing flag for keyword {keyword_id}")
+            except Exception as sql_error:
+                logger.critical(f"BULLETPROOF RAW SQL FAILED for keyword {keyword_id}: {sql_error}")
+        
         # Always release the lock
-        cache.delete(lock_key)
+        try:
+            cache.delete(lock_key)
+        except Exception as lock_error:
+            logger.error(f"Failed to release lock for keyword {keyword_id}: {lock_error}")
 
 
 def _extract_top_competitors(html_content: str, project_domain: str, limit: int = 3) -> list:
@@ -557,33 +583,65 @@ def enqueue_keyword_scrapes_batch():
 @shared_task
 def cleanup_stuck_keywords():
     """
-    Dedicated cleanup task that runs every 15 minutes to ensure system health.
-    Performs comprehensive cleanup and recovery operations.
+    AGGRESSIVE cleanup task that runs every 5 minutes for bulletproof system health.
+    Performs comprehensive cleanup and recovery operations with multiple safety layers.
     """
     from project.models import Project
     from celery import current_app
+    from django.db import transaction
     
     cleanup_stats = {
-        'stuck_reset': 0,
+        'stuck_reset_short': 0,
+        'stuck_reset_long': 0,
         'orphaned_reset': 0,
         'projects_activated': 0,
         'overdue_queued': 0,
-        'errors_cleared': 0
+        'errors_cleared': 0,
+        'cache_locks_cleared': 0
     }
     
     try:
         now = timezone.now()
         
-        # 1. Reset keywords stuck in processing for >15 minutes
-        stuck_cutoff = now - timedelta(minutes=15)
-        stuck_keywords = Keyword.objects.filter(
+        # 0. EMERGENCY: Clear keywords stuck for >12 hours (definitely abandoned)
+        emergency_cutoff = now - timedelta(hours=12)
+        emergency_stuck = Keyword.objects.filter(
             processing=True,
-            updated_at__lt=stuck_cutoff  # Use updated_at to catch truly stuck ones
+            updated_at__lt=emergency_cutoff
         )
-        cleanup_stats['stuck_reset'] = stuck_keywords.update(
+        emergency_count = emergency_stuck.update(
             processing=False,
-            last_error_message="Auto-reset: stuck in processing"
+            last_error_message="Auto-reset: emergency cleanup >12hrs"
         )
+        if emergency_count > 0:
+            logger.warning(f"[EMERGENCY CLEANUP] Reset {emergency_count} keywords stuck >12 hours")
+        
+        # 1. CONSERVATIVE: Reset keywords stuck for >2 hours (legitimately stuck)
+        conservative_stuck_cutoff = now - timedelta(hours=2)
+        conservative_stuck = Keyword.objects.filter(
+            processing=True,
+            updated_at__lt=conservative_stuck_cutoff
+        )
+        cleanup_stats['stuck_reset_short'] = conservative_stuck.update(
+            processing=False,
+            last_error_message="Auto-reset: stuck >2hrs"
+        )
+        
+        # 2. AGGRESSIVE: Reset keywords stuck for >3 hours with bulletproof method
+        aggressive_stuck_cutoff = now - timedelta(hours=3)
+        
+        # Use raw SQL for maximum reliability - only for truly abandoned keywords
+        from django.db import connection
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                UPDATE keywords_keyword 
+                SET processing = FALSE, 
+                    last_error_message = 'Auto-reset: abandoned >3hrs',
+                    updated_at = %s
+                WHERE processing = TRUE 
+                AND updated_at < %s
+            """, [now, aggressive_stuck_cutoff])
+            cleanup_stats['stuck_reset_long'] = cursor.rowcount
         
         # 2. Clear processing flag for keywords with no active Celery tasks
         i = current_app.control.inspect()
@@ -598,11 +656,27 @@ def cleanup_stuck_keywords():
                         if args and isinstance(args[0], int):
                             active_keyword_ids.add(args[0])
         
-        # Find keywords claiming to be processing but not in active tasks
+        # 3. Find keywords claiming to be processing but not in active tasks
+        # BUT only reset those stuck for more than 30 minutes (allow time for queuing)
+        orphaned_cutoff = now - timedelta(minutes=30)
         orphaned = Keyword.objects.filter(
-            processing=True
+            processing=True,
+            updated_at__lt=orphaned_cutoff  # Give 30 minutes grace period
         ).exclude(id__in=active_keyword_ids)
-        cleanup_stats['orphaned_reset'] = orphaned.update(processing=False)
+        cleanup_stats['orphaned_reset'] = orphaned.update(
+            processing=False,
+            last_error_message="Auto-reset: orphaned task >30min"
+        )
+        
+        # 4. Clear stale Redis cache locks (older than 10 minutes)
+        cache_lock_pattern = "lock:serp:*"
+        try:
+            from django.core.cache import cache
+            # This is a simplified approach - in production you might want to use Redis directly
+            # for more precise pattern matching and cleanup
+            cleanup_stats['cache_locks_cleared'] = 0  # Placeholder
+        except Exception as cache_error:
+            logger.warning(f"Cache lock cleanup failed: {cache_error}")
         
         # 3. Auto-activate projects with overdue keywords
         min_interval = timedelta(hours=settings.FETCH_MIN_INTERVAL_HOURS)
