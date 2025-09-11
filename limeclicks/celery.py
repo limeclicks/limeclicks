@@ -57,8 +57,46 @@ app.conf.worker_prefetch_multiplier = 1
 app.conf.task_default_priority = 5
 app.conf.task_inherit_parent_priority = True
 
-# General worker configuration
-app.conf.worker_concurrency = 4  # Total worker concurrency
+# OPTIMIZED WORKER CONFIGURATION FOR 8-CORE SERVER
+# =================================================
+# Server: 8 cores, 29GB RAM, PostgreSQL + Redis on same server
+# Strategy: Maximize keyword processing while protecting database
+
+# Worker pool settings
+app.conf.worker_concurrency = 6  # Optimized for 8-core server (6 workers max)
+app.conf.worker_pool_restarts = True  # Enable pool restarts for memory management
+
+# Connection management (critical for shared database server)
+app.conf.worker_max_tasks_per_child = 100  # Increased from 50 (recycle workers more frequently)
+app.conf.worker_max_memory_per_child = 200000  # 200MB per worker (memory limit)
+
+# Performance optimizations
+app.conf.worker_disable_rate_limits = True  # Remove rate limiting for faster processing
+app.conf.worker_direct = True  # Direct acknowledgment for better performance
+app.conf.worker_hijack_root_logger = False  # Prevent logger conflicts
+
+# Task execution settings
+app.conf.task_time_limit = 180  # Reduced from 300s (3min max per task)
+app.conf.task_soft_time_limit = 150  # Reduced from 240s (2.5min soft limit)
+app.conf.task_always_eager = False  # Ensure async execution
+app.conf.task_eager_propagates = True  # Propagate exceptions in tests
+
+# Queue optimization
+app.conf.task_default_queue = 'serp_default'  # Default to keyword processing queue
+app.conf.task_default_exchange = 'serp'
+app.conf.task_default_exchange_type = 'direct'
+app.conf.task_default_routing_key = 'serp.default'
+
+# Result backend optimization
+app.conf.result_expires = 3600  # 1 hour result retention
+app.conf.result_compression = 'gzip'  # Compress results to save Redis memory
+
+# Database connection optimization
+app.conf.database_engine_options = {
+    'pool_size': 2,  # Limit DB connections per worker
+    'max_overflow': 0,  # No connection overflow
+    'pool_recycle': 3600,  # Recycle connections every hour
+}
 
 # Auto-discover tasks from Django apps
 app.autodiscover_tasks()

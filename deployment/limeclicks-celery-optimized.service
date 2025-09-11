@@ -1,0 +1,81 @@
+[Unit]
+Description=LimeClicks Celery Worker (Optimized for Keyword Processing)
+After=network.target redis.service postgresql.service
+Wants=redis.service postgresql.service
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/home/ubuntu/new-limeclicks
+Environment="PATH=/home/ubuntu/.pyenv/shims:/home/ubuntu/.pyenv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+Environment="PYENV_ROOT=/home/ubuntu/.pyenv"
+Environment="PYENV_VERSION=3.12.2"
+
+# Load environment variables from .env file
+EnvironmentFile=/home/ubuntu/new-limeclicks/.env
+
+# Celery configuration
+Environment="CELERY_BROKER_URL=redis://localhost:6379/0"
+Environment="CELERY_RESULT_BACKEND=redis://localhost:6379/0"
+
+# OPTIMIZED WORKER CONFIGURATION
+# ===============================
+# Designed for 8-core server with shared database
+# Maximizes keyword processing throughput while protecting system resources
+
+ExecStart=/home/ubuntu/.pyenv/shims/celery \
+          -A limeclicks \
+          worker \
+          --loglevel=info \
+          --concurrency=6 \
+          --max-tasks-per-child=100 \
+          --max-memory-per-child=200000 \
+          --time-limit=180 \
+          --soft-time-limit=150 \
+          --pool=prefork \
+          --without-gossip \
+          --without-mingle \
+          --without-heartbeat \
+          --prefetch-multiplier=1 \
+          --queues=serp_high,serp_default,celery \
+          --logfile=/home/ubuntu/new-limeclicks/logs/celery-worker.log
+
+# Restart policy with backoff
+Restart=always
+RestartSec=5
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+# OPTIMIZED RESOURCE LIMITS
+# =========================
+# Calculated for 8-core server with 29GB RAM and shared database
+
+# File descriptor limits (increased for Redis connections)
+LimitNOFILE=8192
+
+# Process limits (6 workers + children processes)
+LimitNPROC=128
+
+# Memory limits (6 workers * 200MB + overhead = ~1.5GB max)
+MemoryLimit=1536M
+MemoryAccounting=yes
+
+# CPU limits (allow burst usage but prevent system overload)
+CPUWeight=100
+CPUAccounting=yes
+
+# I/O limits (balance keyword processing with database operations)
+IOWeight=100
+IOAccounting=yes
+
+# Security enhancements
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/home/ubuntu/new-limeclicks/logs
+ReadWritePaths=/home/ubuntu/new-limeclicks/storage
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
