@@ -169,11 +169,7 @@
             <div class="card-body p-4">
                 <p class="text-base-content/60 text-xs">Last Checked</p>
                 <p class="text-sm font-bold">
-                    {% if keyword.scraped_at %}
-                        {{ keyword.scraped_at|timesince }} ago
-                    {% else %}
-                        Never
-                    {% endif %}
+                    {{ keyword.scraped_at|time_hours_only }}
                 </p>
             </div>
         </div>

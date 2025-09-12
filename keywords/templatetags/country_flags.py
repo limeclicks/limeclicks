@@ -1,4 +1,6 @@
 from django import template
+from django.utils import timezone
+from datetime import timedelta
 
 register = template.Library()
 
@@ -210,3 +212,26 @@ def country_badge(country_code, css_class="badge badge-ghost"):
         'google_domain': google_domain(country_code),
         'css_class': css_class
     }
+
+
+@register.filter
+def time_hours_only(value):
+    """
+    Returns time in hours format (4 hr format instead of "20 hours, 32 minutes ago").
+    
+    Usage in template:
+        {{ keyword.scraped_at|time_hours_only }}
+    """
+    if not value:
+        return "Never"
+    
+    now = timezone.now()
+    diff = now - value
+    
+    # Convert to total hours
+    total_hours = int(diff.total_seconds() / 3600)
+    
+    if total_hours < 1:
+        return "< 1 hr"
+    else:
+        return f"{total_hours} hr"
