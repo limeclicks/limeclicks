@@ -72,11 +72,7 @@
         </span>
     </td>
     <td>
-        {% if keyword.scraped_at %}
-            <span class="text-sm">{{ keyword.scraped_at|timesince }} ago</span>
-        {% else %}
-            <span class="text-sm text-base-content/40">Never</span>
-        {% endif %}
+        <span class="text-sm">{{ keyword.scraped_at|time_hours_only }}</span>
     </td>
     <td class="text-right">
         <div class="dropdown dropdown-end">

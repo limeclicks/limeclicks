@@ -218,6 +218,7 @@ def country_badge(country_code, css_class="badge badge-ghost"):
 def time_hours_only(value):
     """
     Returns time in hours format (4 hr format instead of "20 hours, 32 minutes ago").
+    Shows "< 1 hr" for anything under 1 hour.
     
     Usage in template:
         {{ keyword.scraped_at|time_hours_only }}
