@@ -146,13 +146,15 @@ def project_keywords(request, project_id):
     elif sort_by == 'rank':
         # Sort by rank (NR/0 should come last)
         if sort_order == 'desc':
-            keywords_qs = keywords_qs.extra(
-                select={'rank_null': 'CASE WHEN rank = 0 OR rank > 100 THEN 1 ELSE 0 END'}
-            ).order_by('rank_null', '-rank')
-        else:
+            # For descending: best ranks first (1, 2, 3...), then NR/0 last
             keywords_qs = keywords_qs.extra(
                 select={'rank_null': 'CASE WHEN rank = 0 OR rank > 100 THEN 1 ELSE 0 END'}
             ).order_by('rank_null', 'rank')
+        else:
+            # For ascending: worst ranks first (...98, 99, 100), then NR/0 last
+            keywords_qs = keywords_qs.extra(
+                select={'rank_null': 'CASE WHEN rank = 0 OR rank > 100 THEN 1 ELSE 0 END'}
+            ).order_by('rank_null', '-rank')
     elif sort_by == 'change':
         if sort_order == 'desc':
             keywords_qs = keywords_qs.order_by('-rank_diff_from_last_time')
