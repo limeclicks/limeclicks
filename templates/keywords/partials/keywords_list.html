@@ -1,4 +1,6 @@
 <!-- This partial should only return the table rows, not the full structure -->
+<!-- Hidden element to pass sort state to JavaScript -->
+<tr style="display: none;" data-sort-info="true" data-sort-by="{{ sort_by }}" data-sort-order="{{ sort_order }}"></tr>
 {% for keyword in keywords %}
 <tr class="keyword-row" data-keyword-id="{{ keyword.id }}">
     <td class="w-12">

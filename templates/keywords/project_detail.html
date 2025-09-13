@@ -823,7 +823,7 @@
     
     // Listen for HTMX after swap events to update sort state
     document.body.addEventListener('htmx:afterSwap', function(evt) {
-        if (evt.target.id === 'keywords-table-body') {
+        if (evt.target.id === 'keywords-container') {
             // Look for the hidden sort info element
             const sortInfo = document.querySelector('[data-sort-info="true"]');
             if (sortInfo) {

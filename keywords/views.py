@@ -146,25 +146,39 @@ def project_keywords(request, project_id):
     elif sort_by == 'rank':
         # Sort by rank (NR/0 should come last)
         if sort_order == 'desc':
-            # For descending: best ranks first (1, 2, 3...), then NR/0 last
-            keywords_qs = keywords_qs.extra(
-                select={'rank_null': 'CASE WHEN rank = 0 OR rank > 100 THEN 1 ELSE 0 END'}
-            ).order_by('rank_null', 'rank')
-        else:
-            # For ascending: worst ranks first (...98, 99, 100), then NR/0 last
+            # For descending: worst ranks first (...98, 99, 100), then NR/0 last
             keywords_qs = keywords_qs.extra(
                 select={'rank_null': 'CASE WHEN rank = 0 OR rank > 100 THEN 1 ELSE 0 END'}
             ).order_by('rank_null', '-rank')
+        else:
+            # For ascending: best ranks first (1, 2, 3...), then NR/0 last
+            keywords_qs = keywords_qs.extra(
+                select={'rank_null': 'CASE WHEN rank = 0 OR rank > 100 THEN 1 ELSE 0 END'}
+            ).order_by('rank_null', 'rank')
     elif sort_by == 'change':
+        # Sort by change (handle NULL/None values properly)
         if sort_order == 'desc':
-            keywords_qs = keywords_qs.order_by('-rank_diff_from_last_time')
+            # Descending: biggest improvements first (positive changes), then negative changes
+            keywords_qs = keywords_qs.extra(
+                select={'change_null': 'CASE WHEN rank_diff_from_last_time IS NULL THEN 1 ELSE 0 END'}
+            ).order_by('change_null', '-rank_diff_from_last_time')
         else:
-            keywords_qs = keywords_qs.order_by('rank_diff_from_last_time')
+            # Ascending: biggest declines first (negative changes), then positive changes
+            keywords_qs = keywords_qs.extra(
+                select={'change_null': 'CASE WHEN rank_diff_from_last_time IS NULL THEN 1 ELSE 0 END'}
+            ).order_by('change_null', 'rank_diff_from_last_time')
     elif sort_by == 'last_checked':
+        # Sort by last checked date (handle NULL/None values - never checked items last)
         if sort_order == 'desc':
-            keywords_qs = keywords_qs.order_by('-scraped_at')
+            # Descending: most recent first, never checked last
+            keywords_qs = keywords_qs.extra(
+                select={'scraped_null': 'CASE WHEN scraped_at IS NULL THEN 1 ELSE 0 END'}
+            ).order_by('scraped_null', '-scraped_at')
         else:
-            keywords_qs = keywords_qs.order_by('scraped_at')
+            # Ascending: oldest first, never checked last
+            keywords_qs = keywords_qs.extra(
+                select={'scraped_null': 'CASE WHEN scraped_at IS NULL THEN 1 ELSE 0 END'}
+            ).order_by('scraped_null', 'scraped_at')
     else:
         # Default sort
         keywords_qs = keywords_qs.order_by('-created_at')
