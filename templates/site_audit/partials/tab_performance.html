@@ -740,7 +740,7 @@
                             <div class="flex items-start gap-3">
                                 <i class="fas ${iconClass} mt-1 flex-shrink-0"></i>
                                 <div class="flex-1 pr-4">
-                                    <h4 class="font-medium text-base-content mb-1">${imp.title.replace(/`/g, '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</h4>
+                                    <h4 class="font-medium text-base-content mb-1">${String(imp.title || '').replace(/`/g, '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</h4>
                                     <p class="text-sm text-base-content/70">${description}</p>
                                     ${imp.displayValue ? `
                                     <div class="flex items-center gap-2 mt-2">
@@ -793,7 +793,7 @@
                                             if (typeof value === 'object' && value !== null) {
                                                 // Handle node/element objects
                                                 if (value.type === 'node' || h.valueType === 'node') {
-                                                    const selector = value.selector || value.nodeLabel || value.snippet || '';
+                                                    const selector = String(value.selector || value.nodeLabel || value.snippet || '');
                                                     // Clean up the selector/snippet for display
                                                     const cleanText = selector
                                                         .replace(/<[^>]*>/g, '') // Remove HTML tags
@@ -828,7 +828,7 @@
                                                 }
                                                 // Default object handling - try to extract meaningful text
                                                 else {
-                                                    const text = value.text || value.label || value.value || value.snippet || value.selector || JSON.stringify(value);
+                                                    const text = String(value.text || value.label || value.value || value.snippet || value.selector || JSON.stringify(value) || '');
                                                     return `<td class="text-xs truncate max-w-xs" title="${text.replace(/"/g, '&quot;')}">${text}</td>`;
                                                 }
                                             }
@@ -871,7 +871,7 @@
                                 text = item;
                             } else if (typeof item === 'object' && item !== null) {
                                 // Try to extract meaningful text from object
-                                text = item.text || item.label || item.value || item.snippet || item.selector || JSON.stringify(item);
+                                text = String(item.text || item.label || item.value || item.snippet || item.selector || JSON.stringify(item) || '');
                             } else {
                                 text = String(item);
                             }
