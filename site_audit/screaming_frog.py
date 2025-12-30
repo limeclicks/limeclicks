@@ -89,9 +89,22 @@ class ScreamingFrogCLI:
             # Log the output
             if result.stdout:
                 logger.info(f"Screaming Frog stdout: {result.stdout}")
+
+                # Check for license expiry in stdout
+                if 'Licence expired' in result.stdout or 'License expired' in result.stdout:
+                    error_msg = "Screaming Frog license has expired. Please renew the license."
+                    logger.error(error_msg)
+                    return False, temp_dir, error_msg
+
             if result.stderr:
                 logger.warning(f"Screaming Frog stderr: {result.stderr}")
-            
+
+                # Check for license expiry in stderr
+                if 'Licence expired' in result.stderr or 'License expired' in result.stderr:
+                    error_msg = "Screaming Frog license has expired. Please renew the license."
+                    logger.error(error_msg)
+                    return False, temp_dir, error_msg
+
             # Check if any files were generated
             # Screaming Frog creates a timestamped subdirectory when using --timestamped-output
             output_files = list(Path(temp_dir).glob('*'))
